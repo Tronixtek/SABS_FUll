@@ -1,0 +1,24 @@
+const express = require('express');
+const router = express.Router();
+const {
+  getEmployees,
+  getEmployee,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  forceDeleteEmployee,
+  getEmployeeStats
+} = require('../controllers/employeeController');
+const { protect, checkPermission } = require('../middleware/auth');
+
+router.use(protect);
+
+router.get('/', checkPermission('view_attendance'), getEmployees);
+router.get('/:id', checkPermission('view_attendance'), getEmployee);
+router.get('/:id/stats', checkPermission('view_attendance'), getEmployeeStats);
+router.post('/', checkPermission('manage_employees'), createEmployee);
+router.put('/:id', checkPermission('manage_employees'), updateEmployee);
+router.delete('/:id', checkPermission('manage_employees'), deleteEmployee);
+router.delete('/:id/force', checkPermission('manage_employees'), forceDeleteEmployee);
+
+module.exports = router;
