@@ -1,0 +1,3 @@
+[submodule "java-attendance-service"]
+	path = java-attendance-service
+	url = https://github.com/Tronixtek/Java_backend_attendance.git
