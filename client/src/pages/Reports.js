@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import {
   FileText,
   Download,
@@ -42,6 +40,11 @@ const Reports = () => {
     } catch (error) {
       console.error('Failed to fetch facilities');
     }
+  };
+
+  const handleReportTypeChange = (newType) => {
+    setReportType(newType);
+    setReportData(null); // Clear existing report data
   };
 
   const generateReport = async () => {
@@ -88,18 +91,32 @@ const Reports = () => {
     }
 
     const headers = ['Employee ID', 'Name', 'Department', 'Designation', 'Facility', 'Status', 'Check In', 'Check Out', 'Work Hours', 'Overtime'];
-    const rows = reportData.records.map(record => [
-      record.employee?.employeeId || '',
-      `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim(),
-      record.employee?.department || '',
-      record.employee?.designation || '',
-      record.facility?.name || '',
-      record.status || '',
-      record.checkIn?.time ? format(new Date(record.checkIn.time), 'hh:mm a') : '',
-      record.checkOut?.time ? format(new Date(record.checkOut.time), 'hh:mm a') : '',
-      record.workHours?.toFixed(2) || '0.00',
-      record.overtime?.toFixed(2) || '0.00'
-    ]);
+    const rows = reportData.records.map(record => {
+      const formatTime = (timeValue) => {
+        try {
+          if (!timeValue) return '';
+          const date = new Date(timeValue);
+          if (isNaN(date.getTime())) return '';
+          return format(date, 'hh:mm a');
+        } catch (error) {
+          console.warn('Invalid time in CSV export:', timeValue);
+          return '';
+        }
+      };
+
+      return [
+        record.employee?.employeeId || '',
+        `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim(),
+        record.employee?.department || '',
+        record.employee?.designation || '',
+        record.facility?.name || '',
+        record.status || '',
+        formatTime(record.checkIn?.time),
+        formatTime(record.checkOut?.time),
+        record.workHours?.toFixed(2) || '0.00',
+        record.overtime?.toFixed(2) || '0.00'
+      ];
+    });
 
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -112,131 +129,55 @@ const Reports = () => {
     toast.success('Report exported successfully');
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (!reportData) {
       toast.error('Generate a report first');
       return;
     }
 
     try {
-      const doc = new jsPDF();
+      toast.loading('Generating PDF report...');
       
-      // Add title
-      doc.setFontSize(18);
-      doc.setTextColor(40, 40, 40);
-      doc.text('Attendance Report', 14, 22);
-      
-      // Add report info
-      doc.setFontSize(11);
-      doc.setTextColor(100, 100, 100);
-      let reportTitle = '';
-      if (reportType === 'daily') {
-        reportTitle = `Daily Report - ${format(new Date(reportData.date || new Date()), 'MMM dd, yyyy')}`;
-      } else if (reportType === 'monthly') {
-        reportTitle = `Monthly Report - ${new Date(0, filters.month - 1).toLocaleString('default', { month: 'long' })} ${filters.year}`;
-      } else {
-        reportTitle = `Custom Report - ${filters.startDate} to ${filters.endDate}`;
-      }
-      doc.text(reportTitle, 14, 30);
-      doc.text(`Generated: ${format(new Date(), 'MMM dd, yyyy hh:mm a')}`, 14, 36);
-      
-      // Add statistics
-      doc.setFontSize(12);
-      doc.setTextColor(40, 40, 40);
-      doc.text('Summary Statistics', 14, 46);
-      
-      const statsData = [
-        ['Total Employees', String(reportData.totalEmployees || 0)],
-        ['Present', `${reportData.present || 0} (${reportData.totalEmployees > 0 ? ((reportData.present / reportData.totalEmployees) * 100).toFixed(1) : 0}%)`],
-        ['Late', `${reportData.late || 0} (${reportData.totalEmployees > 0 ? ((reportData.late / reportData.totalEmployees) * 100).toFixed(1) : 0}%)`],
-        ['Absent', `${reportData.absent || 0} (${reportData.totalEmployees > 0 ? ((reportData.absent / reportData.totalEmployees) * 100).toFixed(1) : 0}%)`]
-      ];
-      
-      doc.autoTable({
-        startY: 50,
-        head: [['Metric', 'Value']],
-        body: statsData,
-        theme: 'striped',
-        headStyles: { fillColor: [59, 130, 246] },
-        margin: { left: 14 }
+      // Prepare query parameters for PDF generation
+      const params = new URLSearchParams({
+        type: reportType,
+        ...(reportType === 'daily' && { date: filters.date }),
+        ...(reportType === 'monthly' && { month: filters.month, year: filters.year }),
+        ...(reportType === 'custom' && { startDate: filters.startDate, endDate: filters.endDate }),
+        ...(filters.facility && { facility: filters.facility })
       });
-      
-      // Add attendance records
-      if (reportData.records && reportData.records.length > 0) {
-        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 90;
-        doc.setFontSize(12);
-        doc.text('Attendance Records', 14, finalY + 10);
-        
-        const tableData = reportData.records.map(record => [
-          record.employee?.employeeId || '',
-          `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim(),
-          record.employee?.department || '-',
-          record.facility?.name || '-',
-          record.checkIn?.time ? format(new Date(record.checkIn.time), 'hh:mm a') : '-',
-          record.checkOut?.time ? format(new Date(record.checkOut.time), 'hh:mm a') : '-',
-          record.workHours ? `${record.workHours.toFixed(2)} hrs` : '-',
-          record.status || '-'
-        ]);
-        
-        doc.autoTable({
-          startY: finalY + 14,
-          head: [['ID', 'Name', 'Department', 'Facility', 'Check In', 'Check Out', 'Hours', 'Status']],
-          body: tableData,
-          theme: 'striped',
-          headStyles: { fillColor: [59, 130, 246] },
-          styles: { fontSize: 8 },
-          columnStyles: {
-            0: { cellWidth: 20 },
-            1: { cellWidth: 35 },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 25 },
-            4: { cellWidth: 20 },
-            5: { cellWidth: 20 },
-            6: { cellWidth: 18 },
-            7: { cellWidth: 20 }
-          },
-          margin: { left: 14, right: 14 }
-        });
-      }
-      
-      // Add absent employees if available
-      if (reportData.absentEmployees && reportData.absentEmployees.length > 0) {
-        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 100;
-        
-        // Check if we need a new page
-        if (finalY > 250) {
-          doc.addPage();
-          doc.setFontSize(12);
-          doc.text('Absent Employees', 14, 20);
-        } else {
-          doc.setFontSize(12);
-          doc.text('Absent Employees', 14, finalY + 10);
+
+      // Make request to server-side PDF generation
+      const response = await fetch(`/api/reports/pdf?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}` // Add auth if needed
         }
-        
-        const absentData = reportData.absentEmployees.map(emp => [
-          emp.employeeId || '',
-          `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
-          emp.department || '-'
-        ]);
-        
-        const startY = finalY > 250 ? 24 : finalY + 14;
-        
-        doc.autoTable({
-          startY: startY,
-          head: [['Employee ID', 'Name', 'Department']],
-          body: absentData,
-          theme: 'striped',
-          headStyles: { fillColor: [239, 68, 68] },
-          margin: { left: 14 }
-        });
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
       }
+
+      // Get the PDF blob
+      const blob = await response.blob();
       
-      // Save the PDF
-      doc.save(`report_${reportType}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-      toast.success('Report exported to PDF successfully');
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_${reportType}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.dismiss();
+      toast.success('PDF report downloaded successfully!');
     } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error(`Failed to generate PDF: ${error.message}`);
+      toast.dismiss();
+      toast.error('Failed to generate PDF report');
+      console.error('PDF export error:', error);
     }
   };
 
@@ -272,19 +213,19 @@ const Reports = () => {
       <div className="card">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <button
-            onClick={() => setReportType('daily')}
+            onClick={() => handleReportTypeChange('daily')}
             className={`btn ${reportType === 'daily' ? 'btn-primary' : 'btn-outline'}`}
           >
             Daily Report
           </button>
           <button
-            onClick={() => setReportType('monthly')}
+            onClick={() => handleReportTypeChange('monthly')}
             className={`btn ${reportType === 'monthly' ? 'btn-primary' : 'btn-outline'}`}
           >
             Monthly Report
           </button>
           <button
-            onClick={() => setReportType('custom')}
+            onClick={() => handleReportTypeChange('custom')}
             className={`btn ${reportType === 'custom' ? 'btn-primary' : 'btn-outline'}`}
           >
             Custom Report
@@ -392,7 +333,7 @@ const Reports = () => {
               <div>
                 <p className="text-sm text-blue-600 font-medium">Total Employees</p>
                 <p className="text-3xl font-bold text-blue-700 mt-1">
-                  {reportData.totalEmployees || 0}
+                  {reportData.statistics?.totalEmployees || 0}
                 </p>
               </div>
               <div className="p-3 bg-blue-200 rounded-full">
@@ -406,11 +347,11 @@ const Reports = () => {
               <div>
                 <p className="text-sm text-green-600 font-medium">Present</p>
                 <p className="text-3xl font-bold text-green-700 mt-1">
-                  {reportData.present || 0}
+                  {reportData.statistics?.present || 0}
                 </p>
-                {reportData.totalEmployees > 0 && (
+                {reportData.statistics?.totalEmployees > 0 && (
                   <p className="text-xs text-green-600 mt-1">
-                    {((reportData.present / reportData.totalEmployees) * 100).toFixed(1)}%
+                    {((reportData.statistics.present / reportData.statistics.totalEmployees) * 100).toFixed(1)}%
                   </p>
                 )}
               </div>
@@ -425,11 +366,11 @@ const Reports = () => {
               <div>
                 <p className="text-sm text-yellow-600 font-medium">Late</p>
                 <p className="text-3xl font-bold text-yellow-700 mt-1">
-                  {reportData.late || 0}
+                  {reportData.statistics?.late || 0}
                 </p>
-                {reportData.totalEmployees > 0 && (
+                {reportData.statistics?.totalEmployees > 0 && (
                   <p className="text-xs text-yellow-600 mt-1">
-                    {((reportData.late / reportData.totalEmployees) * 100).toFixed(1)}%
+                    {((reportData.statistics.late / reportData.statistics.totalEmployees) * 100).toFixed(1)}%
                   </p>
                 )}
               </div>
@@ -444,16 +385,56 @@ const Reports = () => {
               <div>
                 <p className="text-sm text-red-600 font-medium">Absent</p>
                 <p className="text-3xl font-bold text-red-700 mt-1">
-                  {reportData.absent || 0}
+                  {reportData.statistics?.absent || 0}
                 </p>
-                {reportData.totalEmployees > 0 && (
+                {reportData.statistics?.totalEmployees > 0 && (
                   <p className="text-xs text-red-600 mt-1">
-                    {((reportData.absent / reportData.totalEmployees) * 100).toFixed(1)}%
+                    {((reportData.statistics.absent / reportData.statistics.totalEmployees) * 100).toFixed(1)}%
                   </p>
                 )}
               </div>
               <div className="p-3 bg-red-200 rounded-full">
                 <XCircle className="w-6 h-6 text-red-700" />
+              </div>
+            </div>
+          </div>
+
+          {/* Add Excused Card */}
+          <div className="card bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-purple-600 font-medium">Excused</p>
+                <p className="text-3xl font-bold text-purple-700 mt-1">
+                  {reportData.statistics?.excused || 0}
+                </p>
+                {reportData.statistics?.totalEmployees > 0 && (
+                  <p className="text-xs text-purple-600 mt-1">
+                    {((reportData.statistics.excused / reportData.statistics.totalEmployees) * 100).toFixed(1)}%
+                  </p>
+                )}
+              </div>
+              <div className="p-3 bg-purple-200 rounded-full">
+                <CheckCircle className="w-6 h-6 text-purple-700" />
+              </div>
+            </div>
+          </div>
+
+          {/* Add Incomplete Card */}
+          <div className="card bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-600 font-medium">Incomplete</p>
+                <p className="text-3xl font-bold text-orange-700 mt-1">
+                  {reportData.statistics?.incomplete || 0}
+                </p>
+                {reportData.statistics?.totalEmployees > 0 && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    {((reportData.statistics.incomplete / reportData.statistics.totalEmployees) * 100).toFixed(1)}%
+                  </p>
+                )}
+              </div>
+              <div className="p-3 bg-orange-200 rounded-full">
+                <Clock className="w-6 h-6 text-orange-700" />
               </div>
             </div>
           </div>
@@ -521,7 +502,16 @@ const Reports = () => {
                         {record.checkIn?.time ? (
                           <div className="flex items-center gap-1 text-sm">
                             <Clock className="w-3 h-3 text-gray-400" />
-                            {format(new Date(record.checkIn.time), 'hh:mm a')}
+                            {(() => {
+                              try {
+                                const date = new Date(record.checkIn.time);
+                                if (isNaN(date.getTime())) return '-';
+                                return format(date, 'hh:mm a');
+                              } catch (error) {
+                                console.warn('Invalid check-in time:', record.checkIn.time);
+                                return '-';
+                              }
+                            })()}
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>
@@ -531,7 +521,16 @@ const Reports = () => {
                         {record.checkOut?.time ? (
                           <div className="flex items-center gap-1 text-sm">
                             <Clock className="w-3 h-3 text-gray-400" />
-                            {format(new Date(record.checkOut.time), 'hh:mm a')}
+                            {(() => {
+                              try {
+                                const date = new Date(record.checkOut.time);
+                                if (isNaN(date.getTime())) return '-';
+                                return format(date, 'hh:mm a');
+                              } catch (error) {
+                                console.warn('Invalid check-out time:', record.checkOut.time);
+                                return '-';
+                              }
+                            })()}
                           </div>
                         ) : (
                           <span className="text-gray-400">-</span>

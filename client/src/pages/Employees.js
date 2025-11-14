@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import EmployeeModal from '../components/EmployeeModal';
+import EmployeeModalWithJavaIntegration from '../components/EmployeeModalWithJavaIntegration';
 
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
@@ -17,13 +17,7 @@ const Employees = () => {
     status: ''
   });
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchFacilities();
-    fetchShifts();
-  }, [filters]);
-
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (filters.search) params.append('search', filters.search);
@@ -37,7 +31,13 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchFacilities();
+    fetchShifts();
+  }, [fetchEmployees]);
 
   const fetchFacilities = async () => {
     try {
@@ -249,13 +249,15 @@ const Employees = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Employees</h1>
-        <button
-          onClick={handleAddEmployee}
-          className="btn btn-primary flex items-center"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Add Employee
-        </button>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleAddEmployee}
+            className="btn btn-primary flex items-center"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Add Employee
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -371,7 +373,7 @@ const Employees = () => {
       </div>
 
       {modalOpen && (
-        <EmployeeModal
+        <EmployeeModalWithJavaIntegration
           employee={selectedEmployee}
           facilities={facilities}
           shifts={shifts}

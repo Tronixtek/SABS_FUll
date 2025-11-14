@@ -1,0 +1,289 @@
+{
+  "info": {
+    "name": "Employee CRUD API - XO5 Device",
+    "description": "Complete CRUD operations for Employee Management with XO5 Biometric Device",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Employee Registration",
+      "item": [
+        {
+          "name": "1. Register New Employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"EMP001\",\n  \"fullName\": \"John Doe\",\n  \"faceImage\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"john.doe@example.com\",\n  \"department\": \"Engineering\",\n  \"position\": \"Software Developer\",\n  \"verificationStyle\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employee/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "register"]
+            }
+          }
+        },
+        {
+          "name": "2. Register Employee with Force Update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"EMP001\",\n  \"fullName\": \"John Doe Updated\",\n  \"faceImage\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"john.doe.updated@example.com\",\n  \"department\": \"Engineering\",\n  \"position\": \"Senior Software Developer\",\n  \"verificationStyle\": 1,\n  \"forceUpdate\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employee/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employee CRUD Operations",
+      "item": [
+        {
+          "name": "1. Get All Employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employee/list?deviceKey={{device_key}}&secret={{device_secret}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "list"],
+              "query": [
+                {
+                  "key": "deviceKey",
+                  "value": "{{device_key}}"
+                },
+                {
+                  "key": "secret",
+                  "value": "{{device_secret}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Get Employee by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employee/EMP001?deviceKey={{device_key}}&secret={{device_secret}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "EMP001"],
+              "query": [
+                {
+                  "key": "deviceKey",
+                  "value": "{{device_key}}"
+                },
+                {
+                  "key": "secret",
+                  "value": "{{device_secret}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Update Employee",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"John Smith\",\n  \"faceImage\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"john.smith@example.com\",\n  \"department\": \"Engineering\",\n  \"position\": \"Lead Developer\",\n  \"verificationStyle\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employee/EMP001?deviceKey={{device_key}}&secret={{device_secret}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "EMP001"],
+              "query": [
+                {
+                  "key": "deviceKey",
+                  "value": "{{device_key}}"
+                },
+                {
+                  "key": "secret",
+                  "value": "{{device_secret}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4. Delete Employee",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employee/EMP001?deviceKey={{device_key}}&secret={{device_secret}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "EMP001"],
+              "query": [
+                {
+                  "key": "deviceKey",
+                  "value": "{{device_key}}"
+                },
+                {
+                  "key": "secret",
+                  "value": "{{device_secret}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test Multiple Employees",
+      "item": [
+        {
+          "name": "Register Employee 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"EMP002\",\n  \"fullName\": \"Jane Smith\",\n  \"faceImage\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"jane.smith@example.com\",\n  \"department\": \"Marketing\",\n  \"position\": \"Marketing Manager\",\n  \"verificationStyle\": 3\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employee/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register Employee 3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"EMP003\",\n  \"fullName\": \"Mike Johnson\",\n  \"faceImage\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"mike.johnson@example.com\",\n  \"department\": \"HR\",\n  \"position\": \"HR Specialist\",\n  \"verificationStyle\": 8\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employee/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Handling Tests",
+      "item": [
+        {
+          "name": "Register Duplicate Employee (Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"EMP001\",\n  \"fullName\": \"John Duplicate\",\n  \"faceImage\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"john.duplicate@example.com\",\n  \"department\": \"Engineering\",\n  \"position\": \"Software Developer\",\n  \"verificationStyle\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employee/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "register"]
+            }
+          }
+        },
+        {
+          "name": "Get Non-Existent Employee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employee/NONEXISTENT?deviceKey={{device_key}}&secret={{device_secret}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "NONEXISTENT"],
+              "query": [
+                {
+                  "key": "deviceKey",
+                  "value": "{{device_key}}"
+                },
+                {
+                  "key": "secret",
+                  "value": "{{device_secret}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Invalid Device Credentials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employee/list?deviceKey=invalid&secret=wrong",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employee", "list"],
+              "query": [
+                {
+                  "key": "deviceKey",
+                  "value": "invalid"
+                },
+                {
+                  "key": "secret",
+                  "value": "wrong"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "device_key",
+      "value": "020e7096a03c670f63"
+    },
+    {
+      "key": "device_secret",
+      "value": "123456"
+    }
+  ]
+}

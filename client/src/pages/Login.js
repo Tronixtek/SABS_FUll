@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Login = () => {
@@ -19,7 +20,7 @@ const Login = () => {
       
       if (result.success) {
         toast.success('Login successful!');
-        navigate('/dashboard');
+        navigate('/app/dashboard');
       } else {
         toast.error(result.message || 'Login failed');
       }
@@ -33,6 +34,15 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
       <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Back to Home link */}
+        <Link 
+          to="/" 
+          className="flex items-center text-gray-600 hover:text-blue-600 mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Home
+        </Link>
+        
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             SABS

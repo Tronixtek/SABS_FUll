@@ -83,14 +83,36 @@ const Analytics = () => {
         axios.get('/api/analytics/overtime', { params })
       ]);
 
-      const dashboardDataRaw = dashboardRes.data.data;
+      const dashboardDataRaw = dashboardRes.data.data || {
+        summary: {
+          totalEmployees: 0,
+          totalFacilities: 0,
+          todayPresent: 0,
+          todayAbsent: 0,
+          todayLate: 0,
+          attendanceRate: 0,
+          punctualityRate: 0,
+          todayWorkHours: 0,
+          todayOnTime: 0
+        },
+        monthAttendance: [],
+        attendanceTrend: [],
+        topLateComers: [],
+        facilityWiseAttendance: []
+      };
       
       // Filter out attendance trends with invalid dates
-      if (dashboardDataRaw.attendanceTrend) {
+      if (dashboardDataRaw.attendanceTrend && Array.isArray(dashboardDataRaw.attendanceTrend)) {
         dashboardDataRaw.attendanceTrend = dashboardDataRaw.attendanceTrend.filter(day => {
           return day && day.date && !isNaN(new Date(day.date).getTime());
         });
       }
+
+      // Ensure all required arrays exist
+      dashboardDataRaw.monthAttendance = dashboardDataRaw.monthAttendance || [];
+      dashboardDataRaw.topLateComers = dashboardDataRaw.frequentLateArrivals || [];
+      dashboardDataRaw.facilityWiseAttendance = dashboardDataRaw.facilityWisePerformance || [];
+      dashboardDataRaw.attendanceTrend = dashboardDataRaw.attendanceTrend || [];
 
       setDashboardData(dashboardDataRaw);
       setPerformanceData(performanceRes.data.data || []);
@@ -104,12 +126,28 @@ const Analytics = () => {
   };
 
   const calculateAttendanceRate = () => {
-    const total = dashboardData.summary.todayPresent + 
-                  dashboardData.summary.todayAbsent + 
-                  dashboardData.summary.todayLate;
+    // Use the backend-calculated attendance rate if available, otherwise calculate manually
+    if (dashboardData?.summary?.attendanceRate !== undefined) {
+      return dashboardData.summary.attendanceRate;
+    }
+    
+    // Fallback to manual calculation
+    const total = dashboardData?.summary?.totalEmployees || 0;
     if (total === 0) return 0;
-    const present = dashboardData.summary.todayPresent + dashboardData.summary.todayLate;
+    const present = dashboardData?.summary?.todayPresent || 0;
     return ((present / total) * 100).toFixed(1);
+  };
+
+  const calculatePunctualityRate = () => {
+    // Use the backend-calculated punctuality rate if available
+    if (dashboardData?.summary?.punctualityRate !== undefined) {
+      return dashboardData.summary.punctualityRate;
+    }
+    
+    // Fallback: Calculate punctuality rate (on-time / total arrivals)
+    const totalArrivals = (dashboardData?.summary?.todayOnTime || 0) + (dashboardData?.summary?.todayLate || 0);
+    if (totalArrivals === 0) return 0;
+    return (((dashboardData?.summary?.todayOnTime || 0) / totalArrivals) * 100).toFixed(1);
   };
 
   const getMonthStats = () => {
@@ -121,13 +159,16 @@ const Analytics = () => {
       totalOvertime: 0
     };
 
-    dashboardData.monthAttendance.forEach(item => {
-      if (item._id === 'present') stats.present = item.count;
-      if (item._id === 'absent') stats.absent = item.count;
-      if (item._id === 'late') stats.late = item.count;
-      stats.totalWorkHours += item.totalWorkHours || 0;
-      stats.totalOvertime += item.totalOvertime || 0;
-    });
+    // Handle undefined or empty monthAttendance data
+    if (dashboardData?.monthAttendance && Array.isArray(dashboardData.monthAttendance)) {
+      dashboardData.monthAttendance.forEach(item => {
+        if (item._id === 'present') stats.present = item.count;
+        if (item._id === 'absent') stats.absent = item.count;
+        if (item._id === 'late') stats.late = item.count;
+        stats.totalWorkHours += item.totalWorkHours || 0;
+        stats.totalOvertime += item.totalOvertime || 0;
+      });
+    }
 
     return stats;
   };
@@ -238,6 +279,8 @@ const Analytics = () => {
 
   const monthStats = getMonthStats();
   const attendanceRate = calculateAttendanceRate();
+  const punctualityRate = calculatePunctualityRate();
+  const todayWorkHours = dashboardData?.summary?.todayWorkHours || 0;
 
   return (
     <div className="space-y-6">
@@ -285,12 +328,12 @@ const Analytics = () => {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-6">
             <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-100 text-sm font-medium">Total Employees</p>
-                  <p className="text-3xl font-bold mt-2">{dashboardData.summary.totalEmployees}</p>
+                  <p className="text-3xl font-bold mt-2">{dashboardData?.summary?.totalEmployees || 0}</p>
                 </div>
                 <Users className="w-12 h-12 text-blue-200" />
               </div>
@@ -300,7 +343,7 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-100 text-sm font-medium">Today Present</p>
-                  <p className="text-3xl font-bold mt-2">{dashboardData.summary.todayPresent}</p>
+                  <p className="text-3xl font-bold mt-2">{dashboardData?.summary?.todayPresent || 0}</p>
                 </div>
                 <CheckCircle className="w-12 h-12 text-green-200" />
               </div>
@@ -310,7 +353,7 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-100 text-sm font-medium">Today Late</p>
-                  <p className="text-3xl font-bold mt-2">{dashboardData.summary.todayLate}</p>
+                  <p className="text-3xl font-bold mt-2">{dashboardData?.summary?.todayLate || 0}</p>
                 </div>
                 <Clock className="w-12 h-12 text-orange-200" />
               </div>
@@ -320,7 +363,7 @@ const Analytics = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-red-100 text-sm font-medium">Today Absent</p>
-                  <p className="text-3xl font-bold mt-2">{dashboardData.summary.todayAbsent}</p>
+                  <p className="text-3xl font-bold mt-2">{dashboardData?.summary?.todayAbsent || 0}</p>
                 </div>
                 <XCircle className="w-12 h-12 text-red-200" />
               </div>
@@ -333,6 +376,26 @@ const Analytics = () => {
                   <p className="text-3xl font-bold mt-2">{attendanceRate}%</p>
                 </div>
                 <Target className="w-12 h-12 text-purple-200" />
+              </div>
+            </div>
+
+            <div className="card bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-indigo-100 text-sm font-medium">Punctuality Rate</p>
+                  <p className="text-3xl font-bold mt-2">{punctualityRate}%</p>
+                </div>
+                <Clock className="w-12 h-12 text-indigo-200" />
+              </div>
+            </div>
+
+            <div className="card bg-gradient-to-br from-cyan-500 to-cyan-600 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-cyan-100 text-sm font-medium">Today Work Hours</p>
+                  <p className="text-3xl font-bold mt-2">{todayWorkHours.toFixed(1)}</p>
+                </div>
+                <Clock className="w-12 h-12 text-cyan-200" />
               </div>
             </div>
           </div>
@@ -414,7 +477,7 @@ const Analytics = () => {
                 Frequent Late Arrivals
               </h2>
               <div className="space-y-3">
-                {dashboardData.topLateComers.map((item, index) => (
+                {(dashboardData?.topLateComers || []).map((item, index) => (
                   <div 
                     key={item.employee._id} 
                     onClick={() => fetchEmployeeDetails(item.employee._id)}
@@ -437,7 +500,7 @@ const Analytics = () => {
                     </div>
                   </div>
                 ))}
-                {dashboardData.topLateComers.length === 0 && (
+                {(dashboardData?.topLateComers || []).length === 0 && (
                   <p className="text-gray-500 text-center py-4">No late arrivals this period! 🎉</p>
                 )}
               </div>
@@ -463,7 +526,7 @@ const Analytics = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {dashboardData.facilityWiseAttendance.map(item => (
+                  {(dashboardData?.facilityWiseAttendance || []).map(item => (
                     <tr 
                       key={item.facility._id}
                       onClick={() => fetchFacilityDetails(item.facility._id)}
@@ -740,7 +803,7 @@ const Analytics = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {employeeModal.data.metrics.recentAttendance.map(record => (
+                          {(employeeModal.data?.metrics?.recentAttendance || []).map(record => (
                             <tr key={record._id}>
                               <td className="font-medium">{formatDate(record.date, 'MMM dd, yyyy')}</td>
                               <td>
@@ -761,7 +824,7 @@ const Analytics = () => {
                               </td>
                             </tr>
                           ))}
-                          {employeeModal.data.metrics.recentAttendance.length === 0 && (
+                          {(employeeModal.data?.metrics?.recentAttendance || []).length === 0 && (
                             <tr>
                               <td colSpan="7" className="text-center text-gray-500 py-4">
                                 No attendance records found for this period
@@ -879,7 +942,7 @@ const Analytics = () => {
                       Top Performers at This Facility
                     </h3>
                     <div className="space-y-3">
-                      {facilityModal.data.topEmployees.map((item, index) => (
+                      {(facilityModal.data?.topEmployees || []).map((item, index) => (
                         <div 
                           key={item.employee._id}
                           onClick={() => {
@@ -910,21 +973,21 @@ const Analytics = () => {
                           </div>
                         </div>
                       ))}
-                      {facilityModal.data.topEmployees.length === 0 && (
+                      {(facilityModal.data?.topEmployees || []).length === 0 && (
                         <p className="text-gray-500 text-center py-4">No employee data available</p>
                       )}
                     </div>
                   </div>
 
                   {/* Attendance Trend */}
-                  {facilityModal.data.analytics.attendanceTrend.length > 0 && (
+                  {(facilityModal.data?.analytics?.attendanceTrend || []).length > 0 && (
                     <div className="card">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-blue-600" />
                         7-Day Attendance Trend
                       </h3>
                       <div className="space-y-2">
-                        {facilityModal.data.analytics.attendanceTrend.map(day => {
+                        {(facilityModal.data?.analytics?.attendanceTrend || []).map(day => {
                           const total = day.present + day.absent + day.late;
                           const presentPercentage = total > 0 ? ((day.present + day.late) / total * 100).toFixed(1) : 0;
                           

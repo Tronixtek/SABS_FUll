@@ -25,8 +25,16 @@ exports.getAttendance = async (req, res) => {
     
     if (startDate || endDate) {
       query.date = {};
-      if (startDate) query.date.$gte = new Date(startDate);
-      if (endDate) query.date.$lte = new Date(endDate);
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        query.date.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.date.$lte = end;
+      }
     }
     
     // Filter by user's accessible facilities
@@ -34,17 +42,106 @@ exports.getAttendance = async (req, res) => {
       query.facility = { $in: req.user.facilities };
     }
     
+    console.log('🔍 Attendance query:', JSON.stringify(query, null, 2));
+    
     const skip = (page - 1) * limit;
     
-    const attendance = await Attendance.find(query)
+    // Get attendance records and group by employee+date to combine check-in/check-out
+    const rawAttendance = await Attendance.find(query)
       .populate('employee', 'employeeId firstName lastName department profileImage')
       .populate('facility', 'name code')
       .populate('shift', 'name code')
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ date: -1, 'checkIn.time': -1 });
+      .sort({ date: -1, timestamp: -1 });
     
-    const total = await Attendance.countDocuments(query);
+    // Group records by employee+date and combine check-in/check-out into single records
+    const attendanceMap = new Map();
+    
+    rawAttendance.forEach(record => {
+      // Skip records without employee data or date
+      if (!record.employee || !record.employee._id || !record.date) {
+        console.warn('⚠️ Skipping attendance record without employee/date data:', record._id);
+        return;
+      }
+      
+      const key = `${record.employee._id}-${record.date.toISOString().split('T')[0]}`;
+      
+      if (!attendanceMap.has(key)) {
+        attendanceMap.set(key, {
+          _id: record._id,
+          employee: record.employee,
+          facility: record.facility,
+          shift: record.shift,
+          date: record.date,
+          scheduledCheckIn: record.scheduledCheckIn,
+          scheduledCheckOut: record.scheduledCheckOut,
+          status: record.status,
+          workHours: 0,
+          overtime: 0,
+          undertime: 0,
+          lateArrival: record.lateArrival || 0,
+          checkIn: {},
+          checkOut: {},
+          breaks: []
+        });
+      }
+      
+      const attendanceItem = attendanceMap.get(key);
+      
+      if (record.type === 'check-in') {
+        attendanceItem.checkIn = {
+          time: record.timestamp,
+          deviceId: record.deviceIP || record.xo5Data?.deviceKey,
+          method: record.xo5Data?.verificationMethod?.[0] || 'face',
+          recordedBy: 'XO5-Device',
+          xo5Data: record.xo5Data
+        };
+        // Update main record status if this check-in is late
+        if (record.status === 'late') {
+          attendanceItem.status = 'late';
+          attendanceItem.lateArrival = record.lateArrival || 0;
+        }
+      } else if (record.type === 'check-out') {
+        attendanceItem.checkOut = {
+          time: record.timestamp,
+          deviceId: record.deviceIP || record.xo5Data?.deviceKey,
+          method: record.xo5Data?.verificationMethod?.[0] || 'face',
+          recordedBy: 'XO5-Device',
+          xo5Data: record.xo5Data
+        };
+        
+        // Don't calculate work hours here - will do it in final pass
+      }
+    });
+    
+    // Final pass: Calculate work hours for all records that have both check-in and check-out
+    for (const [key, attendanceItem] of attendanceMap) {
+      if (attendanceItem.checkIn.time && attendanceItem.checkOut.time) {
+        const workMinutes = moment(attendanceItem.checkOut.time).diff(moment(attendanceItem.checkIn.time), 'minutes');
+        attendanceItem.workHours = Math.max(0, workMinutes / 60);
+        
+        // Calculate overtime/undertime
+        const expectedHours = attendanceItem.shift?.workingHours || 8;
+        if (attendanceItem.workHours > expectedHours) {
+          attendanceItem.overtime = attendanceItem.workHours - expectedHours;
+        } else if (attendanceItem.workHours < expectedHours - 1) { // 1 hour grace
+          attendanceItem.undertime = expectedHours - attendanceItem.workHours;
+        }
+        
+        console.log(`📊 Calculated work hours for ${attendanceItem.employee.firstName}: ${attendanceItem.workHours.toFixed(2)}h (${workMinutes} minutes)`);
+      } else if (!attendanceItem.checkOut.time && attendanceItem.checkIn.time) {
+        // Only checked in, no checkout - mark as incomplete ONLY if not already late/excused
+        if (attendanceItem.status === 'present') {
+          attendanceItem.status = 'incomplete';
+        }
+        // If status is already 'late' or 'excused', preserve it
+      }
+    }
+    
+    // Convert map to array and apply pagination
+    const attendance = Array.from(attendanceMap.values())
+      .slice(skip, skip + parseInt(limit));
+    
+    const total = attendanceMap.size;
     
     res.json({
       success: true,
@@ -57,6 +154,8 @@ exports.getAttendance = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('❌ Error in getAttendance:', error);
+    console.error('Query parameters:', req.query);
     res.status(500).json({
       success: false,
       message: error.message

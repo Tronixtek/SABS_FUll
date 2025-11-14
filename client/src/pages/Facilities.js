@@ -30,7 +30,8 @@ const Facilities = () => {
     timezone: 'Asia/Kolkata',
     configuration: {
       autoSync: true,
-      syncInterval: 5
+      syncInterval: 5,
+      integrationType: 'java-xo5' // Default to Java Smart Device integration
     },
     status: 'active'
   });
@@ -87,7 +88,8 @@ const Facilities = () => {
         timezone: facility.timezone || 'Asia/Kolkata',
         configuration: {
           autoSync: facility.configuration?.autoSync ?? true,
-          syncInterval: facility.configuration?.syncInterval || 5
+          syncInterval: facility.configuration?.syncInterval || 5,
+          integrationType: facility.configuration?.integrationType || 'java-xo5'
         },
         status: facility.status || 'active'
       });
@@ -115,7 +117,8 @@ const Facilities = () => {
         timezone: 'Asia/Kolkata',
         configuration: {
           autoSync: true,
-          syncInterval: 5
+          syncInterval: 5,
+          integrationType: 'java-xo5'
         },
         status: 'active'
       });
@@ -525,6 +528,26 @@ const Facilities = () => {
                   </span>
                 </h3>
                 <div className="space-y-4">
+                  {/* Integration Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Integration Type *
+                    </label>
+                    <select
+                      name="configuration.integrationType"
+                      value={formData.configuration.integrationType}
+                      onChange={handleInputChange}
+                      required
+                      className="input"
+                    >
+                      <option value="java-xo5">Smart Device (Full Management)</option>
+                      <option value="legacy">Standard Device (Basic)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Smart Device: Two-way communication with remote management, configuration, and monitoring<br/>
+                      Standard Device: One-way data collection for basic attendance tracking
+                    </p>
+                  </div>
                   {/* Device ID - Read Only */}
                   {editingFacility?.deviceInfo?.deviceId && (
                     <div>

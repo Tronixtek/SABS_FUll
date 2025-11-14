@@ -63,7 +63,7 @@ const facilitySchema = new mongoose.Schema({
     lastSyncTime: Date,
     syncStatus: {
       type: String,
-      enum: ['success', 'failed', 'pending', 'in-progress'],
+      enum: ['success', 'failed', 'pending', 'in-progress', 'skipped'],
       default: 'pending'
     },
     lastSyncError: String
@@ -80,6 +80,23 @@ const facilitySchema = new mongoose.Schema({
     maxRetries: {
       type: Number,
       default: 3
+    },
+    // Integration type configuration
+    integrationType: {
+      type: String,
+      enum: ['legacy', 'java-xo5'],
+      default: 'legacy'
+    },
+    deviceKey: {
+      type: String,
+      trim: true,
+      // XO5 device key for Java service integration
+    },
+    deviceSecret: {
+      type: String,
+      trim: true,
+      // XO5 device secret for Java service integration
+      default: '123456'
     },
     userApiUrl: {
       type: String,
@@ -99,6 +116,40 @@ const facilitySchema = new mongoose.Schema({
       // URL to delete users FROM device
       // Example: DELETE https://device.com/api/person/{person_uuid}
       // Use {person_uuid} as placeholder for the employee device ID
+    },
+    // Device-agnostic Integration Configuration
+    smartDeviceConfig: {
+      webhookUrl: {
+        type: String,
+        trim: true,
+        // URL where smart device will send attendance data
+        // Example: http://your-server.com:5000/api/device/record
+      },
+      deviceKey: {
+        type: String,
+        trim: true,
+        // Unique identifier for the smart device
+      },
+      enableStrictFiltering: {
+        type: Boolean,
+        default: true,
+        // Only process verified check-in/check-out events
+      },
+      allowedDirections: [{
+        type: String,
+        enum: ['1', '4'], // 1 = check-in, 4 = check-out
+        default: ['1', '4']
+      }],
+      requiredFlags: {
+        resultFlag: {
+          type: String,
+          default: '1' // Only successful access
+        },
+        personType: {
+          type: String,
+          default: '1' // Only registered users
+        }
+      }
     }
   },
   metadata: {

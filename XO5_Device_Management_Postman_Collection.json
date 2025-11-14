@@ -1,0 +1,299 @@
+{
+  "info": {
+    "name": "XO5 Device Management API",
+    "description": "Collection for testing XO5 biometric device management endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Device Methods",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8081/api/device/methods",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "device", "methods"]
+        },
+        "description": "Get all available SDK methods for the device"
+      }
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8081/api/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "health"]
+        },
+        "description": "Check service health"
+      }
+    },
+    {
+      "name": "Service Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8081/api/info",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "info"]
+        },
+        "description": "Get service information"
+      }
+    },
+    {
+      "name": "Device Status (Test Controller)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8081/api/status",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "status"]
+        },
+        "description": "Get device status via test controller"
+      }
+    },
+    {
+      "name": "Test Device Connection",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/test",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "test"]
+        },
+        "description": "Test device connectivity"
+      }
+    },
+    {
+      "name": "Device Information",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/device/info",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "device", "info"]
+        },
+        "description": "Get device information"
+      }
+    },
+    {
+      "name": "Device Status",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/device/status",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "device", "status"]
+        },
+        "description": "Get device status"
+      }
+    },
+    {
+      "name": "Device Details",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/device/details",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "device", "details"]
+        },
+        "description": "Get detailed device information"
+      }
+    },
+    {
+      "name": "Get Device Info (Test Controller)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/get",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "get"]
+        },
+        "description": "Get device information via test controller"
+      }
+    },
+    {
+      "name": "Sync Device Time",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/device/sync-time",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "device", "sync-time"]
+        },
+        "description": "Synchronize device time with server"
+      }
+    },
+    {
+      "name": "Device Configuration",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\",\n  \"config\": {\n    \"setting1\": \"value1\",\n    \"setting2\": \"value2\"\n  }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/device/config",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "device", "config"]
+        },
+        "description": "Configure device settings"
+      }
+    },
+    {
+      "name": "Device Reboot",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/device/reboot",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "device", "reboot"]
+        },
+        "description": "Reboot the device (use with caution)"
+      }
+    },
+    {
+      "name": "Reboot Device (Test Controller)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceKey\": \"{{deviceKey}}\",\n  \"secret\": \"{{secret}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8081/api/reboot",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8081",
+          "path": ["api", "reboot"]
+        },
+        "description": "Reboot device via test controller"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "deviceKey",
+      "value": "your_device_key"
+    },
+    {
+      "key": "secret",
+      "value": "your_device_secret"
+    }
+  ]
+}

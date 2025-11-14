@@ -1,0 +1,469 @@
+{
+	"info": {
+		"_postman_id": "xo5-complete-management",
+		"name": "XO5 Complete Management API",
+		"description": "Complete API collection for XO5 biometric device - Employee Management & Device Management",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/api/health",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "health"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Server Info",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/api/info",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "info"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/api/status?deviceKey=020e7096a03c670f63&secret=123456",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "status"],
+					"query": [
+						{
+							"key": "deviceKey",
+							"value": "020e7096a03c670f63"
+						},
+						{
+							"key": "secret",
+							"value": "123456"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "== DEVICE MANAGEMENT ==",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/api/device/methods",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "device", "methods"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device Info",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/device/info",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "device", "info"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device Status & Health",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/device/status",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "device", "status"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device Configuration",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/device/config",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "device", "config"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reboot Device",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/device/reboot",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "device", "reboot"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device Time Sync",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"deviceKey\": \"020e7096a03c670f63\",\n    \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/device/sync-time",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "device", "sync-time"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device Details",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"deviceKey\": \"020e7096a03c670f63\",\n    \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/device/details",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "device", "details"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "== EMPLOYEE MANAGEMENT ==",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8081/api/employee/list",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "employee", "list"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Employees on Device",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/employee/list",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "employee", "list"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Employee Records from Device",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"pageNum\": 1,\n  \"pageSize\": 100\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/employee/records",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "employee", "records"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Sync Employee to Device",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"employeeId\": \"EMP001\",\n  \"fullName\": \"John Doe\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"faceImage\": null\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/employee/sync",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "employee", "sync"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Sync Employee with Face Image",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"employeeId\": \"EMP002\",\n  \"fullName\": \"Jane Smith\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"faceImage\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD...\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/employee/sync",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "employee", "sync"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Remove Employee from Device",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"employeeId\": \"EmP003\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/employee/remove",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "employee", "remove"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Employee on Device",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"employeeId\": \"EMP001\",\n  \"fullName\": \"John Doe Updated\",\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"faceImage\": null\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/employee/update",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "employee", "update"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Test Device Connection",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/test",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "test"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Device Information",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/get",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "get"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reboot Device",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8081/api/reboot",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8081",
+					"path": ["api", "reboot"]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8081"
+		},
+		{
+			"key": "deviceKey",
+			"value": "020e7096a03c670f63"
+		},
+		{
+			"key": "secret",
+			"value": "123456"
+		}
+	]
+}

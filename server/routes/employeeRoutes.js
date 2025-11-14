@@ -4,6 +4,7 @@ const {
   getEmployees,
   getEmployee,
   createEmployee,
+  registerEmployeeWithDevice,
   updateEmployee,
   deleteEmployee,
   forceDeleteEmployee,
@@ -17,6 +18,7 @@ router.get('/', checkPermission('view_attendance'), getEmployees);
 router.get('/:id', checkPermission('view_attendance'), getEmployee);
 router.get('/:id/stats', checkPermission('view_attendance'), getEmployeeStats);
 router.post('/', checkPermission('manage_employees'), createEmployee);
+router.post('/register', checkPermission('manage_employees'), registerEmployeeWithDevice);
 router.put('/:id', checkPermission('manage_employees'), updateEmployee);
 router.delete('/:id', checkPermission('manage_employees'), deleteEmployee);
 router.delete('/:id/force', checkPermission('manage_employees'), forceDeleteEmployee);

@@ -20,14 +20,14 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
-    { name: 'Dashboard', to: '/dashboard', icon: HomeIcon },
-    { name: 'Employees', to: '/employees', icon: UsersIcon },
-    { name: 'Attendance', to: '/attendance', icon: ClipboardDocumentCheckIcon },
-    { name: 'Facilities', to: '/facilities', icon: BuildingOfficeIcon },
-    { name: 'Shifts', to: '/shifts', icon: ClockIcon },
-    { name: 'Reports', to: '/reports', icon: DocumentTextIcon },
-    { name: 'Analytics', to: '/analytics', icon: ChartBarIcon },
-    { name: 'Settings', to: '/settings', icon: Cog6ToothIcon },
+    { name: 'Dashboard', to: '/app/dashboard', icon: HomeIcon },
+    { name: 'Employees', to: '/app/employees', icon: UsersIcon },
+    { name: 'Attendance', to: '/app/attendance', icon: ClipboardDocumentCheckIcon },
+    { name: 'Facilities', to: '/app/facilities', icon: BuildingOfficeIcon },
+    { name: 'Shifts', to: '/app/shifts', icon: ClockIcon },
+    { name: 'Reports', to: '/app/reports', icon: DocumentTextIcon },
+    { name: 'Analytics', to: '/app/analytics', icon: ChartBarIcon },
+    { name: 'Settings', to: '/app/settings', icon: Cog6ToothIcon },
   ];
 
   return (

@@ -1,0 +1,545 @@
+{
+	"info": {
+		"_postman_id": "e4b2c1d5-8a91-4c92-b3ef-d1e2f3a4b5c6",
+		"name": "XO5 Employee Management API",
+		"description": "Complete API collection for XO5 biometric device employee management with face enrollment",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Device Connection",
+			"item": [
+				{
+					"name": "Test Device Connection",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Device connection successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/test",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"test"
+							]
+						},
+						"description": "Test connection to XO5 device and verify credentials"
+					},
+					"response": []
+				}
+			],
+			"description": "Test device connectivity and credentials"
+		},
+		{
+			"name": "Employee Management",
+			"item": [
+				{
+					"name": "Register Employee to Device",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Employee registration successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.msg).to.include(\"successfully registered\");",
+									"});",
+									"",
+									"pm.test(\"Response contains employee data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data).to.have.property(\"personId\");",
+									"    pm.expect(jsonData.data).to.have.property(\"name\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"personId\": \"EMP001\",\n  \"name\": \"John Doe\",\n  \"faceImages\": [\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==\"],\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"john.doe@company.com\",\n  \"department\": \"Engineering\",\n  \"position\": \"Software Developer\",\n  \"verificationStyle\": 0\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"register"
+							]
+						},
+						"description": "Register employee with face enrollment to the physical XO5 device"
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Employees from Device",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Employee list retrieved successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"});",
+									"",
+									"pm.test(\"Response contains employee list\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data).to.be.an(\"array\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/list",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"list"
+							]
+						},
+						"description": "Retrieve all employees currently stored on the XO5 device"
+					},
+					"response": []
+				},
+				{
+					"name": "Find Specific Employee",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Employee found successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"});",
+									"",
+									"pm.test(\"Response contains employee data\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data).to.have.property(\"personId\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/find/EMP001",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"find",
+								"EMP001"
+							]
+						},
+						"description": "Find a specific employee by their person ID on the device"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Employee (Re-register)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Employee update successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"personId\": \"EMP001\",\n  \"name\": \"John Doe Updated\",\n  \"faceImages\": [\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==\"],\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"john.doe.updated@company.com\",\n  \"department\": \"Senior Engineering\",\n  \"position\": \"Senior Software Developer\",\n  \"verificationStyle\": 0\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"register"
+							]
+						},
+						"description": "Update employee information by re-registering with same person ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Employee from Device",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Employee deletion successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/delete/EMP001",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"delete",
+								"EMP001"
+							]
+						},
+						"description": "Remove an employee from the XO5 device by person ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Clear All Employees (DANGER)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"All employees cleared successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/clear-all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"clear-all"
+							]
+						},
+						"description": "⚠️ DANGER: Remove ALL employees from the device. Use with extreme caution!"
+					},
+					"response": []
+				}
+			],
+			"description": "Employee management operations for XO5 device"
+		},
+		{
+			"name": "Testing Scenarios",
+			"item": [
+				{
+					"name": "Bulk Employee Registration Test",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Bulk registration successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.code).to.eql(\"000\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"personId\": \"TEST{{$randomInt}}\",\n  \"name\": \"Test Employee {{$randomFirstName}} {{$randomLastName}}\",\n  \"faceImages\": [\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==\"],\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\",\n  \"email\": \"{{$randomEmail}}\",\n  \"department\": \"{{$randomDepartment}}\",\n  \"position\": \"{{$randomJobTitle}}\",\n  \"verificationStyle\": 0\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"register"
+							]
+						},
+						"description": "Register random test employees for testing purposes"
+					},
+					"response": []
+				},
+				{
+					"name": "Employee Registration with Invalid Data",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Invalid data handled properly\", function () {",
+									"    pm.response.to.have.status(400);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.false;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"personId\": \"\",\n  \"name\": \"\",\n  \"faceImages\": [],\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"register"
+							]
+						},
+						"description": "Test API validation with invalid employee data"
+					},
+					"response": []
+				},
+				{
+					"name": "Find Non-Existent Employee",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Non-existent employee handled properly\", function () {",
+									"    pm.response.to.have.status(404);",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.be.false;",
+									"    pm.expect(jsonData.msg).to.include(\"not found\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceKey\": \"020e7096a03c670f63\",\n  \"secret\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/employee/find/NONEXISTENT999",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"employee",
+								"find",
+								"NONEXISTENT999"
+							]
+						},
+						"description": "Test finding an employee that doesn't exist on the device"
+					},
+					"response": []
+				}
+			],
+			"description": "Various testing scenarios and edge cases"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set random department for testing",
+					"const departments = [\"Engineering\", \"HR\", \"Finance\", \"Marketing\", \"Operations\", \"IT\", \"Sales\"];",
+					"pm.globals.set(\"randomDepartment\", departments[Math.floor(Math.random() * departments.length)]);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test for all requests",
+					"pm.test(\"Response time is less than 5000ms\", function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"pm.test(\"Response has JSON content\", function () {",
+					"    pm.response.to.have.header(\"Content-Type\");",
+					"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8081",
+			"type": "string",
+			"description": "Java Spring Boot service base URL"
+		},
+		{
+			"key": "deviceKey",
+			"value": "020e7096a03c670f63",
+			"type": "string",
+			"description": "XO5 device authentication key"
+		},
+		{
+			"key": "deviceSecret",
+			"value": "123456",
+			"type": "string",
+			"description": "XO5 device secret"
+		}
+	]
+}

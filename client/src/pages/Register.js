@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Register = () => {
@@ -73,6 +74,15 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white rounded-lg shadow-2xl p-8">
+        {/* Back to Home link */}
+        <Link 
+          to="/" 
+          className="flex items-center text-gray-600 hover:text-blue-600 mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Home
+        </Link>
+        
         <div>
           <h2 className="text-center text-3xl font-extrabold text-gray-900">
             SABS - Create Admin User

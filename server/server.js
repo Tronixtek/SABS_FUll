@@ -17,11 +17,21 @@ const breakRoutes = require('./routes/breakRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const xo5Routes = require('./routes/xo5Routes');
+const integrationRoutes = require('./routes/integrationRoutes');
+const leaveRoutes = require('./routes/leave');
+
+// Models
+const Employee = require('./models/Employee');
+const SyncFailure = require('./models/SyncFailure');
 
 // Import services
 const DataSyncService = require('./services/dataSyncService');
 
 const app = express();
+
+// Trust proxy for rate limiting (handles X-Forwarded-For headers)
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
@@ -38,11 +48,16 @@ app.use('/api/', limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
-}));
+// CORS - Allow network access
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000']
+    : true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+app.use(cors(corsOptions));
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
@@ -76,14 +91,28 @@ app.use('/api/breaks', breakRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/xo5', xo5Routes);
+app.use('/api/integration', integrationRoutes);
+app.use('/api/leave', leaveRoutes);
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    res.json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      services: {
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Error handling middleware
@@ -108,6 +137,12 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+  console.log(`📡 Network Access:`);
+  console.log(`   Local:    http://localhost:${PORT}`);
+  console.log(`   Network:  http://0.0.0.0:${PORT}`);
+  console.log(`   LAN:      http://[your-ip]:${PORT}`);
+  console.log(`🔗 XO5 Webhook: http://[your-ip]:${PORT}/api/xo5/record`);
+  console.log(`💡 To find your IP: ipconfig (Windows) or ifconfig (Mac/Linux)`);
 });
 
 module.exports = app;

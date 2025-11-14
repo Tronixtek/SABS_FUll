@@ -28,6 +28,10 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  faceImageUploaded: {
+    type: Boolean,
+    default: false
+  },
   facility: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Facility',
@@ -50,8 +54,9 @@ const employeeSchema = new mongoose.Schema({
   },
   deviceId: {
     type: String,
-    required: true,
-    trim: true
+    required: false, // Facility's device ID (inherited from facility)
+    trim: true,
+    sparse: true // Allow multiple employees with same device ID (same facility)
   },
   joiningDate: {
     type: Date,
@@ -83,7 +88,12 @@ const employeeSchema = new mongoose.Schema({
   biometricData: {
     fingerprintId: String,
     faceId: String,
-    cardId: String
+    cardId: String,
+    // XO5-specific fields
+    xo5PersonSn: String, // XO5 personSn for mapping
+    xo5PersonName: String, // Name as stored in XO5 device
+    xo5DeviceKey: String, // Device key from XO5
+    lastXO5Sync: Date
   },
   workingDays: [{
     type: String,

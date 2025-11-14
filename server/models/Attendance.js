@@ -6,6 +6,11 @@ const attendanceSchema = new mongoose.Schema({
     ref: 'Employee',
     required: true
   },
+  employeeId: {
+    type: String,
+    required: true,
+    index: true
+  },
   facility: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Facility',
@@ -14,6 +19,37 @@ const attendanceSchema = new mongoose.Schema({
   date: {
     type: Date,
     required: true
+  },
+  type: {
+    type: String,
+    required: true,
+    enum: ['check-in', 'check-out', 'break-start', 'break-end'],
+    index: true
+  },
+  timestamp: {
+    type: Date,
+    required: true,
+    index: true
+  },
+  deviceIP: {
+    type: String,
+    default: '192.168.0.169'
+  },
+  verified: {
+    type: Boolean,
+    default: true
+  },
+  source: {
+    type: String,
+    enum: ['XO5_DEVICE', 'MANUAL', 'MOBILE_APP'],
+    default: 'XO5_DEVICE'
+  },
+  deviceResponse: {
+    type: String
+  },
+  workDuration: {
+    type: Number, // Duration in minutes
+    default: 0
   },
   checkIn: {
     time: Date,
@@ -27,7 +63,16 @@ const attendanceSchema = new mongoose.Schema({
       latitude: Number,
       longitude: Number
     },
-    recordedBy: String
+    recordedBy: String,
+    // XO5-specific data
+    xo5Data: {
+      recordId: String,
+      deviceKey: String,
+      verifyStyle: String,
+      temperature: String,
+      openDoorFlag: String,
+      rawData: mongoose.Schema.Types.Mixed
+    }
   },
   checkOut: {
     time: Date,
@@ -41,7 +86,16 @@ const attendanceSchema = new mongoose.Schema({
       latitude: Number,
       longitude: Number
     },
-    recordedBy: String
+    recordedBy: String,
+    // XO5-specific data
+    xo5Data: {
+      recordId: String,
+      deviceKey: String,
+      verifyStyle: String,
+      temperature: String,
+      openDoorFlag: String,
+      rawData: mongoose.Schema.Types.Mixed
+    }
   },
   shift: {
     type: mongoose.Schema.Types.ObjectId,
@@ -58,7 +112,7 @@ const attendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['present', 'absent', 'late', 'half-day', 'on-leave', 'holiday'],
+    enum: ['present', 'absent', 'late', 'half-day', 'on-leave', 'holiday', 'excused'],
     default: 'present'
   },
   workHours: {
@@ -76,6 +130,30 @@ const attendanceSchema = new mongoose.Schema({
   lateArrival: {
     type: Number, // minutes
     default: 0
+  },
+  // Excuse/Leave Management fields
+  isExcused: {
+    type: Boolean,
+    default: false
+  },
+  excuseReason: {
+    type: String
+  },
+  excuseType: {
+    type: String,
+    enum: [
+      'early-departure',
+      'late-arrival', 
+      'partial-day',
+      'emergency-exit',
+      'flexible-time',
+      'medical-leave',
+      'official-duty'
+    ]
+  },
+  leaveRequest: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'LeaveRequest'
   },
   earlyArrival: {
     type: Number, // minutes - arrived more than 30 minutes before shift start
@@ -156,7 +234,7 @@ const attendanceSchema = new mongoose.Schema({
 });
 
 // Compound indexes for efficient queries
-attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ employee: 1, date: 1, type: 1 }, { unique: true }); // Allow multiple records per employee per date but unique per type
 attendanceSchema.index({ facility: 1, date: 1 });
 attendanceSchema.index({ date: 1, status: 1 });
 attendanceSchema.index({ employee: 1, date: -1 });

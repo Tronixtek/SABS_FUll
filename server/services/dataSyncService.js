@@ -14,6 +14,28 @@ class DataSyncService {
     this.isRunning = false;
   }
 
+  // Helper method to detect offline ngrok endpoints
+  isOfflineEndpoint(url) {
+    if (!url || typeof url !== 'string') return true;
+    
+    // Check for ngrok URLs that are likely to be offline
+    const ngrokPattern = /https?:\/\/[a-f0-9]+\.ngrok-free\.app/i;
+    const isNgrokUrl = ngrokPattern.test(url);
+    
+    // Also check for other common placeholder/test URLs
+    const testUrls = [
+      'test-device.com',
+      'facility1-server.com',
+      'facility2-server.com',
+      'localhost',
+      '127.0.0.1'
+    ];
+    
+    const isTestUrl = testUrls.some(testUrl => url.includes(testUrl));
+    
+    return isNgrokUrl || isTestUrl;
+  }
+
   startSync() {
     syncLogger.info(`🔄 Starting data sync service (Every ${this.syncInterval} minutes)`);
 
@@ -58,6 +80,13 @@ class DataSyncService {
 
   async syncFacility(facility) {
     try {
+      // Skip facilities with offline ngrok URLs or invalid endpoints
+      if (this.isOfflineEndpoint(facility.deviceApiUrl)) {
+        syncLogger.info(`⏭️ Skipping ${facility.name}: Offline ngrok endpoint detected`);
+        await facility.updateSyncStatus('skipped', 'Offline ngrok endpoint - sync disabled to reduce noise');
+        return true; // Return success to avoid error count
+      }
+
       syncLogger.info(`\n🔄 ===== FACILITY SYNC STARTED =====`);
       syncLogger.info(`📍 Facility: ${facility.name}`);
       syncLogger.info(`🕐 Time: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
@@ -69,13 +98,17 @@ class DataSyncService {
 
       // STEP 1: SYNC USERS (NON-BLOCKING)
       if (facility.configuration?.userApiUrl) {
-        syncLogger.info(`👥 Step 1: Syncing users first...`);
-        try {
-          await this.syncDeviceUsers(facility, headers);
-        } catch (userSyncError) {
-          syncLogger.warn(`⚠️ User sync failed, but continuing with attendance sync`);
-          syncLogger.warn(`   Error: ${userSyncError.message}`);
-          syncLogger.warn(`   Attendance sync will continue but may skip records for unknown employees`);
+        if (this.isOfflineEndpoint(facility.configuration.userApiUrl)) {
+          syncLogger.info(`⏭️ Step 1: Skipping user sync (offline endpoint detected)`);
+        } else {
+          syncLogger.info(`👥 Step 1: Syncing users first...`);
+          try {
+            await this.syncDeviceUsers(facility, headers);
+          } catch (userSyncError) {
+            syncLogger.warn(`⚠️ User sync failed, but continuing with attendance sync`);
+            syncLogger.warn(`   Error: ${userSyncError.message}`);
+            syncLogger.warn(`   Attendance sync will continue but may skip records for unknown employees`);
+          }
         }
       } else {
         syncLogger.info(`ℹ️ Step 1: Skipping user sync (no userApiUrl configured)`);
