@@ -79,6 +79,7 @@ exports.getAttendance = async (req, res) => {
           overtime: 0,
           undertime: 0,
           lateArrival: record.lateArrival || 0,
+          lateMinutes: record.lateArrival || 0, // Add for frontend compatibility
           checkIn: {},
           checkOut: {},
           breaks: []
@@ -99,6 +100,7 @@ exports.getAttendance = async (req, res) => {
         if (record.status === 'late') {
           attendanceItem.status = 'late';
           attendanceItem.lateArrival = record.lateArrival || 0;
+          attendanceItem.lateMinutes = record.lateArrival || 0; // Add this for frontend compatibility
         }
       } else if (record.type === 'check-out') {
         attendanceItem.checkOut = {

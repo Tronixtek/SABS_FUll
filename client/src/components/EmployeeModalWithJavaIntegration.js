@@ -112,15 +112,41 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    // Set canvas size to video size
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Set optimal canvas size for XO5 device (higher resolution for better face detection)
+    const targetWidth = 640;  // Optimal resolution for XO5 
+    const targetHeight = 480; // 4:3 aspect ratio standard
+    
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
-    // Draw current video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Draw and scale video frame to optimal size for XO5
+    context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, targetWidth, targetHeight);
 
-    // Convert canvas to data URL (base64)
-    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+    // Apply image enhancement for better face detection
+    const imageData = context.getImageData(0, 0, targetWidth, targetHeight);
+    const data = imageData.data;
+    
+    // Enhance contrast and brightness for better XO5 recognition
+    for (let i = 0; i < data.length; i += 4) {
+      // Slight contrast and brightness boost
+      data[i] = Math.min(255, Math.max(0, data[i] * 1.05 + 5));     // Red
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.05 + 5)); // Green  
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.05 + 5)); // Blue
+    }
+    context.putImageData(imageData, 0, 0);
+
+    // Convert canvas to high-quality data URL for XO5 device
+    // Using high quality (0.95) for better XO5 compatibility 
+    const dataURL = canvas.toDataURL('image/jpeg', 0.95);
+    
+    // Validate image size
+    const imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
+    console.log(`Captured image: ${targetWidth}x${targetHeight}, ${imageSizeKB}KB`);
+    
+    if (imageSizeKB < 30) {
+      toast.error('Image quality too low for device recognition. Please ensure good lighting.');
+      return;
+    }
     setCapturedImage(dataURL);
     stopCamera();
     toast.success('Face photo captured successfully!');
@@ -216,7 +242,17 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         if (errorData.error === 'SERVICE_UNAVAILABLE') {
           toast.error('Device service is unavailable. Please check the service status.');
         } else if (errorData.error === 'TIMEOUT') {
-          toast.error('Device enrollment timed out. Please check device connectivity.');
+          if (errorData.possibleSuccess) {
+            toast.error(
+              `⏱️ Device enrollment timed out!\n\n` +
+              `The employee may have been successfully enrolled on the device.\n` +
+              `Please check the device and try again if needed.\n\n` +
+              `Employee ID: ${errorData.employeeId || 'N/A'}`,
+              { duration: 8000 }
+            );
+          } else {
+            toast.error('Device enrollment timed out. Please check device connectivity.');
+          }
         } else {
           toast.error(`Device enrollment error: ${errorData.deviceError || message}`);
         }

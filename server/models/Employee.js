@@ -78,8 +78,21 @@ const employeeSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'inactive', 'suspended', 'terminated'],
+    enum: ['active', 'inactive', 'suspended', 'terminated', 'deleted'],
     default: 'active'
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  deletionReason: {
+    type: String,
+    enum: ['user_request', 'device_sync', 'admin_cleanup', 'force_delete'],
+    required: false  // Allow undefined instead of null
   },
   profileImage: {
     type: String,
@@ -134,9 +147,26 @@ employeeSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
 
-// Method to get active employees only
+// Method to get active employees only (exclude soft deleted)
 employeeSchema.statics.findActive = function(filter = {}) {
-  return this.find({ ...filter, status: 'active' });
+  return this.find({ ...filter, status: 'active', isDeleted: false });
 };
+
+// Method to soft delete employee
+employeeSchema.methods.softDelete = function(reason = 'user_request') {
+  this.isDeleted = true;
+  this.deletedAt = new Date();
+  this.status = 'deleted';
+  this.deletionReason = reason;
+  return this.save();
+};
+
+// Add query middleware to exclude deleted employees by default
+employeeSchema.pre(['find', 'findOne', 'findOneAndUpdate', 'countDocuments'], function() {
+  // Only add the filter if isDeleted is not already specified
+  if (!this.getQuery().hasOwnProperty('isDeleted')) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+});
 
 module.exports = mongoose.model('Employee', employeeSchema);

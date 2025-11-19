@@ -462,8 +462,8 @@ const Analytics = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-green-600">{item.metrics.attendanceRate}%</p>
-                      <p className="text-xs text-gray-500">{item.metrics.presentDays}/{item.metrics.totalDays} days</p>
+                      <p className="text-lg font-bold text-green-600">{item.metrics.punctualityScore}%</p>
+                      <p className="text-xs text-gray-500">{item.metrics.presentDays - item.metrics.lateCount}/{item.metrics.totalDays} on-time</p>
                     </div>
                   </div>
                 ))}
@@ -815,8 +815,8 @@ const Analytics = () => {
                                   {record.status}
                                 </span>
                               </td>
-                              <td className="text-gray-600">{formatDate(record.checkIn, 'HH:mm')}</td>
-                              <td className="text-gray-600">{formatDate(record.checkOut, 'HH:mm')}</td>
+                              <td className="text-gray-600">{formatDate(record.checkIn?.time, 'HH:mm')}</td>
+                              <td className="text-gray-600">{formatDate(record.checkOut?.time, 'HH:mm')}</td>
                               <td className="font-semibold">{record.workHours?.toFixed(2) || 0} hrs</td>
                               <td className="text-purple-600">{record.overtime?.toFixed(2) || 0} hrs</td>
                               <td className={record.lateMinutes > 0 ? 'text-orange-600 font-semibold' : 'text-gray-400'}>

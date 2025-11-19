@@ -246,10 +246,36 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     console.log(`   Device Key (original): ${facilityDoc.configuration?.deviceKey || facilityDeviceId}`);
     console.log(`   Device Key (lowercase): ${deviceKey}`);
     console.log(`   Verification Style: 0 (any verification method)`);
+    
+    // ✅ OPTIMIZE FACE IMAGE FOR XO5 DEVICE
+    console.log(`🖼️ Optimizing face image for XO5 device...`);
+    
+    let optimizedFaceImage = faceImage;
+    
+    // Remove data URL prefix if present (data:image/jpeg;base64,)
+    if (faceImage.includes('data:image')) {
+      optimizedFaceImage = faceImage.split(',')[1];
+    }
+    
+    // Validate Base64 format
+    if (!optimizedFaceImage || optimizedFaceImage.length < 1000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid face image format or image too small',
+        hint: 'Please ensure the image is properly captured and is at least 640x480 resolution'
+      });
+    }
+    
+    // Log image details for debugging
+    console.log(`   Original image length: ${faceImage.length}`);
+    console.log(`   Optimized image length: ${optimizedFaceImage.length}`);
+    console.log(`   Image starts with: ${optimizedFaceImage.substring(0, 20)}...`);
+    console.log(`   Image ends with: ...${optimizedFaceImage.substring(optimizedFaceImage.length - 10)}`);
+    
     const javaServicePayload = {
       employeeId: personId,
       fullName: `${firstName} ${lastName}`,
-      faceImage: faceImage,
+      faceImage: optimizedFaceImage, // Use cleaned Base64 image
       deviceKey: deviceKey,
       secret: facilityDoc.configuration?.deviceSecret || '123456',
       verificationStyle: 0 // Default: 0 = any verification method
@@ -262,7 +288,7 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/register`,
       javaServicePayload,
       {
-        timeout: 30000, // 30 seconds timeout
+        timeout: 60000, // Increased to 60 seconds for XO5 device operations
         headers: {
           'Content-Type': 'application/json'
         }
@@ -270,14 +296,25 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     );
 
     console.log(`   Device service response: ${javaResponse.status}`);
+    console.log(`   Full Java service response:`, JSON.stringify(javaResponse.data, null, 2));
 
-    if (!javaResponse.data.success) {
-      console.error(`❌ Device enrollment failed: ${javaResponse.data.message}`);
+    // Debug the success property specifically
+    console.log(`   Java response success property: ${javaResponse.data.success}`);
+    console.log(`   Java response code: ${javaResponse.data.code}`);
+    console.log(`   Java response success type: ${typeof javaResponse.data.success}`);
+    
+    // Check success using Java service's actual response format
+    const isJavaServiceSuccess = javaResponse.data.success === true || 
+                                javaResponse.data.code === "000" ||
+                                (javaResponse.data.code && javaResponse.data.code.toString() === "000");
+    
+    if (!isJavaServiceSuccess) {
+      console.error(`❌ Device enrollment failed: ${javaResponse.data.msg || javaResponse.data.message}`);
       
       return res.status(502).json({
         success: false,
         message: 'Device enrollment failed',
-        deviceError: javaResponse.data.message || 'Unknown device error',
+        deviceError: javaResponse.data.msg || javaResponse.data.message || 'Unknown device error',
         step: 'device_enrollment'
       });
     }
@@ -337,7 +374,17 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`❌ Registration error:`, error);
+    console.error(`❌ ===== REGISTRATION ERROR DETAILS =====`);
+    console.error(`Error message: ${error.message}`);
+    console.error(`Error code: ${error.code}`);
+    console.error(`Error stack:`, error.stack);
+    console.error(`Device enrollment success: ${deviceEnrollmentSuccess}`);
+    
+    if (error.response) {
+      console.error(`HTTP response status: ${error.response.status}`);
+      console.error(`HTTP response data:`, error.response.data);
+    }
+    console.error(`❌ ===== END ERROR DETAILS =====`);
 
     // ✅ DEVICE-FIRST ERROR HANDLING - No database cleanup needed!
     // Since we don't save to database until device enrollment succeeds,
@@ -348,20 +395,98 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     }
 
     // Handle different error types
+    if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+      console.log(`⚠️ TIMEOUT: Device operation may have succeeded but response was slow`);
+      console.log(`   Recommendation: Check device to see if employee ${personId} was actually enrolled`);
+      
+      // Try to verify if the employee was actually enrolled despite timeout
+      try {
+        console.log(`🔍 Attempting to verify if employee was enrolled despite timeout...`);
+        
+        // Quick verification call to Java service
+        const verificationResponse = await axios.post(
+          `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/validate`,
+          {
+            employeeId: personId,
+            deviceKey: deviceKey,
+            secret: facilityDoc.configuration?.deviceSecret || '123456'
+          },
+          {
+            timeout: 10000 // Quick 10-second timeout for verification
+          }
+        );
+        
+        if (verificationResponse.data.success && verificationResponse.data.data.exists) {
+          console.log(`✅ TIMEOUT RECOVERY: Employee was successfully enrolled despite timeout!`);
+          console.log(`   Proceeding with database save...`);
+          
+          // Continue with database save since device enrollment actually succeeded
+          const employeeData = {
+            employeeId, firstName, lastName, email, phone, facility,
+            department, designation, shift, joiningDate,
+            dateOfBirth, nationality, nationalId,
+            profileImage,
+            faceImageUploaded: true,
+            status: 'active',
+            deviceId: facilityDeviceId,
+            biometricData: {
+              faceId: personId,
+              xo5PersonSn: personId,
+              xo5PersonName: `${firstName} ${lastName}`,
+              xo5DeviceKey: deviceKey,
+              xo5DeviceId: facilityDeviceId,
+              lastXO5Sync: new Date()
+            }
+          };
+
+          const newEmployee = await Employee.create(employeeData);
+          await newEmployee.populate([
+            { path: 'facility', select: 'name code' },
+            { path: 'shift', select: 'name code startTime endTime' }
+          ]);
+
+          console.log(`✅ TIMEOUT RECOVERY COMPLETED - Employee saved to database after verification`);
+
+          return res.status(201).json({
+            success: true,
+            message: 'Employee registered successfully (recovered from timeout)',
+            data: {
+              employee: newEmployee,
+              deviceEnrollment: {
+                deviceId: facilityDeviceId,
+                personId: personId,
+                status: 'enrolled',
+                facilityName: facilityDoc.name,
+                note: 'Enrollment succeeded despite initial timeout'
+              },
+              steps: {
+                validation: 'completed',
+                deviceEnrollment: 'completed',
+                databaseSave: 'completed'
+              }
+            }
+          });
+        }
+      } catch (verificationError) {
+        console.log(`❌ Verification failed: ${verificationError.message}`);
+      }
+      
+      return res.status(408).json({
+        success: false,
+        message: 'Device enrollment timed out after 60 seconds',
+        error: 'TIMEOUT',
+        step: 'device_enrollment',
+        possibleSuccess: true,
+        recommendedAction: 'Check device to verify if employee was actually enrolled',
+        employeeId: personId
+      });
+    }
+    
     if (error.code === 'ECONNREFUSED') {
       return res.status(503).json({
         success: false,
         message: 'Device service is unavailable',
         error: 'SERVICE_UNAVAILABLE',
-        step: 'device_enrollment'
-      });
-    }
-
-    if (error.code === 'ETIMEDOUT') {
-      return res.status(408).json({
-        success: false,
-        message: 'Device enrollment timed out',
-        error: 'TIMEOUT',
         step: 'device_enrollment'
       });
     }
@@ -429,7 +554,7 @@ exports.updateEmployee = async (req, res) => {
   }
 };
 
-// @desc    Delete employee (device-first approach)
+// @desc    Delete employee with validation-first approach
 // @route   DELETE /api/employees/:id
 // @access  Private
 exports.deleteEmployee = async (req, res) => {
@@ -446,143 +571,152 @@ exports.deleteEmployee = async (req, res) => {
       });
     }
 
+    console.log(`\n� ===== VALIDATION-FIRST DELETE STARTED =====`);
+    console.log(`   Employee: ${employee.firstName} ${employee.lastName}`);
+    console.log(`   Employee ID: ${employee.employeeId}`);
+    console.log(`   Device ID: ${employee.deviceId}`);
+    console.log(`   Facility: ${employee.facility?.name || 'Unknown'}`);
+
     const facility = employee.facility;
-    
-    // ✅ STEP 1: DELETE FROM DEVICE FIRST
+
+    // ✅ STEP 1: VALIDATE DEVICE CONFIGURATION & EMPLOYEE EXISTS ON DEVICE
     if (facility?.configuration?.deleteUserApiUrl && employee.deviceId) {
+      console.log(`\n🔍 Step 1: Device validation configured`);
+      console.log(`   Delete URL: ${facility.configuration.deleteUserApiUrl}`);
+
       try {
-        console.log(`\n🗑️ ===== DEVICE DELETE STARTED =====`);
-        console.log(`   Employee: ${employee.firstName} ${employee.lastName}`);
-        console.log(`   Device ID (personUUID): ${employee.deviceId}`);
-        console.log(`   Facility: ${facility.name}`);
+        // ✅ STEP 2: VALIDATE EMPLOYEE EXISTS ON DEVICE VIA JAVA SERVICE
+        console.log(`\n🔍 Step 2: Validating employee exists on device via Java service...`);
         
-        // Use configured delete URL template
-        let deviceDeleteUrl = facility.configuration.deleteUserApiUrl;
+        const javaServiceClient = require('../services/javaServiceClient');
         
-        // Replace placeholders with actual device ID
-        deviceDeleteUrl = deviceDeleteUrl.replace('{person_uuid}', employee.deviceId);
-        deviceDeleteUrl = deviceDeleteUrl.replace('{personUUID}', employee.deviceId);
-        deviceDeleteUrl = deviceDeleteUrl.replace('{uuid}', employee.deviceId);
-        deviceDeleteUrl = deviceDeleteUrl.replace('{id}', employee.deviceId);
-        
-        console.log(`   Delete URL: ${deviceDeleteUrl}`);
-        
-        const headers = {
-          'Content-Type': 'application/json',
+        if (!javaServiceClient.isEnabled()) {
+          console.log(`⚠️ Java service integration is disabled - skipping validation`);
+          // Fall back to direct device deletion without validation
+          return await performDirectDeviceDelete(req, res, employee, facility);
+        }
+
+        // Use Java service for validation and deletion
+        const validationPayload = {
+          employeeId: employee.deviceId || employee.employeeId,
+          deviceKey: facility.configuration.deviceKey,
+          secret: facility.configuration.secret
         };
-        
-        if (facility.deviceApiKey) {
-          headers['Authorization'] = `Bearer ${facility.deviceApiKey}`;
-          console.log(`   Using API Key: ${facility.deviceApiKey.substring(0, 10)}...`);
-        }
 
-        console.log(`   Sending DELETE request to device...`);
+        console.log(`   Sending validation request to Java service...`);
+        const validationResponse = await javaServiceClient.client.post('/api/employee/delete', validationPayload);
 
-        // Send DELETE request to device
-        const deviceResponse = await axios.delete(deviceDeleteUrl, {
-          headers: headers,
-          timeout: 15000, // 15 seconds timeout
-          validateStatus: (status) => {
-            // Accept 2xx and 404 (already deleted)
-            return (status >= 200 && status < 300) || status === 404;
+        console.log(`   Java service response:`, validationResponse.data);
+
+        if (!validationResponse.data.success) {
+          // Handle specific error cases
+          if (validationResponse.data.errorCode === '1003') {
+            console.log(`❌ Employee not found on device - cannot proceed with deletion`);
+            return res.status(400).json({
+              success: false,
+              message: 'Employee not found on biometric device. Cannot proceed with validation-first deletion.',
+              error: 'EMPLOYEE_NOT_ON_DEVICE',
+              details: {
+                employeeId: employee.employeeId,
+                deviceChecked: true,
+                canForceDelete: true,
+                suggestion: 'Use force delete if you want to remove from database only'
+              },
+              requiresConfirmation: true
+            });
+          } else {
+            // Other validation/device error
+            console.log(`❌ Device validation failed: ${validationResponse.data.message}`);
+            return res.status(503).json({
+              success: false,
+              message: `Device operation failed: ${validationResponse.data.message}`,
+              error: 'DEVICE_OPERATION_FAILED',
+              details: validationResponse.data,
+              requiresConfirmation: true
+            });
           }
-        });
-
-        console.log(`   Device response status: ${deviceResponse.status}`);
-        console.log(`   Device response data: ${JSON.stringify(deviceResponse.data)}`);
-
-        // Check if device deletion was successful
-        if (deviceResponse.status === 404) {
-          console.log(`ℹ️ Person not found on device (may have been deleted already)`);
-        } else if (deviceResponse.status === 200 || deviceResponse.status === 204) {
-          console.log(`✅ Employee deleted from device successfully`);
-        } else if (deviceResponse.data?.result === 'success' || deviceResponse.data?.code === 0) {
-          console.log(`✅ Employee deleted from device successfully`);
-        } else {
-          console.warn(`⚠️ Device returned status ${deviceResponse.status}, proceeding with caution`);
         }
+
+        // ✅ STEP 3: EMPLOYEE EXISTS AND WAS DELETED FROM DEVICE SUCCESSFULLY
+        console.log(`✅ Employee validated and deleted from device successfully`);
 
       } catch (deviceError) {
-        console.error(`❌ Device deletion failed: ${deviceError.message}`);
+        console.error(`❌ Device validation/deletion failed:`, deviceError.message);
         
-        // Handle different types of device errors
+        // Handle Java service connectivity issues
         if (deviceError.code === 'ECONNABORTED' || deviceError.code === 'ETIMEDOUT') {
-          console.error(`   Error: Device request timed out`);
           return res.status(503).json({ 
             success: false,
-            message: 'Device request timed out. Device may be offline.',
-            error: 'DEVICE_TIMEOUT',
+            message: 'Java service request timed out. Service may be offline.',
+            error: 'JAVA_SERVICE_TIMEOUT',
             employeeId: id,
             requiresConfirmation: true,
           });
         }
         
         if (deviceError.code === 'ECONNREFUSED' || deviceError.code === 'ENOTFOUND') {
-          console.error(`   Error: Cannot connect to device`);
           return res.status(503).json({ 
             success: false,
-            message: 'Cannot connect to device. Device is unreachable.',
-            error: 'DEVICE_UNREACHABLE',
+            message: 'Cannot connect to Java service. Service is unreachable.',
+            error: 'JAVA_SERVICE_UNREACHABLE',
             employeeId: id,
             requiresConfirmation: true,
           });
         }
 
+        // Java service error response
         if (deviceError.response) {
-          console.error(`   Device responded with error: ${deviceError.response.status}`);
-          console.error(`   Error data: ${JSON.stringify(deviceError.response.data)}`);
-          
-          // If device says person not found (404), proceed with DB deletion
-          if (deviceError.response.status === 404) {
-            console.log(`   ℹ️ Person not found on device, proceeding with DB deletion`);
-          } else {
-            return res.status(500).json({ 
-              success: false,
-              message: `Device error: ${deviceError.response.data?.message || deviceError.response.statusText || 'Unknown error'}`,
-              error: 'DEVICE_ERROR',
-              statusCode: deviceError.response.status,
-              requiresConfirmation: true,
-            });
-          }
-        } else {
-          // Network error or other issue
           return res.status(500).json({ 
             success: false,
-            message: `Failed to communicate with device: ${deviceError.message}`,
-            error: 'DEVICE_ERROR',
+            message: `Java service error: ${deviceError.response.data?.message || deviceError.response.statusText}`,
+            error: 'JAVA_SERVICE_ERROR',
+            statusCode: deviceError.response.status,
+            details: deviceError.response.data,
             requiresConfirmation: true,
           });
         }
+
+        // Network or other error
+        return res.status(500).json({ 
+          success: false,
+          message: `Failed to communicate with Java service: ${deviceError.message}`,
+          error: 'JAVA_SERVICE_ERROR',
+          requiresConfirmation: true,
+        });
       }
     } else {
+      console.log(`ℹ️ No device validation configured - proceeding with database-only soft delete`);
       if (!facility?.configuration?.deleteUserApiUrl) {
-        console.log(`ℹ️ No delete API URL configured for facility ${facility?.name || 'Unknown'}`);
+        console.log(`   No delete API URL configured for facility ${facility?.name || 'Unknown'}`);
       }
       if (!employee.deviceId) {
-        console.log(`ℹ️ No device ID found for employee ${employee.firstName} ${employee.lastName}`);
+        console.log(`   No device ID found for employee ${employee.firstName} ${employee.lastName}`);
       }
     }
 
-    // ✅ STEP 2: DELETE FROM DATABASE
-    console.log(`\n🗑️ Deleting employee from database...`);
+    // ✅ STEP 4: SOFT DELETE FROM DATABASE
+    console.log(`\n🗑️ Step 4: Performing soft delete from database...`);
     
     // Count related attendance records
     const Attendance = require('../models/Attendance');
     const attendanceCount = await Attendance.countDocuments({ employee: id });
     console.log(`   Found ${attendanceCount} attendance records (will be preserved)`);
     
-    // Delete the employee
-    await Employee.findByIdAndDelete(id);
+    // Perform soft delete using the new method
+    await employee.softDelete('user_request');
     
-    console.log(`✅ Employee deleted from database successfully`);
-    console.log(`✅ ===== DELETE COMPLETED =====\n`);
+    console.log(`✅ Employee soft deleted from database successfully`);
+    console.log(`✅ ===== VALIDATION-FIRST DELETE COMPLETED =====\n`);
 
     res.json({ 
       success: true,
-      message: 'Employee deleted successfully',
+      message: 'Employee deleted successfully with validation-first approach',
       deletedFrom: facility?.configuration?.deleteUserApiUrl && employee.deviceId ? 'device-and-database' : 'database-only',
+      deletionType: 'soft_delete',
       attendanceRecordsPreserved: attendanceCount,
       employeeName: `${employee.firstName} ${employee.lastName}`,
+      canBeRestored: true,
+      validationPerformed: true
     });
 
   } catch (error) {
@@ -594,6 +728,64 @@ exports.deleteEmployee = async (req, res) => {
     });
   }
 };
+
+// Helper function for direct device delete (fallback)
+async function performDirectDeviceDelete(req, res, employee, facility) {
+  console.log(`\n🔄 Falling back to direct device deletion...`);
+  
+  try {
+    // Use configured delete URL template
+    let deviceDeleteUrl = facility.configuration.deleteUserApiUrl;
+    
+    // Replace placeholders with actual device ID
+    deviceDeleteUrl = deviceDeleteUrl.replace('{person_uuid}', employee.deviceId);
+    deviceDeleteUrl = deviceDeleteUrl.replace('{personUUID}', employee.deviceId);
+    deviceDeleteUrl = deviceDeleteUrl.replace('{uuid}', employee.deviceId);
+    deviceDeleteUrl = deviceDeleteUrl.replace('{id}', employee.deviceId);
+    
+    console.log(`   Delete URL: ${deviceDeleteUrl}`);
+    
+    const headers = { 'Content-Type': 'application/json' };
+    if (facility.deviceApiKey) {
+      headers['Authorization'] = `Bearer ${facility.deviceApiKey}`;
+    }
+
+    // Send DELETE request to device
+    const axios = require('axios');
+    const deviceResponse = await axios.delete(deviceDeleteUrl, {
+      headers: headers,
+      timeout: 15000,
+      validateStatus: (status) => (status >= 200 && status < 300) || status === 404
+    });
+
+    if (deviceResponse.status === 404) {
+      console.log(`ℹ️ Person not found on device (may have been deleted already)`);
+    } else {
+      console.log(`✅ Employee deleted from device successfully`);
+    }
+
+    // Proceed with soft delete
+    await employee.softDelete('user_request');
+    
+    const Attendance = require('../models/Attendance');
+    const attendanceCount = await Attendance.countDocuments({ employee: employee._id });
+    
+    return res.json({ 
+      success: true,
+      message: 'Employee deleted successfully (direct device method)',
+      deletedFrom: 'device-and-database',
+      deletionType: 'soft_delete',
+      attendanceRecordsPreserved: attendanceCount,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      canBeRestored: true,
+      validationPerformed: false
+    });
+    
+  } catch (error) {
+    console.error('❌ Direct device delete failed:', error);
+    throw error;
+  }
+}
 
 // @desc    Force delete employee from database only
 // @route   DELETE /api/employees/:id/force

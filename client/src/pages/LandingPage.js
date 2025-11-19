@@ -132,7 +132,7 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium mb-4 inline-block">
+              <div className="bg-green-100 font-bold text-green-800 px-6 py-3 rounded-full text-4xl font-bold mb-6 inline-block">
                 Kano State Primary Health Care Development Board
               </div>
               <h1 className="text-5xl font-bold text-gray-900 mb-6">

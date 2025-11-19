@@ -44,8 +44,8 @@ public class TestController extends BaseController {
     @GetMapping("/info")
     public BaseResult serverInfo() {
         try {
-            String serverHost = hostInfo != null ? hostInfo.getHost() : "unknown";
-            int serverPort = hostInfo != null ? hostInfo.getPort() : 0;
+            String serverHost = getHostInfo() != null ? getHostInfo().getHost() : "unknown";
+            int serverPort = getHostInfo() != null ? getHostInfo().getPort() : 0;
             
             return ResultWrapper.wrapSuccess(
                 "Gateway Host: " + serverHost + 
@@ -74,8 +74,8 @@ public class TestController extends BaseController {
             
         try {
             validateCommon(deviceKey, secret);
-            System.out.println("DEBUG - Calling HfDeviceClient.test with hostInfo: " + hostInfo.getHost() + ":" + hostInfo.getPort());
-            HfDeviceResp tdxSdkResp = HfDeviceClient.test(hostInfo, deviceKey, secret);
+            System.out.println("DEBUG - Calling HfDeviceClient.test with hostInfo: " + getHostInfo().getHost() + ":" + getHostInfo().getPort());
+            HfDeviceResp tdxSdkResp = HfDeviceClient.test(getHostInfo(), deviceKey, secret);
             System.out.println("DEBUG - HfDeviceClient.test response: " + tdxSdkResp);
             return ResultWrapper.wrapTdxSdkResponse(tdxSdkResp);
         } catch (CgiErrorException e) {
@@ -105,7 +105,7 @@ public class TestController extends BaseController {
         
         try {
             validateCommon(deviceKey, secret);
-            HfDeviceResp tdxSdkResp = HfDeviceClient.deviceGet(hostInfo, deviceKey, secret);
+            HfDeviceResp tdxSdkResp = HfDeviceClient.deviceGet(getHostInfo(), deviceKey, secret);
             return ResultWrapper.wrapTdxSdkResponse(tdxSdkResp);
         } catch (CgiErrorException e) {
             return ResultWrapper.wrapFailure("1000", "Validation failed: deviceKey must be at least 16 characters and secret cannot be empty");
@@ -125,7 +125,7 @@ public class TestController extends BaseController {
         
         try {
             validateCommon(deviceKey, secret);
-            HfDeviceResp tdxSdkResp = HfDeviceClient.deviceReboot(hostInfo, deviceKey, secret);
+            HfDeviceResp tdxSdkResp = HfDeviceClient.deviceReboot(getHostInfo(), deviceKey, secret);
             return ResultWrapper.wrapTdxSdkResponse(tdxSdkResp);
         } catch (CgiErrorException e) {
             return ResultWrapper.wrapFailure("1000", "Validation failed: deviceKey must be at least 16 characters and secret cannot be empty");
@@ -139,7 +139,7 @@ public class TestController extends BaseController {
     public BaseResult getDeviceStatus(@RequestParam String deviceKey, @RequestParam String secret) {
         try {
             validateCommon(deviceKey, secret);
-            HfDeviceResp response = HfDeviceClient.deviceGet(hostInfo, deviceKey, secret);
+            HfDeviceResp response = HfDeviceClient.deviceGet(getHostInfo(), deviceKey, secret);
             
             // Create a simplified status response for dashboard
             boolean isConnected = "0000".equals(response.getCode());

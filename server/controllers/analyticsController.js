@@ -219,9 +219,16 @@ exports.getDashboardAnalytics = async (req, res) => {
       .map(perf => ({
         ...perf,
         attendanceRate: perf.totalDays > 0 ? Math.round((perf.presentDays / perf.totalDays) * 100) : 0,
+        punctualityScore: perf.totalDays > 0 ? Math.round(((perf.presentDays - perf.lateCount) / perf.totalDays) * 100) : 0,
         totalWorkHours: Math.round(perf.totalWorkHours * 100) / 100
       }))
-      .sort((a, b) => b.attendanceRate - a.attendanceRate)
+      .sort((a, b) => {
+        // Sort by punctuality score first (on-time performance), then by attendance rate
+        if (b.punctualityScore !== a.punctualityScore) {
+          return b.punctualityScore - a.punctualityScore;
+        }
+        return b.attendanceRate - a.attendanceRate;
+      })
       .slice(0, 5);
     
     console.log('🏆 Top performers:', topPerformersList.length);
@@ -244,6 +251,10 @@ exports.getDashboardAnalytics = async (req, res) => {
       }, {});
     
     const frequentLateArrivalsList = Object.values(frequentLateArrivals)
+      .map(lateData => ({
+        ...lateData,
+        avgLateMinutes: lateData.lateCount > 0 ? Math.round(lateData.totalLateMinutes / lateData.lateCount) : 0
+      }))
       .sort((a, b) => b.lateCount - a.lateCount)
       .slice(0, 5);
     
@@ -393,21 +404,62 @@ exports.getEmployeePerformance = async (req, res) => {
     const performance = await Attendance.aggregate([
       { $match: matchFilter },
       {
+        // First, group by employee and date to get one record per day
         $group: {
-          _id: '$employee',
-          totalDays: { $sum: 1 },
-          presentDays: {
-            $sum: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] }
+          _id: {
+            employee: '$employee',
+            date: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$date'
+              }
+            }
           },
-          absentDays: {
-            $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] }
+          // Determine the day's status: late if any check-in was late, otherwise present if any record exists
+          dayStatus: {
+            $first: {
+              $cond: [
+                { $eq: ['$status', 'late'] },
+                'late',
+                { $cond: [
+                  { $eq: ['$status', 'absent'] },
+                  'absent',
+                  'present'
+                ]}
+              ]
+            }
           },
-          lateDays: {
-            $sum: { $cond: [{ $eq: ['$status', 'late'] }, 1, 0] }
+          hasLateRecord: {
+            $max: { $cond: [{ $eq: ['$status', 'late'] }, 1, 0] }
+          },
+          hasAbsentRecord: {
+            $max: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] }
+          },
+          hasPresentRecord: {
+            $max: { $cond: [{ $in: ['$status', ['present', 'late']] }, 1, 0] }
           },
           totalWorkHours: { $sum: '$workHours' },
           totalOvertime: { $sum: '$overtime' },
           totalLateMinutes: { $sum: '$lateArrival' }
+        }
+      },
+      {
+        // Then group by employee to get final metrics
+        $group: {
+          _id: '$_id.employee',
+          totalDays: { $sum: 1 }, // Now this counts actual days, not records
+          presentDays: {
+            $sum: '$hasPresentRecord'
+          },
+          absentDays: {
+            $sum: '$hasAbsentRecord'
+          },
+          lateDays: {
+            $sum: '$hasLateRecord'
+          },
+          totalWorkHours: { $sum: '$totalWorkHours' },
+          totalOvertime: { $sum: '$totalOvertime' },
+          totalLateMinutes: { $sum: '$totalLateMinutes' }
         }
       },
       {
@@ -453,14 +505,20 @@ exports.getEmployeePerformance = async (req, res) => {
             punctualityScore: {
               $round: [
                 {
-                  $subtract: [
-                    100,
+                  $cond: [
+                    { $gt: ['$presentDays', 0] },
                     {
                       $multiply: [
-                        { $divide: ['$lateDays', '$totalDays'] },
+                        {
+                          $divide: [
+                            { $subtract: ['$presentDays', '$lateDays'] },
+                            '$presentDays'
+                          ]
+                        },
                         100
                       ]
-                    }
+                    },
+                    100
                   ]
                 },
                 2

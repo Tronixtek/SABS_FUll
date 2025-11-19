@@ -3,22 +3,59 @@ package com.hfims.xcan.gateway.tcp.demo.web;
 import com.hfims.xcan.gateway.netty.client.dto.HostInfoDto;
 import com.hfims.xcan.gateway.netty.error.CgiErrorEnum;
 import com.hfims.xcan.gateway.netty.error.CgiErrorException;
-import com.hfims.xcan.gateway.tcp.demo.support.IpUtils;
 import com.hfims.xcan.gateway.netty.util.StringUtils;
-import com.hfims.xcan.gateway.tcp.demo.config.HfGatewayDemoConfig;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import javax.annotation.PostConstruct;
 
+@Component
 public abstract class BaseController {
 
-    // Use environment variable for device IP, fallback to Digital Ocean server IP
-    private static final String DEVICE_IP = System.getenv("DEVICE_IP") != null ? 
-        System.getenv("DEVICE_IP") : "143.198.150.26";
+    @Value("${device.ip:localhost}")
+    private String deviceIp;
     
-    final HostInfoDto hostInfo = new HostInfoDto(DEVICE_IP, HfGatewayDemoConfig.SDK_PORT, HfGatewayDemoConfig.TIMEOUT);
-
-    // Constructor to log host info for debugging
-    public BaseController() {
-        System.out.println("DEBUG - Gateway Host Info: " + DEVICE_IP + ":" + HfGatewayDemoConfig.SDK_PORT + " (timeout: " + HfGatewayDemoConfig.TIMEOUT + "ms)");
-        System.out.println("DEBUG - Environment: DEVICE_IP=" + System.getenv("DEVICE_IP") + " (using: " + DEVICE_IP + ")");
+    @Value("${device.port:10011}")
+    private int devicePort;
+    
+    @Value("${device.timeout:10000}")
+    private int deviceTimeout;
+    
+    protected HostInfoDto hostInfo;  // Make it protected so subclasses can access it
+    
+    @PostConstruct
+    private void initializeHostInfo() {
+        String finalDeviceIp = getDeviceIpFromConfig();
+        System.out.println("DEBUG - Gateway Host Info: " + finalDeviceIp + ":" + devicePort + " (timeout: " + deviceTimeout + "ms)");
+        hostInfo = new HostInfoDto(finalDeviceIp, devicePort, deviceTimeout);
+    }
+    
+    // Initialize after Spring injection
+    protected HostInfoDto getHostInfo() {
+        if (hostInfo == null) {
+            initializeHostInfo();
+        }
+        return hostInfo;
+    }
+    
+    // Dynamic device IP configuration - prioritize environment variables, then properties
+    private String getDeviceIpFromConfig() {
+        // 1. Check environment variable
+        String envIp = System.getenv("DEVICE_IP");
+        if (envIp != null && !envIp.trim().isEmpty()) {
+            System.out.println("Using DEVICE_IP from environment: " + envIp);
+            return envIp.trim();
+        }
+        
+        // 2. Check system property
+        String propIp = System.getProperty("device.ip");
+        if (propIp != null && !propIp.trim().isEmpty()) {
+            System.out.println("Using device.ip from system property: " + propIp);
+            return propIp.trim();
+        }
+        
+        // 3. Use Spring configuration property
+        System.out.println("Using device.ip from application.properties: " + deviceIp);
+        return deviceIp;
     }
 
     protected void validateCommon(String deviceKey, String secret)

@@ -68,27 +68,30 @@ const Employees = () => {
   };
 
   const handleDeleteEmployee = async (employee) => {
-    // Show detailed confirmation dialog
+    // Show detailed confirmation dialog for validation-first delete
     const confirmDelete = window.confirm(
-      `⚠️ DELETE EMPLOYEE\n\n` +
+      `🔍 VALIDATION-FIRST DELETE\n\n` +
       `Employee: ${employee.firstName} ${employee.lastName}\n` +
       `Employee ID: ${employee.employeeId}\n` +
       `Device ID: ${employee.deviceId || 'Not set'}\n\n` +
-      `This will:\n` +
-      `✓ Delete employee from the biometric device\n` +
-      `✓ Delete employee from the database\n` +
-      `✓ Preserve attendance records for reports\n\n` +
-      `⚠️ THIS ACTION CANNOT BE UNDONE!\n\n` +
-      `Are you absolutely sure?`
+      `🔍 VALIDATION PROCESS:\n` +
+      `1. Check if employee exists on biometric device\n` +
+      `2. Delete from device (if found and connected)\n` +
+      `3. Soft delete from database (preserves data)\n\n` +
+      `✓ Attendance records will be preserved\n` +
+      `✓ Employee can be restored if needed\n` +
+      `✓ Device validation ensures data consistency\n\n` +
+      `⚠️ If employee is not found on device, deletion will be blocked!\n\n` +
+      `Proceed with validation-first deletion?`
     );
 
     if (!confirmDelete) return;
 
-    const loadingToast = toast.loading('Deleting employee from device...');
+    const loadingToast = toast.loading('🔍 Validating employee on device...');
 
     try {
-      // ✅ STEP 1: Try device-first delete
-      console.log(`🗑️ Attempting to delete employee ${employee.firstName} ${employee.lastName}`);
+      // ✅ STEP 1: Attempt validation-first delete
+      console.log(`🔍 Starting validation-first delete for ${employee.firstName} ${employee.lastName}`);
       
       const response = await axios.delete(`/api/employees/${employee._id}`);
       const data = response.data;
@@ -96,87 +99,113 @@ const Employees = () => {
       toast.dismiss(loadingToast);
       
       if (data.success) {
-        // ✅ SUCCESS: Deleted from both device and database
-        if (data.deletedFrom === 'device-and-database') {
+        // ✅ SUCCESS: Employee validated and deleted
+        if (data.deletionType === 'soft_delete') {
           toast.success(
             `✅ Employee deleted successfully!\n\n` +
-            `Deleted from: Device & Database\n` +
+            `Validation: ${data.validationPerformed ? 'Performed' : 'Skipped'}\n` +
+            `Deleted from: ${data.deletedFrom}\n` +
+            `Type: Soft delete (can be restored)\n` +
             `Attendance records: ${data.attendanceRecordsPreserved} preserved`,
             {
-              duration: 5000,
+              duration: 6000,
               icon: '✅',
             }
           );
-          console.log(`✅ Employee fully deleted from both device and database`);
-        } else if (data.deletedFrom === 'database-only') {
+          console.log(`✅ Employee soft deleted successfully with validation`);
+        } else {
           toast.success('Employee deleted from database', {
             duration: 4000,
           });
-          toast.info('No device configured for this facility', {
-            duration: 3000,
-          });
-          console.log(`ℹ️ Employee deleted from database (no device configured)`);
+          console.log(`ℹ️ Employee deleted (fallback method used)`);
         }
         
         // Refresh employee list
         fetchEmployees();
         
-        // Log success
+        // Log success details
         console.log(`✅ Employee removed from UI`);
         console.log(`   Employee: ${data.employeeName}`);
-        console.log(`   Attendance records preserved: ${data.attendanceRecordsPreserved}`);
+        console.log(`   Deletion type: ${data.deletionType || 'standard'}`);
+        console.log(`   Can be restored: ${data.canBeRestored || false}`);
+        console.log(`   Validation performed: ${data.validationPerformed || false}`);
       }
 
     } catch (error) {
       toast.dismiss(loadingToast);
       
-      // Check if device is unreachable or error occurred
+      // Handle validation-first specific errors
       if (error.response && error.response.data?.requiresConfirmation) {
         const data = error.response.data;
         
         // Show specific error message based on error type
         let errorMessage = '';
         let detailMessage = '';
+        let showForceOption = false;
         
         switch (data.error) {
-          case 'DEVICE_TIMEOUT':
-            errorMessage = '⏱️ Device Request Timed Out';
-            detailMessage = 'The biometric device is not responding. It may be offline or experiencing network issues.';
+          case 'EMPLOYEE_NOT_ON_DEVICE':
+            errorMessage = '🔍 Employee Not Found on Device';
+            detailMessage = 'The employee was not found on the biometric device. This could mean:\n\n' +
+                          '• Employee was never enrolled on the device\n' +
+                          '• Employee was manually removed from device\n' +
+                          '• Device data is out of sync with database\n\n' +
+                          'Validation-first deletion requires the employee to exist on the device.';
+            showForceOption = true;
             break;
-          case 'DEVICE_UNREACHABLE':
-            errorMessage = '🔌 Device Unreachable';
-            detailMessage = 'Cannot connect to the biometric device. Please check if the device is online and the URL is correct.';
+            
+          case 'JAVA_SERVICE_TIMEOUT':
+            errorMessage = '⏱️ Java Service Timeout';
+            detailMessage = 'The Java service (device integration) is not responding. The service may be offline or experiencing issues.';
+            showForceOption = true;
             break;
-          case 'DEVICE_ERROR':
-            errorMessage = '❌ Device Error';
-            detailMessage = data.message || 'The device returned an error while trying to delete the employee.';
+            
+          case 'JAVA_SERVICE_UNREACHABLE':
+            errorMessage = '🔌 Java Service Unreachable';
+            detailMessage = 'Cannot connect to the Java service. Please check if the Java service is running and accessible.';
+            showForceOption = true;
             break;
+            
+          case 'DEVICE_OPERATION_FAILED':
+            errorMessage = '❌ Device Operation Failed';
+            detailMessage = data.message || 'The device operation failed during validation or deletion process.';
+            showForceOption = true;
+            break;
+            
+          case 'JAVA_SERVICE_ERROR':
+            errorMessage = '⚠️ Java Service Error';
+            detailMessage = data.message || 'The Java service encountered an error while processing the request.';
+            showForceOption = true;
+            break;
+            
           default:
-            errorMessage = '⚠️ Device Deletion Failed';
-            detailMessage = data.message;
+            errorMessage = '⚠️ Validation Failed';
+            detailMessage = data.message || 'Employee validation failed for unknown reasons.';
+            showForceOption = true;
         }
         
-        // Ask user if they want to force delete
-        const forceDelete = window.confirm(
-          `${errorMessage}\n\n` +
-          `${detailMessage}\n\n` +
-          `⚠️ WARNING: The employee may still exist on the device!\n\n` +
-          `What would you like to do?\n\n` +
-          `• Click OK to delete from database anyway (you'll need to manually remove from device later)\n` +
-          `• Click Cancel to abort the deletion and check device connection\n\n` +
-          `Proceed with database-only deletion?`
-        );
+        // Ask user if they want to force delete (bypass validation)
+        if (showForceOption) {
+          const forceDelete = window.confirm(
+            `${errorMessage}\n\n` +
+            `${detailMessage}\n\n` +
+            `⚠️ VALIDATION-FIRST DELETION BLOCKED!\n\n` +
+            `Options:\n` +
+            `• Click OK to use FORCE DELETE (database-only, no device validation)\n` +
+            `• Click Cancel to abort and check device/service status\n\n` +
+            `Proceed with force delete (bypasses validation)?`
+          );
 
-        if (!forceDelete) {
-          toast.info('Deletion cancelled. Please check device connection.', {
-            duration: 4000,
-          });
-          return;
-        }
+          if (!forceDelete) {
+            toast.info('Deletion cancelled. Please check device/service connectivity.', {
+              duration: 4000,
+            });
+            return;
+          }
 
-        // ✅ STEP 2: Force delete from database only
-        console.log(`⚠️ Force deleting from database only...`);
-        const forceLoadingToast = toast.loading('Deleting from database only...');
+          // ✅ STEP 2: Force delete (bypass validation)
+          console.log(`⚠️ Using force delete to bypass validation...`);
+          const forceLoadingToast = toast.loading('🔧 Force deleting (bypassing validation)...');
         
         try {
           const forceResponse = await axios.delete(`/api/employees/${employee._id}/force`);
@@ -206,15 +235,16 @@ const Employees = () => {
           console.error('❌ Force delete error:', forceError);
           toast.error(`Force delete failed: ${forceError.response?.data?.message || forceError.message}`);
         }
-      } else {
-        // Other errors
-        console.error('❌ Error deleting employee:', error);
-        toast.error(
-          `Failed to delete employee\n\n${error.response?.data?.message || error.message}`,
-          {
-            duration: 5000,
-          }
-        );
+        } else {
+          // Other errors
+          console.error('❌ Error deleting employee:', error);
+          toast.error(
+            `Failed to delete employee\n\n${error.response?.data?.message || error.message}`,
+            {
+              duration: 5000,
+            }
+          );
+        }
       }
     }
   };

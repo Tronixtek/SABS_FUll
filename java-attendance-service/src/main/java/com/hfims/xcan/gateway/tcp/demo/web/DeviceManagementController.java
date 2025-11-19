@@ -427,18 +427,6 @@ public class DeviceManagementController extends BaseController {
     }
     
     /**
-     * Get default host info configuration
-     */
-    private HostInfoDto getHostInfo() {
-        HostInfoDto hostInfo = new HostInfoDto();
-        hostInfo.setHost("192.168.0.169");
-        hostInfo.setPort(10011);  // Port should be int, not string
-        hostInfo.setTimeout(10000);
-        System.out.println("DEBUG - Gateway Host Info: " + hostInfo.getHost() + ":" + hostInfo.getPort() + " (timeout: " + hostInfo.getTimeout() + "ms)");
-        return hostInfo;
-    }
-
-    /**
      * Validate common device parameters
      */
     protected void validateCommon(String deviceKey, String secret) throws CgiErrorException {
