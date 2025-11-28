@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SABS Mixed Content Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; }
+        #results { margin-top: 20px; }
+        code { background: #f1f1f1; padding: 2px 5px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🔒 SABS Mixed Content Security Test</h1>
+    
+    <div class="test info">
+        <h3>Current Page Security:</h3>
+        <p><strong>Protocol:</strong> <span id="currentProtocol"></span></p>
+        <p><strong>Mixed Content Risk:</strong> <span id="mixedContentRisk"></span></p>
+    </div>
+
+    <div class="test">
+        <h3>Backend API Test:</h3>
+        <p>Testing connection to: <code>http://143.198.150.26:5000</code></p>
+        <button onclick="testBackendAPI()">Test HTTP Backend</button>
+        <div id="apiResult"></div>
+    </div>
+
+    <div class="test">
+        <h3>Java Service Test:</h3>
+        <p>Testing connection to: <code>http://143.198.150.26:8081</code></p>
+        <button onclick="testJavaService()">Test HTTP Java Service</button>
+        <div id="javaResult"></div>
+    </div>
+
+    <div class="test">
+        <h3>Environment Variables:</h3>
+        <button onclick="showEnvironment()">Show React Environment</button>
+        <div id="envResult"></div>
+    </div>
+
+    <div id="results">
+        <h3>📋 Test Results Summary</h3>
+        <div id="summary"></div>
+    </div>
+
+    <script>
+        // Check current protocol
+        document.addEventListener('DOMContentLoaded', function() {
+            const protocol = window.location.protocol;
+            const isHttps = protocol === 'https:';
+            
+            document.getElementById('currentProtocol').textContent = protocol;
+            document.getElementById('currentProtocol').style.color = isHttps ? 'green' : 'orange';
+            
+            const riskText = isHttps ? 
+                '⚠️ HIGH - HTTPS page will block HTTP API calls' : 
+                '✅ LOW - HTTP page can call HTTP APIs';
+            document.getElementById('mixedContentRisk').innerHTML = riskText;
+            document.getElementById('mixedContentRisk').style.color = isHttps ? 'red' : 'green';
+        });
+
+        async function testBackendAPI() {
+            const resultDiv = document.getElementById('apiResult');
+            resultDiv.innerHTML = '<p>🔄 Testing...</p>';
+            
+            try {
+                const response = await fetch('http://143.198.150.26:5000/api/health');
+                if (response.ok) {
+                    resultDiv.innerHTML = '<p style="color: green;">✅ Backend API accessible</p>';
+                } else {
+                    resultDiv.innerHTML = '<p style="color: orange;">⚠️ Backend responded with error: ' + response.status + '</p>';
+                }
+            } catch (error) {
+                const isHttps = window.location.protocol === 'https:';
+                const errorMsg = isHttps ? 
+                    '❌ Mixed Content blocked - HTTPS page cannot call HTTP API' : 
+                    '❌ Connection failed: ' + error.message;
+                resultDiv.innerHTML = '<p style="color: red;">' + errorMsg + '</p>';
+            }
+        }
+
+        async function testJavaService() {
+            const resultDiv = document.getElementById('javaResult');
+            resultDiv.innerHTML = '<p>🔄 Testing...</p>';
+            
+            try {
+                const response = await fetch('http://143.198.150.26:8081/actuator/health');
+                if (response.ok) {
+                    resultDiv.innerHTML = '<p style="color: green;">✅ Java Service accessible</p>';
+                } else {
+                    resultDiv.innerHTML = '<p style="color: orange;">⚠️ Java Service responded with error: ' + response.status + '</p>';
+                }
+            } catch (error) {
+                const isHttps = window.location.protocol === 'https:';
+                const errorMsg = isHttps ? 
+                    '❌ Mixed Content blocked - HTTPS page cannot call HTTP service' : 
+                    '❌ Connection failed: ' + error.message;
+                resultDiv.innerHTML = '<p style="color: red;">' + errorMsg + '</p>';
+            }
+        }
+
+        function showEnvironment() {
+            const resultDiv = document.getElementById('envResult');
+            
+            // This would work in actual React app with process.env
+            const mockEnv = {
+                'REACT_APP_API_URL': 'http://143.198.150.26:5000',
+                'REACT_APP_JAVA_API_URL': 'http://143.198.150.26:8081',
+                'Current Page Protocol': window.location.protocol,
+                'Will Mixed Content Block?': window.location.protocol === 'https:' ? 'YES - API calls will be blocked' : 'NO - HTTP to HTTP is allowed'
+            };
+            
+            let html = '<div style="margin-top: 10px;">';
+            for (const [key, value] of Object.entries(mockEnv)) {
+                const color = key.includes('Will Mixed Content') && value.includes('YES') ? 'red' : 'black';
+                html += `<p><strong>${key}:</strong> <code style="color: ${color};">${value}</code></p>`;
+            }
+            html += '</div>';
+            
+            resultDiv.innerHTML = html;
+        }
+
+        // Summary generator
+        function updateSummary() {
+            // This would be called after tests complete
+            // For demo purposes, we'll show static recommendations
+        }
+    </script>
+
+    <div class="test info" style="margin-top: 30px;">
+        <h3>🛠️ Quick Fixes:</h3>
+        <ul>
+            <li><strong>If tests fail due to Mixed Content:</strong> Enable HTTPS on backend or use frontend proxy</li>
+            <li><strong>If CORS errors occur:</strong> Update backend CORS settings to allow your frontend domain</li>
+            <li><strong>For immediate testing:</strong> Deploy both frontend and backend on HTTP temporarily</li>
+        </ul>
+    </div>
+</body>
+</html>

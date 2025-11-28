@@ -1,4 +1,4 @@
-# Production configuration for Digital Ocean deployment
+# Production configuration for Digital Ocean deployment with HTTPS
 server:
   address: 0.0.0.0
   port: ${PORT:8081}
@@ -7,7 +7,6 @@ server:
 spring:
   application:
     name: hf-tcp-gateway-demo
-  # profiles.active removed to avoid Spring Boot error
 
 # Device Configuration - Use environment variables
 device:
@@ -17,10 +16,10 @@ device:
   username: ${DEVICE_USERNAME:admin}
   password: ${DEVICE_PASSWORD:123456}
 
-# MERN Backend Configuration - Use environment variables
+# MERN Backend Configuration - Internal HTTP communication
 mern:
   backend:
-    url: ${MERN_BACKEND_URL:http://localhost:3001}
+    url: ${MERN_BACKEND_URL:http://127.0.0.1:5000}
     timeout: ${MERN_BACKEND_TIMEOUT:10000}
     retry:
       max-attempts: ${MERN_RETRY_ATTEMPTS:3}
