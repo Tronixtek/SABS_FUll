@@ -102,18 +102,6 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            First time setup?{' '}
-            <button
-              onClick={() => navigate('/register')}
-              className="text-blue-600 hover:text-purple-600 font-medium transition-colors"
-            >
-              Create Admin User
-            </button>
-          </p>
-        </div>
-
         <div className="mt-6 text-center text-xs sm:text-sm text-gray-600">
           <p>Multi-facility attendance management system</p>
           <p className="mt-2">© 2025 All rights reserved</p>
