@@ -55,6 +55,33 @@ exports.register = async (req, res) => {
       });
     }
 
+    // Validate manager-specific requirements
+    if (role === 'manager') {
+      // Manager must have at least one facility assigned
+      if (!facilities || facilities.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Manager role requires at least one facility to be assigned. Please select a facility.'
+        });
+      }
+
+      // Check the 2-manager limit for each assigned facility
+      for (const facilityId of facilities) {
+        const managersCount = await User.countDocuments({
+          role: 'manager',
+          facilities: facilityId,
+          status: 'active'
+        });
+
+        if (managersCount >= 2) {
+          return res.status(400).json({
+            success: false,
+            message: 'This facility already has the maximum of 2 managers. Please select a different facility or contact an admin.'
+          });
+        }
+      }
+    }
+
     // Set default permissions based on role
     let permissions = [];
     switch (role) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -14,11 +14,38 @@ const Register = () => {
     firstName: '',
     lastName: '',
     role: 'admin',
+    facility: '',
     developerKey: ''
   });
   const [loading, setLoading] = useState(false);
+  const [facilities, setFacilities] = useState([]);
+  const [loadingFacilities, setLoadingFacilities] = useState(false);
 
-  const { username, email, password, confirmPassword, firstName, lastName, role, developerKey } = formData;
+  const { username, email, password, confirmPassword, firstName, lastName, role, facility, developerKey } = formData;
+
+  // Fetch facilities when component mounts or when role changes to manager
+  useEffect(() => {
+    if (role === 'manager') {
+      fetchFacilities();
+    }
+  }, [role]);
+
+  const fetchFacilities = async () => {
+    setLoadingFacilities(true);
+    try {
+      const res = await axios.get('/api/facilities');
+      setFacilities(res.data.data || []);
+      if (res.data.data.length === 0) {
+        toast.error('No facilities available. An admin must create a facility first.');
+      }
+    } catch (error) {
+      console.error('Failed to fetch facilities:', error);
+      toast.error('Failed to load facilities');
+      setFacilities([]);
+    } finally {
+      setLoadingFacilities(false);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,6 +57,18 @@ const Register = () => {
     // Validation
     if (!username || !email || !password || !firstName || !lastName) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Manager must select a facility
+    if (role === 'manager' && !facility) {
+      toast.error('Please select a facility for the manager');
+      return;
+    }
+
+    // Check if facilities are available for manager role
+    if (role === 'manager' && facilities.length === 0) {
+      toast.error('Cannot create manager account. No facilities available. Admin must create a facility first.');
       return;
     }
 
@@ -52,6 +91,9 @@ const Register = () => {
     setLoading(true);
 
     try {
+      // Prepare facilities array - only for manager role
+      const facilitiesArray = role === 'manager' && facility ? [facility] : [];
+
       const res = await axios.post('/api/auth/register', {
         username,
         email,
@@ -59,7 +101,7 @@ const Register = () => {
         firstName,
         lastName,
         role,
-        facilities: [],
+        facilities: facilitiesArray,
         developerKey
       });
 
@@ -227,6 +269,59 @@ const Register = () => {
                 <option value="viewer">Viewer</option>
               </select>
             </div>
+
+            {/* Facility Selection - Only for Manager role */}
+            {role === 'manager' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <label htmlFor="facility" className="block text-sm font-medium text-gray-700 mb-1">
+                  Assign Facility *
+                </label>
+                {loadingFacilities ? (
+                  <div className="flex items-center justify-center py-3">
+                    <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="ml-2 text-sm text-gray-600">Loading facilities...</span>
+                  </div>
+                ) : facilities.length === 0 ? (
+                  <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mt-2">
+                    <div className="flex items-start">
+                      <svg className="w-5 h-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">No Facilities Available</p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          An admin must create a facility before you can assign managers. Please create a facility first or select a different role.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      id="facility"
+                      name="facility"
+                      required
+                      value={facility}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
+                    >
+                      <option value="">Select a facility</option>
+                      {facilities.map((fac) => (
+                        <option key={fac._id} value={fac._id}>
+                          {fac.name} - {fac.code}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs text-blue-700">
+                      This manager will only be able to manage employees and data for this facility. Maximum 2 managers per facility.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="pt-2">
