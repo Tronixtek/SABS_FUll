@@ -182,25 +182,32 @@ const Reports = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 sm:p-6">
         <div className="flex items-center gap-3">
-          <FileText className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-bold text-gray-800">Reports</h1>
+          <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+            <FileText className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Reports & Analytics
+            </h1>
+            <p className="text-gray-600 mt-1">Generate and export attendance reports</p>
+          </div>
         </div>
         {reportData && (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <button
               onClick={exportToCSV}
-              className="btn btn-secondary"
+              className="flex-1 sm:flex-none bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center gap-2"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </button>
             <button
               onClick={exportToPDF}
-              className="btn btn-primary"
+              className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
             >
               <FileText className="w-4 h-4" />
               Export PDF
@@ -210,36 +217,67 @@ const Reports = () => {
       </div>
 
       {/* Report Type Selection */}
-      <div className="card">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Select Report Type</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
           <button
             onClick={() => handleReportTypeChange('daily')}
-            className={`btn ${reportType === 'daily' ? 'btn-primary' : 'btn-outline'}`}
+            className={`p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
+              reportType === 'daily'
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+            }`}
           >
-            Daily Report
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5" />
+              <div>
+                <p className="font-medium">Daily Report</p>
+                <p className="text-sm opacity-75">Single day attendance</p>
+              </div>
+            </div>
           </button>
           <button
             onClick={() => handleReportTypeChange('monthly')}
-            className={`btn ${reportType === 'monthly' ? 'btn-primary' : 'btn-outline'}`}
+            className={`p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
+              reportType === 'monthly'
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+            }`}
           >
-            Monthly Report
+            <div className="flex items-center gap-3">
+              <BarChart3 className="w-5 h-5" />
+              <div>
+                <p className="font-medium">Monthly Report</p>
+                <p className="text-sm opacity-75">Full month analysis</p>
+              </div>
+            </div>
           </button>
           <button
             onClick={() => handleReportTypeChange('custom')}
-            className={`btn ${reportType === 'custom' ? 'btn-primary' : 'btn-outline'}`}
+            className={`p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
+              reportType === 'custom'
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+            }`}
           >
-            Custom Report
+            <div className="flex items-center gap-3">
+              <TrendingUp className="w-5 h-5" />
+              <div>
+                <p className="font-medium">Custom Report</p>
+                <p className="text-sm opacity-75">Date range selection</p>
+              </div>
+            </div>
           </button>
         </div>
 
         {/* Filters based on report type */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {reportType === 'daily' && (
             <div>
-              <label className="label">Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
               <input
                 type="date"
-                className="input"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 value={filters.date}
                 onChange={(e) => setFilters({ ...filters, date: e.target.value })}
               />
@@ -249,9 +287,9 @@ const Reports = () => {
           {reportType === 'monthly' && (
             <>
               <div>
-                <label className="label">Month</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
                 <select
-                  className="input"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
                   value={filters.month}
                   onChange={(e) => setFilters({ ...filters, month: e.target.value })}
                 >
@@ -263,10 +301,10 @@ const Reports = () => {
                 </select>
               </div>
               <div>
-                <label className="label">Year</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
                 <input
                   type="number"
-                  className="input"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   value={filters.year}
                   onChange={(e) => setFilters({ ...filters, year: e.target.value })}
                 />
@@ -277,19 +315,19 @@ const Reports = () => {
           {reportType === 'custom' && (
             <>
               <div>
-                <label className="label">Start Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                 <input
                   type="date"
-                  className="input"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   value={filters.startDate}
                   onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
                 />
               </div>
               <div>
-                <label className="label">End Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                 <input
                   type="date"
-                  className="input"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   value={filters.endDate}
                   onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
                 />
@@ -298,9 +336,9 @@ const Reports = () => {
           )}
 
           <div>
-            <label className="label">Facility</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Facility</label>
             <select
-              className="input"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
               value={filters.facility}
               onChange={(e) => setFilters({ ...filters, facility: e.target.value })}
             >
@@ -314,39 +352,53 @@ const Reports = () => {
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-6 pt-4 border-t border-gray-200">
           <button
             onClick={generateReport}
             disabled={loading}
-            className="btn btn-primary"
+            className={`w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+              loading
+                ? 'opacity-50 cursor-not-allowed'
+                : 'hover:from-blue-700 hover:to-purple-700 transform hover:scale-105'
+            }`}
           >
-            {loading ? 'Generating...' : 'Generate Report'}
+            {loading ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Generating...
+              </>
+            ) : (
+              'Generate Report'
+            )}
           </button>
         </div>
       </div>
 
       {/* Statistics Cards */}
       {reportData && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-blue-50 to-blue-100">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600 font-medium">Total Employees</p>
-                <p className="text-3xl font-bold text-blue-700 mt-1">
+              <div className="flex-1">
+                <p className="text-xs sm:text-sm text-blue-600 font-medium">Total Employees</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-700 mt-1">
                   {reportData.statistics?.totalEmployees || 0}
                 </p>
               </div>
-              <div className="p-3 bg-blue-200 rounded-full">
-                <Users className="w-6 h-6 text-blue-700" />
+              <div className="p-2 sm:p-3 bg-blue-200 rounded-full flex-shrink-0 ml-2">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-blue-700" />
               </div>
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-green-50 to-green-100">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600 font-medium">Present</p>
-                <p className="text-3xl font-bold text-green-700 mt-1">
+              <div className="flex-1">
+                <p className="text-xs sm:text-sm text-green-600 font-medium">Present</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-700 mt-1">
                   {reportData.statistics?.present || 0}
                 </p>
                 {reportData.statistics?.totalEmployees > 0 && (
@@ -355,17 +407,17 @@ const Reports = () => {
                   </p>
                 )}
               </div>
-              <div className="p-3 bg-green-200 rounded-full">
-                <CheckCircle className="w-6 h-6 text-green-700" />
+              <div className="p-2 sm:p-3 bg-green-200 rounded-full flex-shrink-0 ml-2">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-green-700" />
               </div>
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-yellow-50 to-yellow-100">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-yellow-600 font-medium">Late</p>
-                <p className="text-3xl font-bold text-yellow-700 mt-1">
+              <div className="flex-1">
+                <p className="text-xs sm:text-sm text-yellow-600 font-medium">Late</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-yellow-700 mt-1">
                   {reportData.statistics?.late || 0}
                 </p>
                 {reportData.statistics?.totalEmployees > 0 && (
@@ -374,17 +426,17 @@ const Reports = () => {
                   </p>
                 )}
               </div>
-              <div className="p-3 bg-yellow-200 rounded-full">
-                <AlertCircle className="w-6 h-6 text-yellow-700" />
+              <div className="p-2 sm:p-3 bg-yellow-200 rounded-full flex-shrink-0 ml-2">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-yellow-700" />
               </div>
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-red-50 to-red-100">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-red-600 font-medium">Absent</p>
-                <p className="text-3xl font-bold text-red-700 mt-1">
+              <div className="flex-1">
+                <p className="text-xs sm:text-sm text-red-600 font-medium">Absent</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-700 mt-1">
                   {reportData.statistics?.absent || 0}
                 </p>
                 {reportData.statistics?.totalEmployees > 0 && (
@@ -393,8 +445,8 @@ const Reports = () => {
                   </p>
                 )}
               </div>
-              <div className="p-3 bg-red-200 rounded-full">
-                <XCircle className="w-6 h-6 text-red-700" />
+              <div className="p-2 sm:p-3 bg-red-200 rounded-full flex-shrink-0 ml-2">
+                <XCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-red-700" />
               </div>
             </div>
           </div>

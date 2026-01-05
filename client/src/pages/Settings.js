@@ -197,17 +197,24 @@ const Settings = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 sm:p-6">
         <div className="flex items-center gap-3">
-          <SettingsIcon className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-bold text-gray-800">Settings</h1>
+          <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+            <SettingsIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              System Settings
+            </h1>
+            <p className="text-gray-600 mt-1">Configure system preferences and parameters</p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={fetchSettings}
-            className="btn btn-secondary"
+            className="flex-1 sm:flex-none bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-2"
             disabled={loading}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -215,7 +222,7 @@ const Settings = () => {
           </button>
           <button
             onClick={handleSave}
-            className="btn btn-primary"
+            className="flex-1 sm:flex-none bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
             disabled={saving}
           >
             <Save className="w-4 h-4" />
@@ -225,35 +232,35 @@ const Settings = () => {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <div className="flex gap-4 overflow-x-auto">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600 font-medium'
-                    : 'border-transparent text-gray-600 hover:text-gray-800'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                {tab.label}
-              </button>
-            );
-          })}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+        <div className="border-b border-gray-200">
+          <div className="flex gap-0 overflow-x-auto scrollbar-hide">
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-3 sm:px-4 py-3 sm:py-4 border-b-2 transition-all whitespace-nowrap min-w-0 flex-shrink-0 ${
+                    activeTab === tab.id
+                      ? 'border-blue-600 text-blue-600 font-medium bg-blue-50'
+                      : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-xs sm:text-sm font-medium">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="spinner"></div>
-        </div>
-      ) : (
-        <div className="card">
-          {/* General Settings */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="spinner"></div>
+          </div>
+        ) : (
+          <div className="card">{/* General Settings */}
           {activeTab === 'general' && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-800">General Settings</h3>
@@ -680,6 +687,7 @@ const Settings = () => {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 };

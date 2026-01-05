@@ -10,10 +10,40 @@ const generateToken = (id) => {
 
 // @desc    Register user
 // @route   POST /api/auth/register
-// @access  Public (or Admin only in production)
+// @access  Development only (or with special setup key in production)
 exports.register = async (req, res) => {
   try {
-    const { username, email, password, firstName, lastName, role, facilities } = req.body;
+    const { username, email, password, firstName, lastName, role, facilities, developerKey } = req.body;
+
+    // Enhanced security logging
+    console.log(`[SECURITY] User registration attempt - Role: ${role || 'viewer'}, Environment: ${process.env.NODE_ENV}, IP: ${req.ip || 'unknown'}`);
+
+    // Validate developer key for super-admin role
+    if (role === 'super-admin') {
+      const requiredDeveloperKey = process.env.DEVELOPER_KEY || 'dev-secret-2025-sabs';
+      if (!developerKey || developerKey !== requiredDeveloperKey) {
+        console.log(`[SECURITY] Failed super-admin creation attempt - Invalid developer key from IP: ${req.ip || 'unknown'}`);
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid or missing developer key. Super admin creation requires valid developer access.',
+          securityNote: 'This action has been logged for security purposes.'
+        });
+      }
+      console.log(`[SECURITY] Super-admin user creation authorized with valid developer key`);
+    }
+
+    // Validate developer key for super-admin role
+    if (role === 'super-admin') {
+      const requiredDeveloperKey = process.env.DEVELOPER_KEY || 'dev-secret-2025-sabs';
+      if (!developerKey || developerKey !== requiredDeveloperKey) {
+        console.log(`[SECURITY] Failed super-admin creation attempt - Invalid developer key`);
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid or missing developer key. Super admin creation requires valid developer access.',
+          securityNote: 'This action has been logged for security purposes.'
+        });
+      }
+    }
 
     // Check if user exists
     const userExists = await User.findOne({ $or: [{ email }, { username }] });

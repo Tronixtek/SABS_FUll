@@ -219,25 +219,37 @@ const Shifts = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">Shift Management</h1>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 sm:p-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Shift Management
+          </h1>
+          <p className="text-gray-600 mt-1">Manage work shifts and schedules</p>
+        </div>
         <button 
           onClick={() => handleOpenModal()}
-          className="btn btn-primary flex items-center"
+          className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
         >
-          <PlusIcon className="h-5 w-5 mr-2" />
+          <PlusIcon className="h-5 w-5" />
           Add Shift
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-96">
-          <div className="spinner"></div>
+          <div className="flex flex-col items-center">
+            <svg className="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-gray-600">Loading shifts...</p>
+          </div>
         </div>
       ) : shifts.length === 0 ? (
-        <div className="text-center py-12">
-          <ClockIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+        <div className="text-center py-12 bg-white rounded-xl shadow-lg border border-gray-100">
+          <ClockIcon className="h-16 w-16 mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500 text-lg mb-4">No shifts found</p>
           <button 
             onClick={() => handleOpenModal()}

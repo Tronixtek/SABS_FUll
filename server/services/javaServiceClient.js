@@ -3,7 +3,7 @@ const axios = require('axios');
 class JavaServiceClient {
   constructor() {
     this.baseURL = process.env.JAVA_SERVICE_URL || 'http://localhost:8081';
-    this.timeout = parseInt(process.env.JAVA_SERVICE_TIMEOUT) || 30000;
+    this.timeout = parseInt(process.env.JAVA_SERVICE_TIMEOUT) || 120000; // Increased to 2 minutes for image processing
     this.authKey = process.env.JAVA_SERVICE_AUTH_KEY || 'java-service-auth-key-2025';
     this.enabled = process.env.ENABLE_JAVA_INTEGRATION === 'true';
 

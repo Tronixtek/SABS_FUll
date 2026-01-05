@@ -283,18 +283,25 @@ const Analytics = () => {
   const todayWorkHours = dashboardData?.summary?.todayWorkHours || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 sm:p-6">
         <div className="flex items-center gap-3">
-          <BarChart3 className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-bold text-gray-800">Analytics & Insights</h1>
+          <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+            <BarChart3 className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Analytics & Insights
+            </h1>
+            <p className="text-gray-600 mt-1">Advanced attendance analytics and performance metrics</p>
+          </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <select
-            className="input max-w-xs"
+            className="w-full sm:w-auto px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
             value={selectedFacility}
             onChange={(e) => setSelectedFacility(e.target.value)}
           >
@@ -306,46 +313,54 @@ const Analytics = () => {
             ))}
           </select>
 
-          <input
-            type="date"
-            className="input"
-            value={dateRange.startDate}
-            onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-          />
-          <input
-            type="date"
-            className="input"
-            value={dateRange.endDate}
-            onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              value={dateRange.startDate}
+              onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+            />
+            <input
+              type="date"
+              className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              value={dateRange.endDate}
+              onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+            />
+          </div>
         </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="spinner"></div>
+          <div className="flex flex-col items-center">
+            <svg className="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-gray-600">Loading analytics data...</p>
+          </div>
         </div>
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-6">
-            <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4 lg:gap-6">
+            <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-blue-500 to-blue-600 text-white">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm font-medium">Total Employees</p>
-                  <p className="text-3xl font-bold mt-2">{dashboardData?.summary?.totalEmployees || 0}</p>
+                <div className="flex-1">
+                  <p className="text-blue-100 text-xs sm:text-sm font-medium">Total Employees</p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 sm:mt-2">{dashboardData?.summary?.totalEmployees || 0}</p>
                 </div>
-                <Users className="w-12 h-12 text-blue-200" />
+                <Users className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-blue-200 flex-shrink-0 ml-2" />
               </div>
             </div>
 
-            <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
+            <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-green-500 to-green-600 text-white">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm font-medium">Today Present</p>
-                  <p className="text-3xl font-bold mt-2">{dashboardData?.summary?.todayPresent || 0}</p>
+                <div className="flex-1">
+                  <p className="text-green-100 text-xs sm:text-sm font-medium">Today Present</p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 sm:mt-2">{dashboardData?.summary?.todayPresent || 0}</p>
                 </div>
-                <CheckCircle className="w-12 h-12 text-green-200" />
+                <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-green-200 flex-shrink-0 ml-2" />
               </div>
             </div>
 

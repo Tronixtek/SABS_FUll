@@ -13,11 +13,12 @@ const Register = () => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    role: 'super-admin'
+    role: 'super-admin',
+    developerKey: ''
   });
   const [loading, setLoading] = useState(false);
 
-  const { username, email, password, confirmPassword, firstName, lastName, role } = formData;
+  const { username, email, password, confirmPassword, firstName, lastName, role, developerKey } = formData;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -29,6 +30,12 @@ const Register = () => {
     // Validation
     if (!username || !email || !password || !firstName || !lastName) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Developer key validation for super-admin role
+    if (role === 'super-admin' && !developerKey) {
+      toast.error('Developer key is required for super admin creation');
       return;
     }
 
@@ -52,7 +59,8 @@ const Register = () => {
         firstName,
         lastName,
         role,
-        facilities: []
+        facilities: [],
+        developerKey
       });
 
       toast.success('Admin user created successfully!');
@@ -72,65 +80,34 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-2xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center py-4 px-4 sm:py-12 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-6 sm:p-8 mx-4">
         {/* Back to Home link */}
         <Link 
           to="/" 
-          className="flex items-center text-gray-600 hover:text-blue-600 mb-6 transition-colors"
+          className="inline-flex items-center text-gray-600 hover:text-blue-600 mb-6 transition-colors text-sm font-medium"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Home
         </Link>
         
-        <div>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900">
-            SABS - Create Admin User
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <span className="text-white font-bold text-2xl">S</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
+            Create Admin User
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            One-time setup for your Smart Attendance Biometric System
+          <p className="mt-2 text-sm text-gray-600">
+            One-time setup for your Smart Attendance System
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {/* Username */}
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username *
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                value={username}
-                onChange={handleChange}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="admin"
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email *
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={handleChange}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="admin@company.com"
-              />
-            </div>
-
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* First Name */}
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
                 First Name *
               </label>
               <input
@@ -140,14 +117,14 @@ const Register = () => {
                 required
                 value={firstName}
                 onChange={handleChange}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="System"
               />
             </div>
 
             {/* Last Name */}
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
                 Last Name *
               </label>
               <input
@@ -157,14 +134,50 @@ const Register = () => {
                 required
                 value={lastName}
                 onChange={handleChange}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Administrator"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Username */}
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                Username *
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                value={username}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="admin"
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address *
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                value={email}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="admin@company.com"
               />
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Password *
               </label>
               <input
@@ -174,14 +187,14 @@ const Register = () => {
                 required
                 value={password}
                 onChange={handleChange}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Minimum 6 characters"
               />
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
                 Confirm Password *
               </label>
               <input
@@ -191,14 +204,14 @@ const Register = () => {
                 required
                 value={confirmPassword}
                 onChange={handleChange}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Re-enter password"
               />
             </div>
 
             {/* Role - Fixed to super-admin */}
             <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
                 Role
               </label>
               <select
@@ -206,7 +219,7 @@ const Register = () => {
                 name="role"
                 value={role}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
               >
                 <option value="super-admin">Super Admin (Full Access)</option>
                 <option value="admin">Admin</option>
@@ -215,37 +228,82 @@ const Register = () => {
                 <option value="viewer">Viewer</option>
               </select>
             </div>
+
+            {/* Developer Key - Only shown for super-admin */}
+            {role === 'super-admin' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <label htmlFor="developerKey" className="block text-sm font-medium text-gray-700 mb-1">
+                  Developer Key *
+                </label>
+                <input
+                  id="developerKey"
+                  name="developerKey"
+                  type="password"
+                  required
+                  value={developerKey}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                  placeholder="Enter developer access key"
+                />
+                <div className="mt-2 flex items-start">
+                  <svg className="w-4 h-4 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-xs text-yellow-700">
+                    This key is required for super admin creation and is only known to developers.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div>
+          <div className="pt-2">
             <button
               type="submit"
               disabled={loading}
-              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+              className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white transition-all ${
                 loading
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transform hover:scale-105'
               }`}
             >
-              {loading ? 'Creating User...' : 'Create Admin User'}
+              {loading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating User...
+                </>
+              ) : (
+                'Create Admin User'
+              )}
             </button>
           </div>
 
-          <div className="text-center">
+          <div className="text-center pt-4">
             <button
               type="button"
               onClick={() => navigate('/login')}
-              className="text-sm text-blue-600 hover:text-blue-500"
+              className="text-sm text-blue-600 hover:text-purple-600 transition-colors font-medium"
             >
               Already have an account? Login here
             </button>
           </div>
         </form>
 
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-          <p className="text-xs text-yellow-800">
-            <strong>⚠️ Security Note:</strong> After creating your admin user, you should disable public registration by protecting this route in production.
-          </p>
+        <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-yellow-800 mb-1">Security Reminder</p>
+              <p className="text-xs text-yellow-700">
+                After creating your admin user, protect this route in production to prevent unauthorized access.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

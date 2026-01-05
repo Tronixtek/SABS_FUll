@@ -61,3 +61,28 @@ exports.checkPermission = (permission) => {
     next();
   };
 };
+
+// Middleware to restrict certain routes in production
+exports.restrictInProduction = (req, res, next) => {
+  // Allow in development mode
+  if (process.env.NODE_ENV !== 'production') {
+    return next();
+  }
+
+  // In production, require special authorization header
+  const authHeader = req.headers['x-admin-setup'];
+  const setupKey = process.env.ADMIN_SETUP_KEY || 'admin-setup-secret-2025';
+  
+  if (!authHeader || authHeader !== setupKey) {
+    return res.status(403).json({
+      success: false,
+      message: 'User registration is disabled in production. Use the admin panel to create new users.',
+      hint: 'If you need to create the initial admin user, please set the X-Admin-Setup header with the correct key.',
+      documentation: 'See deployment guide for initial admin setup instructions.'
+    });
+  }
+
+  // Log the production setup attempt for security monitoring
+  console.log(`[SECURITY] Production admin setup attempted from IP: ${req.ip || 'unknown'}`);
+  next();
+};

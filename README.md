@@ -259,6 +259,47 @@ client/src/
 
 ## 🔧 Configuration
 
+### ⚠️ Production Security Setup
+
+**IMPORTANT**: Before deploying to production, follow these security steps:
+
+1. **Set Environment Variables**:
+   ```bash
+   export NODE_ENV=production
+   export ADMIN_SETUP_KEY=your-extremely-secure-setup-key-2025
+   export DEVELOPER_KEY=your-secure-developer-key-2025
+   export JWT_SECRET=your-extremely-secure-jwt-secret
+   ```
+
+2. **Create Initial Admin User**:
+   ```bash
+   curl -X POST https://your-domain.com/api/auth/register \
+     -H "Content-Type: application/json" \
+     -H "X-Admin-Setup: your-extremely-secure-setup-key-2025" \
+     -d '{
+       "username": "admin",
+       "email": "admin@company.com", 
+       "password": "SecurePassword123!",
+       "firstName": "Admin",
+       "lastName": "User",
+       "role": "super-admin",
+       "developerKey": "your-secure-developer-key-2025"
+     }'
+   ```
+
+3. **Verify Security**:
+   ```bash
+   # Linux/Mac
+   ./security-check.sh
+   
+   # Windows
+   .\security-check.ps1
+   ```
+
+4. **After Setup**: Remove or rotate the setup key for additional security
+
+📚 **For detailed security instructions, see**: [PRODUCTION_SECURITY_GUIDE.md](./PRODUCTION_SECURITY_GUIDE.md)
+
 ### Facility Setup
 
 1. Navigate to the Facilities page

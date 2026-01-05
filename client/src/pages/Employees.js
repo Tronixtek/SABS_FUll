@@ -259,54 +259,67 @@ const Employees = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      active: 'badge-success',
-      inactive: 'badge-gray',
-      suspended: 'badge-warning',
-      terminated: 'badge-danger'
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-gray-100 text-gray-800',
+      suspended: 'bg-yellow-100 text-yellow-800',
+      terminated: 'bg-red-100 text-red-800'
     };
-    return `badge ${badges[status] || 'badge-gray'}`;
+    return `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badges[status] || 'bg-gray-100 text-gray-800'}`;
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="spinner"></div>
+        <div className="flex flex-col items-center">
+          <svg className="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-gray-600">Loading employees...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">Employees</h1>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 sm:p-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Employee Management
+          </h1>
+          <p className="text-gray-600 mt-1">Manage your workforce and employee data</p>
+        </div>
         <div className="flex items-center space-x-4">
           <button
             onClick={handleAddEmployee}
-            className="btn btn-primary flex items-center"
+            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
+            <PlusIcon className="h-5 w-5" />
             Add Employee
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card">
+      <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Filter Employees</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="label">Search</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <input
               type="text"
-              className="input"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               placeholder="Search by name, ID, or email..."
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
             />
           </div>
           <div>
-            <label className="label">Facility</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Facility</label>
             <select
-              className="input"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
               value={filters.facility}
               onChange={(e) => setFilters({ ...filters, facility: e.target.value })}
             >
@@ -319,9 +332,9 @@ const Employees = () => {
             </select>
           </div>
           <div>
-            <label className="label">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
-              className="input"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
             >
@@ -335,71 +348,155 @@ const Employees = () => {
         </div>
       </div>
 
-      {/* Employee Table */}
-      <div className="card overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Employee ID</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Facility</th>
-              <th>Department</th>
-              <th>Shift</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.length > 0 ? (
-              employees.map((employee) => (
-                <tr key={employee._id}>
-                  <td className="font-medium">{employee.employeeId}</td>
-                  <td>
-                    {employee.firstName} {employee.lastName}
-                  </td>
-                  <td className="text-gray-600">{employee.email}</td>
-                  <td>{employee.facility?.name || 'N/A'}</td>
-                  <td>{employee.department}</td>
-                  <td>
-                    <span className="badge badge-info">
-                      {employee.shift?.name || 'N/A'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={getStatusBadge(employee.status)}>
-                      {employee.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEditEmployee(employee)}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="Edit"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEmployee(employee)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Delete"
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
+      {/* Employee Table/Cards */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Employee ID</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Name</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Email</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Facility</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Department</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Shift</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Status</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {employees.length > 0 ? (
+                employees.map((employee) => (
+                  <tr key={employee._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4 px-6 text-sm font-medium text-gray-900">{employee.employeeId}</td>
+                    <td className="py-4 px-6 text-sm text-gray-900 font-medium">
+                      {employee.firstName} {employee.lastName}
+                    </td>
+                    <td className="py-4 px-6 text-sm text-gray-600">{employee.email}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{employee.facility?.name || 'N/A'}</td>
+                    <td className="py-4 px-6 text-sm text-gray-700">{employee.department}</td>
+                    <td className="py-4 px-6">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {employee.shift?.name || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={getStatusBadge(employee.status)}>
+                        {employee.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => handleEditEmployee(employee)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Edit"
+                        >
+                          <PencilIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEmployee(employee)}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Delete"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="8" className="py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center">
+                      <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <p className="text-lg font-medium text-gray-900">No employees found</p>
+                      <p className="text-gray-500">Try adjusting your filters or add a new employee</p>
                     </div>
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="8" className="text-center text-gray-500 py-8">
-                  No employees found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="lg:hidden p-4 space-y-4">
+          {employees.length > 0 ? (
+            employees.map((employee) => (
+              <div key={employee._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      {employee.firstName} {employee.lastName}
+                    </h3>
+                    <p className="text-sm text-gray-600">ID: {employee.employeeId}</p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleEditEmployee(employee)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteEmployee(employee)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Email:</span>
+                    <span className="text-sm font-medium text-gray-900">{employee.email}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Facility:</span>
+                    <span className="text-sm font-medium text-gray-900">{employee.facility?.name || 'N/A'}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Department:</span>
+                    <span className="text-sm font-medium text-gray-900">{employee.department}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Shift:</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {employee.shift?.name || 'N/A'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Status:</span>
+                    <span className={getStatusBadge(employee.status)}>
+                      {employee.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-12 text-center text-gray-500">
+              <div className="flex flex-col items-center">
+                <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <p className="text-lg font-medium text-gray-900">No employees found</p>
+                <p className="text-gray-500">Try adjusting your filters or add a new employee</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {modalOpen && (
