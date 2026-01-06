@@ -55,6 +55,24 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    
+    // Auto-generate employee ID when facility is selected
+    if (e.target.name === 'facility' && e.target.value && !employee) {
+      generateEmployeeId(e.target.value);
+    }
+  };
+
+  const generateEmployeeId = async (facilityId) => {
+    try {
+      const response = await axios.get(`/api/employees/generate-id/${facilityId}`);
+      if (response.data.success) {
+        setFormData(prev => ({ ...prev, employeeId: response.data.data.employeeId }));
+        toast.success(`Employee ID generated: ${response.data.data.employeeId}`);
+      }
+    } catch (error) {
+      console.error('Failed to generate employee ID:', error);
+      toast.error('Failed to generate employee ID');
+    }
   };
 
   const startCamera = async () => {
@@ -456,15 +474,19 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               <h4 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Employee ID *</label>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Employee ID *
+                    {!employee && <span className="text-xs text-gray-500 ml-1">(Auto-generated)</span>}
+                  </label>
                   <input
                     type="text"
                     name="employeeId"
                     value={formData.employeeId}
                     onChange={handleChange}
                     required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., EMP001"
+                    readOnly={!employee}
+                    className={`mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${!employee ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    placeholder={!employee ? "Select facility to generate ID" : "e.g., EMP001"}
                   />
                 </div>
                 

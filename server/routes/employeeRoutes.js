@@ -8,13 +8,15 @@ const {
   updateEmployee,
   deleteEmployee,
   forceDeleteEmployee,
-  getEmployeeStats
+  getEmployeeStats,
+  generateNextEmployeeId
 } = require('../controllers/employeeController');
 const { protect, checkPermission } = require('../middleware/auth');
 
 router.use(protect);
 
 router.get('/', checkPermission('view_attendance'), getEmployees);
+router.get('/generate-id/:facilityId', checkPermission('manage_employees'), generateNextEmployeeId);
 router.get('/:id', checkPermission('view_attendance'), getEmployee);
 router.get('/:id/stats', checkPermission('view_attendance'), getEmployeeStats);
 router.post('/', checkPermission('manage_employees'), createEmployee);

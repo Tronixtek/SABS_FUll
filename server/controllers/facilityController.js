@@ -88,7 +88,31 @@ exports.createFacility = async (req, res) => {
       });
     }
 
-    const facility = await Facility.create(req.body);
+    const { assignedManagers, ...facilityData } = req.body;
+    
+    const facility = await Facility.create(facilityData);
+    
+    // Assign managers to this facility if provided
+    if (assignedManagers && assignedManagers.length > 0) {
+      const User = require('../models/User');
+      
+      // Update each selected manager to include this facility
+      for (const managerId of assignedManagers) {
+        const manager = await User.findById(managerId);
+        if (manager && manager.role === 'facility-manager') {
+          // Check if manager already has 2 facilities
+          if (manager.facilities.length >= 2) {
+            console.warn(`Manager ${manager.email} already has 2 facilities, skipping assignment`);
+            continue;
+          }
+          
+          if (!manager.facilities.includes(facility._id)) {
+            manager.facilities.push(facility._id);
+            await manager.save();
+          }
+        }
+      }
+    }
     
     res.status(201).json({
       success: true,
@@ -135,15 +159,55 @@ exports.updateFacility = async (req, res) => {
         });
       }
     }
+
+    // Extract assignedManagers from request
+    const { assignedManagers, ...facilityData } = req.body;
     
+    // Update the facility
     const facility = await Facility.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      facilityData,
       {
         new: true,
         runValidators: true
       }
     );
+
+    // Handle manager assignments if provided and user is admin
+    if (assignedManagers && (req.user.role === 'super-admin' || req.user.role === 'admin')) {
+      // Get currently assigned managers
+      const currentManagers = await User.find({ facilities: facility._id });
+      const currentManagerIds = currentManagers.map(m => m._id.toString());
+      
+      // Remove facility from managers that are no longer assigned
+      const managersToRemove = currentManagerIds.filter(id => !assignedManagers.includes(id));
+      await User.updateMany(
+        { _id: { $in: managersToRemove } },
+        { $pull: { facilities: facility._id } }
+      );
+      
+      // Add facility to newly assigned managers
+      const managersToAdd = assignedManagers.filter(id => !currentManagerIds.includes(id));
+      
+      for (const managerId of managersToAdd) {
+        const manager = await User.findById(managerId);
+        if (manager && manager.role === 'facility-manager') {
+          // Check if manager already has 2 facilities
+          if (manager.facilities && manager.facilities.length >= 2) {
+            return res.status(400).json({
+              success: false,
+              message: `Manager ${manager.firstName} ${manager.lastName} already has 2 facilities assigned`
+            });
+          }
+          
+          // Add facility to manager's facilities array
+          await User.findByIdAndUpdate(
+            managerId,
+            { $addToSet: { facilities: facility._id } }
+          );
+        }
+      }
+    }
     
     res.json({
       success: true,

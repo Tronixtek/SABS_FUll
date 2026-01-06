@@ -10,6 +10,8 @@ const Facilities = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingFacility, setEditingFacility] = useState(null);
+  const [facilityManagers, setFacilityManagers] = useState([]);
+  const [selectedManagers, setSelectedManagers] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -40,7 +42,18 @@ const Facilities = () => {
 
   useEffect(() => {
     fetchFacilities();
+    fetchFacilityManagers();
   }, []);
+
+  const fetchFacilityManagers = async () => {
+    try {
+      const response = await axios.get('/api/auth/users');
+      const managers = response.data.data.filter(u => u.role === 'facility-manager');
+      setFacilityManagers(managers);
+    } catch (error) {
+      console.error('Failed to fetch managers:', error);
+    }
+  };
 
   const fetchFacilities = async () => {
     try {
@@ -64,10 +77,18 @@ const Facilities = () => {
     }
   };
 
-  const handleOpenModal = (facility = null) => {
+  const handleOpenModal = async (facility = null) => {
     if (facility) {
-      // Editing existing facility
+      // Editing existing facility - fetch managers assigned to this facility
       setEditingFacility(facility);
+      
+      // Get managers assigned to this facility
+      const assignedManagers = facilityManagers
+        .filter(manager => manager.facilities && manager.facilities.some(f => f._id === facility._id))
+        .map(manager => manager._id);
+      
+      setSelectedManagers(assignedManagers);
+      
       setFormData({
         name: facility.name || '',
         code: facility.code || '',
@@ -98,6 +119,7 @@ const Facilities = () => {
     } else {
       // Adding new facility
       setEditingFacility(null);
+      setSelectedManagers([]);
       setFormData({
         name: '',
         code: '',
@@ -165,7 +187,8 @@ const Facilities = () => {
           ...formData.configuration,
           userApiUrl: formData.userApiUrl,
           addUserApiUrl: formData.addUserApiUrl
-        }
+        },
+        assignedManagers: selectedManagers // Include selected managers
       };
       // Remove from root level (keep only in configuration)
       delete submitData.userApiUrl;
@@ -181,6 +204,7 @@ const Facilities = () => {
       
       handleCloseModal();
       fetchFacilities();
+      fetchFacilityManagers(); // Refresh managers list
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to save facility';
       toast.error(message, { id: loadingToast });
@@ -557,6 +581,67 @@ const Facilities = () => {
                       placeholder="John Doe"
                     />
                   </div>
+                  
+                  {/* Assign Facility Managers */}
+                  {hasPermission('manage_facilities') && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Assign Facility Managers (Max 2)
+                      </label>
+                      <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 max-h-48 overflow-y-auto">
+                        {facilityManagers.length === 0 ? (
+                          <p className="text-sm text-gray-500">No facility managers available. Create managers in Users page first.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {facilityManagers.map(manager => {
+                              const managerFacilityCount = manager.facilities?.length || 0;
+                              const isSelected = selectedManagers.includes(manager._id);
+                              const canSelect = isSelected || selectedManagers.length < 2;
+                              
+                              return (
+                                <label 
+                                  key={manager._id}
+                                  className={`flex items-center p-2 rounded hover:bg-gray-100 ${!canSelect ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    disabled={!canSelect}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        if (managerFacilityCount >= 2) {
+                                          toast.error(`${manager.firstName} ${manager.lastName} already manages 2 facilities (maximum allowed)`);
+                                          return;
+                                        }
+                                        setSelectedManagers([...selectedManagers, manager._id]);
+                                      } else {
+                                        setSelectedManagers(selectedManagers.filter(id => id !== manager._id));
+                                      }
+                                    }}
+                                    className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                  />
+                                  <div className="flex-1">
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {manager.firstName} {manager.lastName}
+                                    </span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      ({manager.email})
+                                    </span>
+                                    <span className="text-xs text-gray-400 ml-2">
+                                      - Currently managing {managerFacilityCount} facilities
+                                    </span>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Select up to 2 managers for this facility. Each manager can manage a maximum of 2 facilities.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 

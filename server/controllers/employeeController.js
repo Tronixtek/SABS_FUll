@@ -1,6 +1,48 @@
 const Employee = require('../models/Employee');
+const Facility = require('../models/Facility');
 const axios = require('axios');
 const javaServiceClient = require('../services/javaServiceClient');
+
+// Helper function to generate unique employee ID
+const generateEmployeeId = async (facilityId) => {
+  try {
+    const facility = await Facility.findById(facilityId);
+    if (!facility) {
+      throw new Error('Facility not found');
+    }
+
+    const facilityCode = facility.code.toUpperCase();
+    
+    // Find the last employee ID for this facility
+    const lastEmployee = await Employee.findOne({
+      employeeId: { $regex: `^${facilityCode}_` }
+    }).sort({ employeeId: -1 });
+
+    let nextNumber = 1;
+    if (lastEmployee) {
+      // Extract the number from the last employee ID (e.g., FACILITY_00123 -> 123)
+      const match = lastEmployee.employeeId.match(/_([0-9]+)$/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+
+    // Pad with zeros to make it 5 digits
+    const paddedNumber = String(nextNumber).padStart(5, '0');
+    const employeeId = `${facilityCode}_${paddedNumber}`;
+
+    // Double-check uniqueness
+    const exists = await Employee.findOne({ employeeId });
+    if (exists) {
+      // If somehow exists, try the next number
+      return generateEmployeeId(facilityId);
+    }
+
+    return employeeId;
+  } catch (error) {
+    throw new Error(`Failed to generate employee ID: ${error.message}`);
+  }
+};
 
 // @desc    Get all employees
 // @route   GET /api/employees
@@ -104,6 +146,11 @@ exports.getEmployee = async (req, res) => {
 // @access  Private
 exports.createEmployee = async (req, res) => {
   try {
+    // Auto-generate employee ID if not provided
+    if (!req.body.employeeId && req.body.facility) {
+      req.body.employeeId = await generateEmployeeId(req.body.facility);
+    }
+
     // Create employee in MERN database
     const employee = await Employee.create(req.body);
     await employee.populate('facility shift');
@@ -894,3 +941,23 @@ exports.getEmployeeStats = async (req, res) => {
     });
   }
 };
+
+// @desc    Generate next employee ID for a facility
+// @route   GET /api/employees/generate-id/:facilityId
+// @access  Private
+exports.generateNextEmployeeId = async (req, res) => {
+  try {
+    const employeeId = await generateEmployeeId(req.params.facilityId);
+    
+    res.json({
+      success: true,
+      data: { employeeId }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+

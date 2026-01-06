@@ -226,6 +226,95 @@ const Users = () => {
         </div>
       </div>
 
+      {/* Users Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Users List</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Login Credentials</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Assigned Facilities</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Created</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                    No users found. Create your first user to get started.
+                  </td>
+                </tr>
+              ) : (
+                users.map((user) => (
+                  <tr key={user._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                          {user.firstName?.[0]}{user.lastName?.[0]}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {user.firstName} {user.lastName}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        user.role === 'super-admin' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                        user.role === 'facility-manager' ? 'bg-green-100 text-green-800' :
+                        'bg-orange-100 text-orange-800'
+                      }`}>
+                        {user.role === 'facility-manager' ? 'Facility Manager' :
+                         user.role === 'hr' ? 'HR' :
+                         user.role === 'super-admin' ? 'Super Admin' : 'Admin'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <div className="text-gray-900 font-medium">
+                          <span className="text-gray-500">Email:</span> {user.email}
+                        </div>
+                        <div className="text-gray-900">
+                          <span className="text-gray-500">Username:</span> {user.username}
+                        </div>
+                        <div className="text-gray-600 text-xs mt-1 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 inline-block">
+                          <span className="font-medium">Password:</span> Use reset to change
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {user.facilities && user.facilities.length > 0 ? (
+                        <div className="space-y-1">
+                          {user.facilities.map((facility, index) => (
+                            <div key={index} className="text-sm">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {facility.name} ({facility.code})
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500">No facilities assigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Create User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

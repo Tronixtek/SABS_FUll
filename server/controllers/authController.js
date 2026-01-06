@@ -323,7 +323,7 @@ exports.getUsers = async (req, res) => {
       role: { $in: ['facility-manager', 'hr'] } 
     })
     .select('-password')
-    .populate('facilities', 'name location')
+    .populate('facilities', 'name code location')
     .sort({ createdAt: -1 });
 
     res.json({
