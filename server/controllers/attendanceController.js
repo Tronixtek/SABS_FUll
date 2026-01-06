@@ -38,8 +38,17 @@ exports.getAttendance = async (req, res) => {
     }
     
     // Filter by user's accessible facilities
-    if (req.user.role !== 'super-admin' && req.user.facilities.length > 0) {
-      query.facility = { $in: req.user.facilities };
+    if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      if (req.user.facilities.length > 0) {
+        query.facility = { $in: req.user.facilities };
+      } else {
+        // If no facilities assigned, return empty
+        return res.json({
+          success: true,
+          data: [],
+          pagination: { total: 0, page: 1, pages: 0 }
+        });
+      }
     }
     
     console.log('🔍 Attendance query:', JSON.stringify(query, null, 2));

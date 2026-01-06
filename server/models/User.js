@@ -33,8 +33,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['super-admin', 'admin', 'manager', 'hr', 'viewer'],
-    default: 'viewer'
+    enum: ['super-admin', 'admin', 'facility-manager', 'hr'],
+    default: 'hr'
   },
   facilities: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -48,11 +48,14 @@ const userSchema = new mongoose.Schema({
       'delete_attendance',
       'manage_employees',
       'manage_facilities',
+      'edit_facilities',
       'manage_shifts',
       'view_reports',
       'export_data',
       'manage_users',
-      'system_settings'
+      'system_settings',
+      'enroll_users',
+      'manage_devices'
     ]
   }],
   status: {
@@ -93,8 +96,15 @@ userSchema.virtual('fullName').get(function() {
 
 // Method to check permission
 userSchema.methods.hasPermission = function(permission) {
-  if (this.role === 'super-admin') return true;
+  // Super-admin and admin have all permissions
+  if (this.role === 'super-admin' || this.role === 'admin') return true;
   return this.permissions.includes(permission);
+};
+
+// Method to check if user can manage a specific facility
+userSchema.methods.canAccessFacility = function(facilityId) {
+  if (this.role === 'super-admin' || this.role === 'admin') return true;
+  return this.facilities.some(f => f.toString() === facilityId.toString());
 };
 
 module.exports = mongoose.model('User', userSchema);

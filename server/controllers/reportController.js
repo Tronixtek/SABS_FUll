@@ -100,8 +100,14 @@ exports.getDailyReport = async (req, res) => {
       date: moment(reportDate).startOf('day').toDate()
     };
     
+    // Filter by facility for non-admin users
     if (facility) {
       matchFilter.facility = facility;
+    } else if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      // Facility managers and HR can only see their assigned facilities
+      if (req.user.facilities && req.user.facilities.length > 0) {
+        matchFilter.facility = { $in: req.user.facilities };
+      }
     }
 
     // Get raw attendance records (separate check-in/check-out)
@@ -114,11 +120,21 @@ exports.getDailyReport = async (req, res) => {
     // Aggregate the records to combine check-in/check-out
     const attendanceRecords = aggregateAttendanceRecords(rawAttendanceRecords);
     
+    // Employee filter for all employees list
+    const employeeFilter = { status: 'active' };
+    if (facility) {
+      employeeFilter.facility = facility;
+    } else if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      // Facility managers and HR can only see employees from their assigned facilities
+      if (req.user.facilities && req.user.facilities.length > 0) {
+        employeeFilter.facility = { $in: req.user.facilities };
+      }
+    }
+    
     // Get all employees to check who didn't punch
-    const allEmployees = await Employee.find({
-      ...(facility ? { facility } : {}),
-      status: 'active'
-    }).populate('facility', 'name code').populate('shift', 'name startTime endTime workingHours');
+    const allEmployees = await Employee.find(employeeFilter)
+      .populate('facility', 'name code')
+      .populate('shift', 'name startTime endTime workingHours');
     
     const attendedEmployeeIds = attendanceRecords.map(a => a.employee._id.toString());
     const absentEmployees = allEmployees.filter(
@@ -179,7 +195,16 @@ exports.getMonthlyReport = async (req, res) => {
       date: { $gte: startDate, $lte: endDate }
     };
     
-    if (facility) query.facility = facility;
+    // Filter by facility for non-admin users
+    if (facility) {
+      query.facility = facility;
+    } else if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      // Facility managers and HR can only see their assigned facilities
+      if (req.user.facilities && req.user.facilities.length > 0) {
+        query.facility = { $in: req.user.facilities };
+      }
+    }
+    
     if (employeeId) query.employee = employeeId;
     
     console.log('🔍 Monthly report query:', JSON.stringify(query, null, 2));

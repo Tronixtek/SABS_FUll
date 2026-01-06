@@ -7,7 +7,6 @@ import PrivateRoute from './components/PrivateRoute';
 // Pages
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
@@ -16,6 +15,7 @@ import Shifts from './pages/Shifts';
 import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Users from './pages/Users';
 
 // Layout
 import Layout from './components/Layout';
@@ -28,7 +28,6 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
           
           <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route index element={<Navigate to="dashboard" replace />} />
@@ -39,6 +38,7 @@ function App() {
             <Route path="shifts" element={<Shifts />} />
             <Route path="reports" element={<Reports />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

@@ -112,15 +112,9 @@ const LandingPage = () => {
             <div className="flex items-center space-x-4">
               <Link 
                 to="/login" 
-                className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 Staff Login
-              </Link>
-              <Link 
-                to="/register" 
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Access Portal
               </Link>
             </div>
           </div>
@@ -151,12 +145,6 @@ const LandingPage = () => {
                 >
                   Access Dashboard
                   <ArrowRight className="ml-2 w-5 h-5" />
-                </Link>
-                <Link 
-                  to="/register"
-                  className="border border-green-300 text-green-700 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-green-50 transition-colors flex items-center justify-center"
-                >
-                  Staff Registration
                 </Link>
               </div>
               <div className="flex items-center mt-8 space-x-8">
@@ -312,12 +300,6 @@ const LandingPage = () => {
               className="bg-white text-green-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-50 transition-colors"
             >
               Access Dashboard
-            </Link>
-            <Link 
-              to="/register" 
-              className="border border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white/10 transition-colors"
-            >
-              Register Staff
             </Link>
           </div>
           <p className="text-green-100 mt-4 text-sm">

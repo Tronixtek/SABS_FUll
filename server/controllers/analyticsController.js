@@ -103,9 +103,13 @@ exports.getDashboardAnalytics = async (req, res) => {
     const facilityFilter = {};
     if (facility) {
       facilityFilter.facility = facility;
-    } else if (req.user.role !== 'super-admin' && req.user.facilities.length > 0) {
-      facilityFilter.facility = { $in: req.user.facilities };
+    } else if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      // Facility managers and HR can only see their assigned facilities
+      if (req.user.facilities && req.user.facilities.length > 0) {
+        facilityFilter.facility = { $in: req.user.facilities };
+      }
     }
+    // Super-admin and admin see all facilities (no filter)
     
     console.log('📊 Analytics facility filter:', facilityFilter);
     console.log('📅 Analytics date range:', { start, end, today, todayEnd });
@@ -118,8 +122,14 @@ exports.getDashboardAnalytics = async (req, res) => {
     
     console.log('👥 Total active employees:', totalEmployees);
     
-    // Total facilities
-    const totalFacilities = await Facility.countDocuments({ status: 'active' });
+    // Total facilities - also filter for non-admin users
+    let totalFacilities;
+    if (req.user.role === 'super-admin' || req.user.role === 'admin') {
+      totalFacilities = await Facility.countDocuments({ status: 'active' });
+    } else {
+      // Facility managers and HR only see count of their assigned facilities
+      totalFacilities = req.user.facilities ? req.user.facilities.length : 0;
+    }
     
     // Today's attendance - get raw records and aggregate them
     const todayRawAttendance = await Attendance.find({

@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Layout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -42,6 +42,7 @@ const Layout = () => {
     { name: 'Shifts', to: '/app/shifts', icon: ClockIcon },
     { name: 'Reports', to: '/app/reports', icon: DocumentTextIcon },
     { name: 'Analytics', to: '/app/analytics', icon: ChartBarIcon },
+    { name: 'Users', to: '/app/users', icon: UsersIcon, permission: 'manage_users' },
     { name: 'Settings', to: '/app/settings', icon: Cog6ToothIcon },
   ];
 
@@ -57,17 +58,17 @@ const Layout = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 border-r border-gray-200 ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-6 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
+        <div className="flex items-center justify-between h-16 px-6 bg-gray-900">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
               <span className="text-blue-600 font-bold text-lg">S</span>
             </div>
-            <h1 className="text-xl font-bold text-white">SABS</h1>
+            <h1 className="text-xl font-bold text-white">ATS</h1>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -80,22 +81,22 @@ const Layout = () => {
         {/* Navigation */}
         <nav className="mt-6 px-4 pb-20">
           <div className="space-y-1">
-            {navigation.map((item) => (
+            {navigation
+              .filter(item => !item.permission || hasPermission(item.permission))
+              .map((item) => (
               <NavLink
                 key={item.name}
                 to={item.to}
                 className={({ isActive }) =>
-                  `group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
+                  `group flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
                     isActive 
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md' 
-                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                   }`
                 }
                 onClick={() => isMobile && setSidebarOpen(false)}
               >
-                <item.icon className={`mr-3 h-5 w-5 transition-colors ${
-                  'group-hover:scale-110 transform transition-transform duration-200'
-                }`} />
+                <item.icon className="mr-3 h-5 w-5" />
                 <span className="truncate">{item.name}</span>
               </NavLink>
             ))}
@@ -103,21 +104,21 @@ const Layout = () => {
         </nav>
 
         {/* User Profile Section */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gray-50 border-t border-gray-200">
-          <div className="flex items-center mb-3 p-3 bg-white rounded-xl shadow-sm">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gray-900 border-t border-gray-700">
+          <div className="flex items-center mb-3 p-3 bg-gray-700 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </div>
             <div className="ml-3 flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-white truncate">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-gray-500 truncate">{user?.role}</p>
+              <p className="text-xs text-gray-400 truncate">{user?.role}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 border border-gray-200"
+            className="w-full flex items-center justify-center px-4 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-all duration-200"
           >
             <ArrowRightOnRectangleIcon className="h-4 w-4 mr-2" />
             Logout
@@ -162,20 +163,20 @@ const Layout = () => {
                 </p>
                 <p className="text-xs text-gray-500 truncate max-w-32">{user?.email}</p>
               </div>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
                 {user?.firstName?.[0]}{user?.lastName?.[0]}
               </div>
             </div>
 
             {/* Mobile User Avatar */}
-            <div className="md:hidden w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+            <div className="md:hidden w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 lg:p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 lg:p-6">
           <div className="max-w-full mx-auto">
             <Outlet />
           </div>

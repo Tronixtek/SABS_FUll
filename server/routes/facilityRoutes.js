@@ -16,9 +16,13 @@ router.use(protect);
 router.get('/', getFacilities);
 router.get('/:id', getFacility);
 router.get('/:id/stats', getFacilityStats);
+// Only admin and super-admin can create facilities
 router.post('/', checkPermission('manage_facilities'), createFacility);
-router.put('/:id', checkPermission('manage_facilities'), updateFacility);
+// Facility managers can edit their assigned facilities
+router.put('/:id', updateFacility);
+// Only admin and super-admin can delete facilities
 router.delete('/:id', checkPermission('manage_facilities'), deleteFacility);
-router.post('/:id/sync', checkPermission('manage_facilities'), syncFacility);
+// Allow sync for facility managers
+router.post('/:id/sync', syncFacility);
 
 module.exports = router;

@@ -11,9 +11,18 @@ exports.getFacilities = async (req, res) => {
     const query = {};
     if (status) query.status = status;
     
-    // Filter by user's accessible facilities
-    if (req.user.role !== 'super-admin' && req.user.facilities.length > 0) {
-      query._id = { $in: req.user.facilities };
+    // Super-admin and admin can see all facilities
+    // Facility-manager and HR can only see their assigned facilities
+    if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      if (req.user.facilities.length > 0) {
+        query._id = { $in: req.user.facilities };
+      } else {
+        // If no facilities assigned, return empty array
+        return res.json({
+          success: true,
+          data: []
+        });
+      }
     }
     
     const facilities = await Facility.find(query).sort({ name: 1 });
@@ -43,6 +52,16 @@ exports.getFacility = async (req, res) => {
         message: 'Facility not found'
       });
     }
+
+    // Check if user has access to this facility
+    if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      if (!req.user.canAccessFacility(facility._id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have access to this facility'
+        });
+      }
+    }
     
     res.json({
       success: true,
@@ -58,9 +77,17 @@ exports.getFacility = async (req, res) => {
 
 // @desc    Create facility
 // @route   POST /api/facilities
-// @access  Private
+// @access  Private (admin/super-admin only)
 exports.createFacility = async (req, res) => {
   try {
+    // Extra security check - only admin and super-admin can create facilities
+    if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only administrators can create new facilities. Facility Managers can only edit their assigned facilities.'
+      });
+    }
+
     const facility = await Facility.create(req.body);
     
     res.status(201).json({
@@ -88,6 +115,27 @@ exports.createFacility = async (req, res) => {
 // @access  Private
 exports.updateFacility = async (req, res) => {
   try {
+    // Check if facility exists first
+    const existingFacility = await Facility.findById(req.params.id);
+    
+    if (!existingFacility) {
+      return res.status(404).json({
+        success: false,
+        message: 'Facility not found'
+      });
+    }
+
+    // Check access permissions
+    // Facility managers can only edit their assigned facilities
+    if (req.user.role === 'facility-manager') {
+      if (!req.user.canAccessFacility(existingFacility._id)) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have permission to edit this facility. You can only edit your assigned facilities.'
+        });
+      }
+    }
+    
     const facility = await Facility.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -96,13 +144,6 @@ exports.updateFacility = async (req, res) => {
         runValidators: true
       }
     );
-    
-    if (!facility) {
-      return res.status(404).json({
-        success: false,
-        message: 'Facility not found'
-      });
-    }
     
     res.json({
       success: true,

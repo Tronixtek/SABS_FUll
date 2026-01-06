@@ -16,7 +16,7 @@ exports.register = async (req, res) => {
     const { username, email, password, firstName, lastName, role, facilities, developerKey } = req.body;
 
     // Enhanced security logging
-    console.log(`[SECURITY] User registration attempt - Role: ${role || 'viewer'}, Environment: ${process.env.NODE_ENV}, IP: ${req.ip || 'unknown'}`);
+    console.log(`[SECURITY] User registration attempt - Role: ${role || 'hr'}, Environment: ${process.env.NODE_ENV}, IP: ${req.ip || 'unknown'}`);
 
     // Validate developer key for super-admin role
     if (role === 'super-admin') {
@@ -32,15 +32,34 @@ exports.register = async (req, res) => {
       console.log(`[SECURITY] Super-admin user creation authorized with valid developer key`);
     }
 
-    // Validate developer key for super-admin role
-    if (role === 'super-admin') {
-      const requiredDeveloperKey = process.env.DEVELOPER_KEY || 'dev-secret-2025-sabs';
-      if (!developerKey || developerKey !== requiredDeveloperKey) {
-        console.log(`[SECURITY] Failed super-admin creation attempt - Invalid developer key`);
+    // Validate that only super-admin can create admin users
+    if (role === 'admin') {
+      // Check if request is from authenticated super-admin
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
         return res.status(403).json({
           success: false,
-          message: 'Invalid or missing developer key. Super admin creation requires valid developer access.',
-          securityNote: 'This action has been logged for security purposes.'
+          message: 'Admin users can only be created by Super Admin. Please login as Super Admin first.'
+        });
+      }
+
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const requestingUser = await User.findById(decoded.id);
+
+        if (!requestingUser || requestingUser.role !== 'super-admin') {
+          console.log(`[SECURITY] Unauthorized admin creation attempt from user: ${requestingUser?.username || 'unknown'}`);
+          return res.status(403).json({
+            success: false,
+            message: 'Only Super Admin can create Admin users.'
+          });
+        }
+        console.log(`[SECURITY] Admin user creation authorized by super-admin: ${requestingUser.username}`);
+      } catch (error) {
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid authentication. Admin users can only be created by Super Admin.'
         });
       }
     }
@@ -55,20 +74,20 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Validate manager-specific requirements
-    if (role === 'manager') {
-      // Manager must have at least one facility assigned
+    // Validate facility-manager requirements
+    if (role === 'facility-manager') {
+      // Facility Manager must have at least one facility assigned
       if (!facilities || facilities.length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'Manager role requires at least one facility to be assigned. Please select a facility.'
+          message: 'Facility Manager role requires at least one facility to be assigned. Please select a facility.'
         });
       }
 
       // Check the 2-manager limit for each assigned facility
       for (const facilityId of facilities) {
         const managersCount = await User.countDocuments({
-          role: 'manager',
+          role: 'facility-manager',
           facilities: facilityId,
           status: 'active'
         });
@@ -85,26 +104,43 @@ exports.register = async (req, res) => {
     // Set default permissions based on role
     let permissions = [];
     switch (role) {
-      case 'admin':
+      case 'super-admin':
+        // Super admin gets all permissions
         permissions = [
           'view_attendance', 'edit_attendance', 'delete_attendance',
           'manage_employees', 'manage_facilities', 'manage_shifts',
-          'view_reports', 'export_data', 'manage_users'
+          'view_reports', 'export_data', 'manage_users', 'system_settings',
+          'enroll_users', 'manage_devices'
         ];
         break;
-      case 'manager':
+      case 'admin':
+        // Admin has same privileges as super-admin
+        permissions = [
+          'view_attendance', 'edit_attendance', 'delete_attendance',
+          'manage_employees', 'manage_facilities', 'manage_shifts',
+          'view_reports', 'export_data', 'manage_users', 'system_settings',
+          'enroll_users', 'manage_devices'
+        ];
+        break;
+      case 'facility-manager':
+        // Facility Manager can edit their assigned facilities, enroll users, edit facility info and devices
+        // They CANNOT create new facilities (no manage_facilities permission)
         permissions = [
           'view_attendance', 'edit_attendance',
-          'manage_employees', 'view_reports', 'export_data'
+          'manage_employees', 'manage_shifts',
+          'view_reports', 'export_data',
+          'enroll_users', 'manage_devices', 'edit_facilities'
         ];
         break;
       case 'hr':
+        // HR can view all records and download only (read-only access)
         permissions = [
-          'view_attendance', 'manage_employees', 'view_reports', 'export_data'
+          'view_attendance', 'view_reports', 'export_data'
         ];
         break;
       default:
-        permissions = ['view_attendance', 'view_reports'];
+        // Default to HR permissions for safety
+        permissions = ['view_attendance', 'view_reports', 'export_data'];
     }
 
     const user = await User.create({
@@ -113,7 +149,7 @@ exports.register = async (req, res) => {
       password,
       firstName,
       lastName,
-      role: role || 'viewer',
+      role: role || 'hr',
       facilities: facilities || [],
       permissions
     });
@@ -268,6 +304,32 @@ exports.updatePassword = async (req, res) => {
       success: true,
       data: { token },
       message: 'Password updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Get all users (facility managers and HR only)
+// @route   GET /api/auth/users
+// @access  Private (admin/super-admin only)
+exports.getUsers = async (req, res) => {
+  try {
+    // Only return facility-manager and hr users (exclude super-admin and admin for security)
+    const users = await User.find({ 
+      role: { $in: ['facility-manager', 'hr'] } 
+    })
+    .select('-password')
+    .populate('facilities', 'name location')
+    .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: users.length,
+      data: users
     });
   } catch (error) {
     res.status(500).json({

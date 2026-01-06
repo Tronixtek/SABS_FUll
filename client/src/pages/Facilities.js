@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { PlusIcon, PencilIcon, TrashIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const Facilities = () => {
+  const { user, hasPermission } = useAuth();
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -229,13 +231,16 @@ const Facilities = () => {
           </h1>
           <p className="text-gray-600 mt-1">Manage facilities and device integrations</p>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
-        >
-          <PlusIcon className="h-5 w-5" />
-          Add Facility
-        </button>
+        {/* Only show Add Facility button if user has manage_facilities permission */}
+        {hasPermission('manage_facilities') && (
+          <button 
+            onClick={() => handleOpenModal()}
+            className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <PlusIcon className="h-5 w-5" />
+            Add Facility
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -314,6 +319,7 @@ const Facilities = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2">
+                {/* Sync button - visible to all authenticated users */}
                 <button
                   onClick={() => handleSync(facility._id)}
                   className="flex-1 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-2 text-sm"
@@ -322,21 +328,29 @@ const Facilities = () => {
                   <ArrowPathIcon className="h-4 w-4" />
                   Sync Now
                 </button>
-                <button 
-                  onClick={() => handleOpenModal(facility)}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2 text-sm"
-                  title="Edit Facility"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                  Edit
-                </button>
-                <button 
-                  onClick={() => handleDelete(facility._id, facility.name)}
-                  className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 transition-all duration-200 flex items-center justify-center text-sm"
-                  title="Delete Facility"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
+                
+                {/* Edit button - for admin/super-admin and facility managers (for their facilities) */}
+                {(hasPermission('manage_facilities') || hasPermission('edit_facilities')) && (
+                  <button 
+                    onClick={() => handleOpenModal(facility)}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                    title="Edit Facility"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                    Edit
+                  </button>
+                )}
+                
+                {/* Delete button - only for admin and super-admin */}
+                {hasPermission('manage_facilities') && (
+                  <button 
+                    onClick={() => handleDelete(facility._id, facility.name)}
+                    className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 transition-all duration-200 flex items-center justify-center text-sm"
+                    title="Delete Facility"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

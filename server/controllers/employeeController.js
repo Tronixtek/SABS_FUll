@@ -14,8 +14,17 @@ exports.getEmployees = async (req, res) => {
     // Filter by facility
     if (facility) {
       query.facility = facility;
-    } else if (req.user.role !== 'super-admin' && req.user.facilities.length > 0) {
-      query.facility = { $in: req.user.facilities };
+    } else if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      if (req.user.facilities.length > 0) {
+        query.facility = { $in: req.user.facilities };
+      } else {
+        // If no facilities assigned, return empty
+        return res.json({
+          success: true,
+          data: [],
+          pagination: { total: 0, page: 1, pages: 0 }
+        });
+      }
     }
     
     // Filter by status

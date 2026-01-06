@@ -13,19 +13,19 @@ const Register = () => {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    role: 'admin',
-    facility: '',
+    role: 'facility-manager',
+    facilities: [],
     developerKey: ''
   });
   const [loading, setLoading] = useState(false);
   const [facilities, setFacilities] = useState([]);
   const [loadingFacilities, setLoadingFacilities] = useState(false);
 
-  const { username, email, password, confirmPassword, firstName, lastName, role, facility, developerKey } = formData;
+  const { username, email, password, confirmPassword, firstName, lastName, role, facilities: selectedFacilities, developerKey } = formData;
 
-  // Fetch facilities when component mounts or when role changes to manager
+  // Fetch facilities when component mounts or when role changes to facility-manager
   useEffect(() => {
-    if (role === 'manager') {
+    if (role === 'facility-manager') {
       fetchFacilities();
     }
   }, [role]);
@@ -40,7 +40,12 @@ const Register = () => {
       }
     } catch (error) {
       console.error('Failed to fetch facilities:', error);
-      toast.error('Failed to load facilities');
+      // If authentication error, show appropriate message
+      if (error.response?.status === 401) {
+        toast.error('Please use the Users page inside the app to create facility managers.');
+      } else {
+        toast.error('Unable to load facilities. Please login and use the Users page.');
+      }
       setFacilities([]);
     } finally {
       setLoadingFacilities(false);
@@ -49,6 +54,23 @@ const Register = () => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleFacilityToggle = (facilityId) => {
+    const currentFacilities = formData.facilities || [];
+    if (currentFacilities.includes(facilityId)) {
+      // Remove facility
+      setFormData({
+        ...formData,
+        facilities: currentFacilities.filter(id => id !== facilityId)
+      });
+    } else {
+      // Add facility
+      setFormData({
+        ...formData,
+        facilities: [...currentFacilities, facilityId]
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -60,15 +82,15 @@ const Register = () => {
       return;
     }
 
-    // Manager must select a facility
-    if (role === 'manager' && !facility) {
-      toast.error('Please select a facility for the manager');
+    // Facility Manager must select at least one facility
+    if (role === 'facility-manager' && selectedFacilities.length === 0) {
+      toast.error('Please select at least one facility for the Facility Manager');
       return;
     }
 
-    // Check if facilities are available for manager role
-    if (role === 'manager' && facilities.length === 0) {
-      toast.error('Cannot create manager account. No facilities available. Admin must create a facility first.');
+    // Check if facilities are available for facility-manager role
+    if (role === 'facility-manager' && facilities.length === 0) {
+      toast.error('Cannot create Facility Manager account. No facilities available. Admin must create a facility first.');
       return;
     }
 
@@ -76,6 +98,11 @@ const Register = () => {
     if (role === 'super-admin' && !developerKey) {
       toast.error('Developer key is required for super admin creation');
       return;
+    }
+
+    // Admin creation requires authentication (will be validated by backend)
+    if (role === 'admin') {
+      toast.info('Admin users can only be created by Super Admin. You must be logged in as Super Admin.');
     }
 
     if (password !== confirmPassword) {
@@ -91,8 +118,8 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // Prepare facilities array - only for manager role
-      const facilitiesArray = role === 'manager' && facility ? [facility] : [];
+      // Prepare facilities array - only for facility-manager role
+      const facilitiesArray = role === 'facility-manager' ? selectedFacilities : [];
 
       const res = await axios.post('/api/auth/register', {
         username,
@@ -105,7 +132,14 @@ const Register = () => {
         developerKey
       });
 
-      toast.success('Admin user created successfully!');
+      const roleDisplayName = {
+        'super-admin': 'Super Admin',
+        'admin': 'Admin',
+        'facility-manager': 'Facility Manager',
+        'hr': 'HR'
+      }[role] || 'User';
+
+      toast.success(`${roleDisplayName} user created successfully!`);
       console.log('Registration successful:', res.data);
       
       // Redirect to login after 2 seconds
@@ -138,11 +172,17 @@ const Register = () => {
             <span className="text-white font-bold text-2xl">S</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
-            Create Admin User
+            Create User Account
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            One-time setup for your Smart Attendance System
+            Setup for your Smart Attendance System
           </p>
+          {/* Notice for Admins */}
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-800">
+              💡 <strong>Admins:</strong> To create Facility Managers or HR users, please login and go to <strong>Users</strong> page in the app.
+            </p>
+          </div>
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
@@ -251,10 +291,10 @@ const Register = () => {
               />
             </div>
 
-            {/* Role - Fixed to super-admin */}
+            {/* Role Selection */}
             <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                Role
+                Role *
               </label>
               <select
                 id="role"
@@ -263,15 +303,43 @@ const Register = () => {
                 onChange={handleChange}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
               >
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="hr">HR</option>
-                <option value="viewer">Viewer</option>
+                <option value="facility-manager">Facility Manager</option>
+                <option value="hr">HR (Read Only)</option>
+                <option value="admin">Admin (Super Admin only)</option>
+                <option value="super-admin">Super Admin (Developer)</option>
               </select>
+              <p className="mt-1 text-xs text-gray-500">
+                {role === 'super-admin' && 'Full system access - requires developer key'}
+                {role === 'admin' && 'Same as Super Admin - can only be created by Super Admin'}
+                {role === 'facility-manager' && 'Manage facilities, enroll users, edit devices'}
+                {role === 'hr' && 'View all records and download reports only'}
+              </p>
             </div>
 
-            {/* Facility Selection - Only for Manager role */}
-            {role === 'manager' && (
+            {/* Developer Key - Only for Super Admin */}
+            {role === 'super-admin' && (
+              <div className="col-span-full bg-red-50 border border-red-200 rounded-lg p-4">
+                <label htmlFor="developerKey" className="block text-sm font-medium text-red-800 mb-1">
+                  Developer Key * (Required for Super Admin)
+                </label>
+                <input
+                  id="developerKey"
+                  name="developerKey"
+                  type="password"
+                  required={role === 'super-admin'}
+                  value={developerKey}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 border border-red-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                  placeholder="Enter developer key"
+                />
+                <p className="mt-2 text-xs text-red-700">
+                  🔒 This is a security measure. Only developers should have access to this key.
+                </p>
+              </div>
+            )}
+
+            {/* Facility Selection - Only for Facility Manager role */}
+            {role === 'facility-manager' && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <label htmlFor="facility" className="block text-sm font-medium text-gray-700 mb-1">
                   Assign Facility *
@@ -300,24 +368,33 @@ const Register = () => {
                   </div>
                 ) : (
                   <>
-                    <select
-                      id="facility"
-                      name="facility"
-                      required
-                      value={facility}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white transition-all"
-                    >
-                      <option value="">Select a facility</option>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
                       {facilities.map((fac) => (
-                        <option key={fac._id} value={fac._id}>
-                          {fac.name} - {fac.code}
-                        </option>
+                        <label 
+                          key={fac._id} 
+                          className="flex items-center p-3 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedFacilities.includes(fac._id)}
+                            onChange={() => handleFacilityToggle(fac._id)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <div className="ml-3 flex-1">
+                            <span className="text-sm font-medium text-gray-900">{fac.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({fac.code})</span>
+                          </div>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                     <p className="mt-2 text-xs text-blue-700">
-                      This manager will only be able to manage employees and data for this facility. Maximum 2 managers per facility.
+                      📍 This Facility Manager will manage selected facilities, enroll users, and configure devices.
                     </p>
+                    {selectedFacilities.length > 0 && (
+                      <p className="mt-1 text-xs font-medium text-blue-800">
+                        ✓ {selectedFacilities.length} {selectedFacilities.length === 1 ? 'facility' : 'facilities'} selected
+                      </p>
+                    )}
                   </>
                 )}
               </div>
@@ -343,7 +420,7 @@ const Register = () => {
                   Creating User...
                 </>
               ) : (
-                'Create Admin User'
+                `Create ${role === 'super-admin' ? 'Super Admin' : role === 'admin' ? 'Admin' : role === 'facility-manager' ? 'Facility Manager' : 'HR'} Account`
               )}
             </button>
           </div>
