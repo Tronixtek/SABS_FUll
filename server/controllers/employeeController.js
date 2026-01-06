@@ -11,16 +11,21 @@ const generateEmployeeId = async (facilityId) => {
       throw new Error('Facility not found');
     }
 
-    const facilityCode = facility.code.toUpperCase();
+    // Use facility name and format it (remove spaces, special chars, convert to uppercase)
+    const facilityName = facility.name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '_')  // Replace non-alphanumeric with underscore
+      .replace(/_+/g, '_')          // Replace multiple underscores with single
+      .replace(/^_|_$/g, '');       // Remove leading/trailing underscores
     
     // Find the last employee ID for this facility
     const lastEmployee = await Employee.findOne({
-      employeeId: { $regex: `^${facilityCode}_` }
+      employeeId: { $regex: `^${facilityName}_` }
     }).sort({ employeeId: -1 });
 
     let nextNumber = 1;
     if (lastEmployee) {
-      // Extract the number from the last employee ID (e.g., FACILITY_00123 -> 123)
+      // Extract the number from the last employee ID (e.g., FACILITY_NAME_00123 -> 123)
       const match = lastEmployee.employeeId.match(/_([0-9]+)$/);
       if (match) {
         nextNumber = parseInt(match[1]) + 1;
@@ -29,7 +34,7 @@ const generateEmployeeId = async (facilityId) => {
 
     // Pad with zeros to make it 5 digits
     const paddedNumber = String(nextNumber).padStart(5, '0');
-    const employeeId = `${facilityCode}_${paddedNumber}`;
+    const employeeId = `${facilityName}_${paddedNumber}`;
 
     // Double-check uniqueness
     const exists = await Employee.findOne({ employeeId });
