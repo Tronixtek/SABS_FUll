@@ -362,6 +362,7 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     // Debug the success property specifically
     console.log(`   Java response success property: ${javaResponse.data.success}`);
     console.log(`   Java response code: ${javaResponse.data.code}`);
+    console.log(`   Java response message: ${javaResponse.data.msg || javaResponse.data.message}`);
     console.log(`   Java response success type: ${typeof javaResponse.data.success}`);
     
     // Check success using Java service's actual response format
@@ -370,12 +371,15 @@ exports.registerEmployeeWithDevice = async (req, res) => {
                                 (javaResponse.data.code && javaResponse.data.code.toString() === "000");
     
     if (!isJavaServiceSuccess) {
-      console.error(`❌ Device enrollment failed: ${javaResponse.data.msg || javaResponse.data.message}`);
+      const errorMsg = javaResponse.data.msg || javaResponse.data.message || javaResponse.data.error || 'Unknown device error';
+      console.error(`❌ Device enrollment failed: ${errorMsg}`);
+      console.error(`   Full error response:`, javaResponse.data);
       
       return res.status(502).json({
         success: false,
         message: 'Device enrollment failed',
-        deviceError: javaResponse.data.msg || javaResponse.data.message || 'Unknown device error',
+        deviceError: errorMsg,
+        deviceResponse: javaResponse.data,
         step: 'device_enrollment'
       });
     }
