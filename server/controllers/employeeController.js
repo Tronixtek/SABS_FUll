@@ -314,7 +314,7 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     console.log(`   Facility: ${facilityDoc.name}`);
 
     // Prepare payload for Java device service - matches the expected format
-    const deviceKey = facilityDoc.configuration?.deviceKey || facilityDeviceId;
+    const deviceKey = (facilityDoc.configuration?.deviceKey || facilityDeviceId).toLowerCase();
     console.log(`   Device Key: ${deviceKey}`);
     console.log(`   Verification Style: 0 (any verification method)`);
     
