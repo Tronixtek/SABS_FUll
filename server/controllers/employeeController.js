@@ -11,30 +11,34 @@ const generateEmployeeId = async (facilityId) => {
       throw new Error('Facility not found');
     }
 
-    // Use facility name and format it (remove spaces, special chars, convert to uppercase)
-    const facilityName = facility.name
+    // Use first 3 letters of facility name - REMOVE ALL NON-ALPHANUMERIC
+    let facilityPrefix = facility.name
       .toUpperCase()
-      .replace(/[^A-Z0-9]/g, '_')  // Replace non-alphanumeric with underscore
-      .replace(/_+/g, '_')          // Replace multiple underscores with single
-      .replace(/^_|_$/g, '');       // Remove leading/trailing underscores
+      .replace(/[^A-Z]/g, '')  // Remove ALL non-alphabetic characters (no underscores!)
+      .substring(0, 3);         // Take first 3 letters
     
-    // Find the last employee ID for this facility
+    // Ensure we have at least 3 characters (pad with X if needed)
+    while (facilityPrefix.length < 3) {
+      facilityPrefix += 'X';
+    }
+    
+    // Find the last employee ID for this facility (no underscore in search)
     const lastEmployee = await Employee.findOne({
-      employeeId: { $regex: `^${facilityName}_` }
+      employeeId: { $regex: `^${facilityPrefix}` }
     }).sort({ employeeId: -1 });
 
     let nextNumber = 1;
     if (lastEmployee) {
-      // Extract the number from the last employee ID (e.g., FACILITY_NAME_00123 -> 123)
-      const match = lastEmployee.employeeId.match(/_([0-9]+)$/);
+      // Extract the number from the last employee ID (e.g., HOT00123 -> 123)
+      const match = lastEmployee.employeeId.match(/([0-9]+)$/);
       if (match) {
         nextNumber = parseInt(match[1]) + 1;
       }
     }
 
-    // Pad with zeros to make it 5 digits
+    // Pad with zeros to make it 5 digits - NO UNDERSCORE!
     const paddedNumber = String(nextNumber).padStart(5, '0');
-    const employeeId = `${facilityName}_${paddedNumber}`;
+    const employeeId = `${facilityPrefix}${paddedNumber}`; // Removed underscore!
 
     // Double-check uniqueness
     const exists = await Employee.findOne({ employeeId });
@@ -291,10 +295,17 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     const facilityDeviceId = facilityDoc.deviceInfo?.deviceId || facilityDoc.code || facility;
     
     // Employee gets unique person ID within the device (not device ID)
-    const personId = employeeId; // Use employee ID as person ID within the device
+    // XO5 device has max 32 character limit for person IDs
+    let personId = employeeId;
+    
+    // Validate person ID length for XO5 device compatibility
+    if (personId.length > 32) {
+      console.warn(`⚠️ Person ID too long (${personId.length} chars), truncating to 32 characters`);
+      personId = personId.substring(0, 32);
+    }
     
     console.log(`📱 Facility Device ID: ${facilityDeviceId}`);
-    console.log(`👤 Employee Person ID: ${personId}`);
+    console.log(`👤 Employee Person ID: ${personId} (${personId.length} chars)`);
 
     // ✅ STEP 3: ENROLL TO BIOMETRIC DEVICE FIRST (NO DATABASE SAVE YET)
     console.log(`🔄 Starting biometric device enrollment...`);
@@ -303,9 +314,8 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     console.log(`   Facility: ${facilityDoc.name}`);
 
     // Prepare payload for Java device service - matches the expected format
-    const deviceKey = (facilityDoc.configuration?.deviceKey || facilityDeviceId).toLowerCase();
-    console.log(`   Device Key (original): ${facilityDoc.configuration?.deviceKey || facilityDeviceId}`);
-    console.log(`   Device Key (lowercase): ${deviceKey}`);
+    const deviceKey = facilityDoc.configuration?.deviceKey || facilityDeviceId;
+    console.log(`   Device Key: ${deviceKey}`);
     console.log(`   Verification Style: 0 (any verification method)`);
     
     // ✅ OPTIMIZE FACE IMAGE FOR XO5 DEVICE
