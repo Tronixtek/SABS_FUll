@@ -65,7 +65,10 @@ app.use(cors(corsOptions));
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
+  // Skip logging for XO5 webhook endpoint to keep console clean
+  app.use(morgan('dev', {
+    skip: (req, res) => req.path === '/api/xo5/record'
+  }));
 }
 
 // Database connection

@@ -112,21 +112,9 @@ exports.handleXO5Record = async (req, res) => {
     // Decode the record
     const decodedRecord = decodeXO5Record(recordData);
     
-    // ✅ LOG VALID INCOMING RECORD
-    console.log('\n=== NEW XO5 ATTENDANCE ===');
-    console.log('Person ID:', decodedRecord.personSn);
-    console.log('Direction:', decodedRecord.decoded.direction);
-    console.log('Verification:', decodedRecord.decoded.verificationMethod.join(', '));
-    console.log('Time:', decodedRecord.decoded.timestamp);
-    console.log('Record ID:', decodedRecord.recordId);
-    
-    attendanceLogger.info(`✅ Valid XO5 record received`, {
-      recordId: decodedRecord.recordId,
-      personId: decodedRecord.personSn,
-      direction: decodedRecord.decoded.direction,
-      verificationMethod: decodedRecord.decoded.verificationMethod,
-      timestamp: decodedRecord.decoded.timestamp
-    });
+    // ✅ CLEAN, SIMPLE LOG - ONE LINE
+    const timestamp = new Date(parseInt(decodedRecord.recordTime)).toLocaleTimeString('en-US', { hour12: false });
+    console.log(`✅ ${timestamp} | ${decodedRecord.personSn || 'Unknown'} | ${decodedRecord.decoded.direction} | ${decodedRecord.decoded.verificationMethod.join(',')}`);
     
     // Process the attendance record
     const result = await processXO5Attendance(decodedRecord, deviceId);
