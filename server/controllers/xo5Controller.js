@@ -90,16 +90,6 @@ exports.handleXO5Record = async (req, res) => {
     const deviceId = req.ip || req.connection.remoteAddress || 'unknown';
     const recordData = req.body || req.query || {};
     
-    // LOG ALL INCOMING XO5 DATA FOR DEBUGGING
-    console.log('=== XO5 RECORD RECEIVED ===');
-    console.log('Device IP:', deviceId);
-    console.log('Record Data:', JSON.stringify(recordData, null, 2));
-    console.log('Person SN:', recordData.personSn);
-    console.log('Record ID:', recordData.recordId);
-    console.log('Direction:', recordData.direction);
-    console.log('Result Flag:', recordData.resultFlag);
-    console.log('==============================');
-    
     // Validate XO5 record with strict filtering
     if (!isValidXO5Record(recordData)) {
       const skipReason = [];
@@ -107,16 +97,9 @@ exports.handleXO5Record = async (req, res) => {
       if (recordData?.resultFlag !== '1') skipReason.push(`Failed access (${recordData?.resultFlag})`);
       if (recordData?.personType !== '1') skipReason.push(`Not registered user (${recordData?.personType})`);
       if (!recordData?.personSn) skipReason.push('No person ID');
-      if (recordData?.direction !== '1' && recordData?.direction !== '4') skipReason.push(`Invalid direction (${recordData?.direction})`);
+      if (!['1', '2', '3', '4'].includes(recordData?.direction)) skipReason.push(`Invalid direction (${recordData?.direction})`);
       
-      // Only log skipped records for debugging (commented out to reduce console noise)
-      // attendanceLogger.info(`⏭️ XO5 Record skipped: ${skipReason.join(', ')}`, {
-      //   recordId: recordData?.recordId,
-      //   resultFlag: recordData?.resultFlag,
-      //   personType: recordData?.personType,
-      //   direction: recordData?.direction
-      // });
-      
+      // Silently skip filtered records (no logging)
       return res.json({ 
         status: 'received', 
         message: 'Data received but filtered (strict mode)',
@@ -129,8 +112,15 @@ exports.handleXO5Record = async (req, res) => {
     // Decode the record
     const decodedRecord = decodeXO5Record(recordData);
     
-    // ✅ ONLY LOG VALID PROCESSED RECORDS
-    attendanceLogger.info(`✅ Valid XO5 record processed`, {
+    // ✅ LOG VALID INCOMING RECORD
+    console.log('\n=== NEW XO5 ATTENDANCE ===');
+    console.log('Person ID:', decodedRecord.personSn);
+    console.log('Direction:', decodedRecord.decoded.direction);
+    console.log('Verification:', decodedRecord.decoded.verificationMethod.join(', '));
+    console.log('Time:', decodedRecord.decoded.timestamp);
+    console.log('Record ID:', decodedRecord.recordId);
+    
+    attendanceLogger.info(`✅ Valid XO5 record received`, {
       recordId: decodedRecord.recordId,
       personId: decodedRecord.personSn,
       direction: decodedRecord.decoded.direction,
