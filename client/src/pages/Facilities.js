@@ -206,7 +206,9 @@ const Facilities = () => {
       fetchFacilities();
       fetchFacilityManagers(); // Refresh managers list
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to save facility';
+      console.error('Facility save error:', error);
+      console.error('Error response:', error.response);
+      const message = error.response?.data?.message || error.message || 'Failed to save facility';
       toast.error(message, { id: loadingToast });
     }
   };
