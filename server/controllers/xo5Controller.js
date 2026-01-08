@@ -32,7 +32,8 @@ function isValidXO5Record(data) {
   const isRegisteredUser = data.personType === '1'; // Must be REGISTERED user (not stranger)
   const hasPersonIdentified = data.personSn && data.personSn !== ''; // Must have person serial number
   const hasValidVerification = data.faceFlag === '1' || data.fingerFlag === '1' || data.cardFlag === '1'; // Must have valid verification method
-  const isValidDirection = data.direction === '1' || data.direction === '4'; // Only check-in (1) or check-out (4)
+  // Accept: 1=check-in, 2=break-out, 3=break-in, 4=check-out
+  const isValidDirection = ['1', '2', '3', '4'].includes(data.direction);
   
   // ALL conditions must be met for a valid verified check-in/out
   if (isSuccessfulAccess && isRegisteredUser && hasValidVerification && isValidDirection) {
@@ -63,6 +64,8 @@ function decodeXO5Record(data) {
                  data.personType === '2' ? 'STRANGER' : 
                  'UNKNOWN',
       direction: data.direction === '1' ? 'CHECK-IN' : 
+                data.direction === '3' ? 'BREAK-IN (treated as CHECK-IN)' :
+                data.direction === '2' ? 'BREAK-OUT (treated as CHECK-OUT)' :
                 data.direction === '4' ? 'CHECK-OUT' : 
                 `UNKNOWN(${data.direction})`,
       verificationMethod: [],
@@ -200,10 +203,35 @@ async function processXO5Attendance(xo5Record, deviceId) {
     const attendanceTime = new Date(parseInt(xo5Record.recordTime));
     const attendanceDate = moment(attendanceTime).startOf('day').toDate();
     
-    // Determine if this is check-in or check-out
-    const isCheckIn = xo5Record.direction === '1';
-    const isCheckOut = xo5Record.direction === '4';
-    const attendanceType = isCheckIn ? 'check-in' : 'check-out';
+    // Normalize direction: 1,3 = check-in | 2,4 = check-out
+    // Direction codes: 1=check-in, 2=break-out, 3=break-in, 4=check-out
+    let normalizedDirection;
+    if (xo5Record.direction === '1' || xo5Record.direction === '3') {
+      normalizedDirection = 'check-in'; // Check-in OR Break-in → both are check-in
+    } else if (xo5Record.direction === '2' || xo5Record.direction === '4') {
+      normalizedDirection = 'check-out'; // Break-out OR Check-out → both are check-out
+    } else {
+      normalizedDirection = 'unknown';
+    }
+    
+    // SMART LOGIC: If trying to check-out but no check-in exists today, convert to check-in
+    let attendanceType = normalizedDirection;
+    if (normalizedDirection === 'check-out') {
+      const todayCheckIn = await Attendance.findOne({
+        employee: employee._id,
+        date: attendanceDate,
+        type: 'check-in'
+      });
+      
+      if (!todayCheckIn) {
+        console.log(`⚠️ No check-in found for ${employee.firstName} ${employee.lastName} today, converting check-out to check-in`);
+        attendanceLogger.info(`Converting check-out to check-in for ${employee.employeeId} - no prior check-in found`);
+        attendanceType = 'check-in'; // Force it to be check-in
+      }
+    }
+    
+    const isCheckIn = attendanceType === 'check-in';
+    const isCheckOut = attendanceType === 'check-out';
     
     // Check if this specific attendance event already exists to avoid duplicates
     // Use multiple criteria to ensure we catch duplicates properly
