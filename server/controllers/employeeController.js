@@ -1027,10 +1027,27 @@ exports.deleteEmployeeFromDevice = async (req, res) => {
     
     const facility = employee.facility;
     
+    // Check if facility has device configured
     if (!facility.configuration?.deviceKey) {
-      return res.status(400).json({
-        success: false,
-        message: 'Facility does not have a device configured'
+      console.log(`⚠️ Facility does not have device configured - only updating database`);
+      
+      // No device configured, just update the employee record
+      employee.biometricData = {
+        ...employee.biometricData,
+        lastXO5Sync: null
+      };
+      employee.faceImageUploaded = false;
+      await employee.save();
+      
+      return res.json({
+        success: true,
+        message: `Employee ${employeeId} (${employee.firstName} ${employee.lastName}) removed from database. Note: Facility "${facility.name}" does not have a device configured, so no device deletion was performed.`,
+        data: {
+          employeeId: employee.employeeId,
+          name: `${employee.firstName} ${employee.lastName}`,
+          facility: facility.name,
+          note: 'No device configured - database only update'
+        }
       });
     }
     
@@ -1045,9 +1062,9 @@ exports.deleteEmployeeFromDevice = async (req, res) => {
     // Call Java service to delete employee from device
     try {
       const javaResponse = await axios.post('http://localhost:8081/api/employee/delete', {
+        employeeId: personId,  // Java API expects 'employeeId' field (which is the person's ID on the device)
         deviceKey: deviceKey,
-        secret: secret,
-        personId: personId
+        secret: secret
       }, {
         timeout: 30000
       });

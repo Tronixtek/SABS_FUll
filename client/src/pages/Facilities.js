@@ -242,15 +242,85 @@ const Facilities = () => {
       return;
     }
 
-    const loadingToast = toast.loading('Deleting employee from device...');
+    const loadingToast = toast.loading('Fetching employee details...');
     setDeletingFromDevice(true);
 
     try {
-      const response = await axios.delete(`/api/employees/device/${deleteEmployeeId}`);
-      toast.success(response.data.message || 'Employee deleted from device successfully', { id: loadingToast });
-      setDeleteEmployeeId('');
+      // Step 1: Get employee details from Node.js backend
+      const employeeResponse = await axios.get(`/api/employees?employeeId=${deleteEmployeeId}`);
+      const employee = employeeResponse.data.data.find(emp => emp.employeeId === deleteEmployeeId);
+      
+      if (!employee) {
+        toast.error(`Employee ${deleteEmployeeId} not found`, { id: loadingToast });
+        setDeletingFromDevice(false);
+        return;
+      }
+
+      // Permission check: Facility managers can only delete from their facilities
+      if (user.role === 'facility-manager') {
+        const canAccess = user.facilities.some(
+          f => f._id === employee.facility._id
+        );
+        
+        if (!canAccess) {
+          toast.error('You can only delete employees from your assigned facilities', { id: loadingToast });
+          setDeletingFromDevice(false);
+          return;
+        }
+      }
+
+      // Check if facility has device configured
+      if (!employee.facility?.configuration?.deviceKey) {
+        toast.error(`Facility "${employee.facility?.name}" does not have a device configured`, { id: loadingToast });
+        setDeletingFromDevice(false);
+        return;
+      }
+
+      const deviceKey = employee.facility.configuration.deviceKey.toLowerCase();
+      const secret = employee.facility.configuration.deviceSecret || '';
+      const personId = employee.biometricData?.xo5PersonSn || deleteEmployeeId;
+
+      // Step 2: Call Java API directly to delete from device
+      toast.loading('Deleting from device...', { id: loadingToast });
+      
+      const javaResponse = await axios.post('http://localhost:8081/api/employee/delete', {
+        employeeId: personId,  // Java API expects 'employeeId' field (which is the personId/personSn)
+        deviceKey: deviceKey,
+        secret: secret
+      }, {
+        timeout: 30000
+      });
+
+      if (javaResponse.data.success || javaResponse.data.code === '000') {
+        // Step 3: Update employee record in database to mark as not enrolled
+        await axios.put(`/api/employees/${employee._id}`, {
+          ...employee,
+          faceImageUploaded: false,
+          biometricData: {
+            ...employee.biometricData,
+            lastXO5Sync: null
+          }
+        });
+
+        toast.success(`Employee ${deleteEmployeeId} (${employee.firstName} ${employee.lastName}) deleted from device successfully`, { id: loadingToast });
+        setDeleteEmployeeId('');
+      } else {
+        toast.error(javaResponse.data.message || javaResponse.data.msg || 'Failed to delete from device', { id: loadingToast });
+      }
     } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Failed to delete employee from device';
+      console.error('Delete error:', error);
+      let message = 'Failed to delete employee from device';
+      
+      if (error.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error.response?.data?.msg) {
+        message = error.response.data.msg;
+      } else if (error.code === 'ECONNREFUSED') {
+        message = 'Cannot connect to device service. Please ensure the Java service is running on port 8081.';
+      } else if (error.message) {
+        message = error.message;
+      }
+      
       toast.error(message, { id: loadingToast });
     } finally {
       setDeletingFromDevice(false);
