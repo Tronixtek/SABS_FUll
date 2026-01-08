@@ -139,6 +139,18 @@ exports.createFacility = async (req, res) => {
 // @access  Private
 exports.updateFacility = async (req, res) => {
   try {
+    // Debug logging
+    console.log('updateFacility called');
+    console.log('req.user exists:', !!req.user);
+    console.log('req.user:', req.user ? { id: req.user._id, role: req.user.role } : 'undefined');
+    
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+    
     // Check if facility exists first
     const existingFacility = await Facility.findById(req.params.id);
     
