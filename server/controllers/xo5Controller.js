@@ -87,8 +87,15 @@ exports.handleXO5Record = async (req, res) => {
     const deviceId = req.ip || req.connection.remoteAddress || 'unknown';
     const recordData = req.body || req.query || {};
     
-    // Only log incoming records for debugging when needed (commented out to reduce noise)
-    // attendanceLogger.info(`📥 XO5 Record received from ${deviceId}`, { recordData });
+    // LOG ALL INCOMING XO5 DATA FOR DEBUGGING
+    console.log('=== XO5 RECORD RECEIVED ===');
+    console.log('Device IP:', deviceId);
+    console.log('Record Data:', JSON.stringify(recordData, null, 2));
+    console.log('Person SN:', recordData.personSn);
+    console.log('Record ID:', recordData.recordId);
+    console.log('Direction:', recordData.direction);
+    console.log('Result Flag:', recordData.resultFlag);
+    console.log('==============================');
     
     // Validate XO5 record with strict filtering
     if (!isValidXO5Record(recordData)) {
