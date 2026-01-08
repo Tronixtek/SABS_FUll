@@ -352,6 +352,14 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       verificationStyle: 0 // Default: 0 = any verification method
     };
 
+    console.log(`   === JAVA SERVICE PAYLOAD DEBUG ===`);
+    console.log(`   Employee ID: ${javaServicePayload.employeeId}`);
+    console.log(`   Full Name: ${javaServicePayload.fullName}`);
+    console.log(`   Device Key: ${javaServicePayload.deviceKey}`);
+    console.log(`   Secret: ${javaServicePayload.secret}`);
+    console.log(`   Verification Style: ${javaServicePayload.verificationStyle}`);
+    console.log(`   Face Image Length: ${javaServicePayload.faceImage.length}`);
+    console.log(`   Full Payload (without image): ${JSON.stringify({...javaServicePayload, faceImage: '[BASE64_DATA]'})}`);
     console.log(`   Sending enrollment request to device service...`);
 
     // Call Java device service for employee registration
