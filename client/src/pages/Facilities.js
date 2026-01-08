@@ -12,6 +12,8 @@ const Facilities = () => {
   const [editingFacility, setEditingFacility] = useState(null);
   const [facilityManagers, setFacilityManagers] = useState([]);
   const [selectedManagers, setSelectedManagers] = useState([]);
+  const [deleteEmployeeId, setDeleteEmployeeId] = useState('');
+  const [deletingFromDevice, setDeletingFromDevice] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -228,6 +230,33 @@ const Facilities = () => {
     }
   };
 
+  const handleDeleteEmployeeFromDevice = async (e) => {
+    e.preventDefault();
+    
+    if (!deleteEmployeeId.trim()) {
+      toast.error('Please enter an employee ID');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete employee ${deleteEmployeeId} from the device? This will remove their biometric data and they will no longer be able to check in/out.`)) {
+      return;
+    }
+
+    const loadingToast = toast.loading('Deleting employee from device...');
+    setDeletingFromDevice(true);
+
+    try {
+      const response = await axios.delete(`/api/employees/device/${deleteEmployeeId}`);
+      toast.success(response.data.message || 'Employee deleted from device successfully', { id: loadingToast });
+      setDeleteEmployeeId('');
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to delete employee from device';
+      toast.error(message, { id: loadingToast });
+    } finally {
+      setDeletingFromDevice(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const badges = {
       active: 'badge-success',
@@ -268,6 +297,52 @@ const Facilities = () => {
           </button>
         )}
       </div>
+
+      {/* Delete Employee from Device Section */}
+      {(user?.role === 'admin' || user?.role === 'super-admin' || user?.role === 'facility-manager') && (
+        <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl shadow-lg border border-red-200 p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <TrashIcon className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Employee from Device</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                {user?.role === 'facility-manager' 
+                  ? 'Remove an employee\'s biometric data from devices in your assigned facilities only.'
+                  : 'Remove an employee\'s biometric data from any facility\'s device.'}
+              </p>
+              <form onSubmit={handleDeleteEmployeeFromDevice} className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={deleteEmployeeId}
+                    onChange={(e) => setDeleteEmployeeId(e.target.value.toUpperCase())}
+                    placeholder="Enter Employee ID (e.g., HOT00001)"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    disabled={deletingFromDevice}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={deletingFromDevice || !deleteEmployeeId.trim()}
+                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                  {deletingFromDevice ? 'Deleting...' : 'Delete from Device'}
+                </button>
+              </form>
+              {user?.role === 'facility-manager' && (
+                <p className="text-xs text-gray-500 mt-2">
+                  ⚠️ You can only delete employees from facilities: {user?.facilities?.map(f => f.name).join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-96">

@@ -9,7 +9,8 @@ const {
   deleteEmployee,
   forceDeleteEmployee,
   getEmployeeStats,
-  generateNextEmployeeId
+  generateNextEmployeeId,
+  deleteEmployeeFromDevice
 } = require('../controllers/employeeController');
 const { protect, checkPermission } = require('../middleware/auth');
 
@@ -24,5 +25,6 @@ router.post('/register', checkPermission('manage_employees'), registerEmployeeWi
 router.put('/:id', checkPermission('manage_employees'), updateEmployee);
 router.delete('/:id', checkPermission('manage_employees'), deleteEmployee);
 router.delete('/:id/force', checkPermission('manage_employees'), forceDeleteEmployee);
+router.delete('/device/:employeeId', checkPermission('manage_employees'), deleteEmployeeFromDevice);
 
 module.exports = router;
