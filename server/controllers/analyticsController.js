@@ -147,7 +147,7 @@ exports.getDashboardAnalytics = async (req, res) => {
     
     // Count today's statuses
     const todayStats = {
-      totalPresent: todayAggregated.filter(a => ['present', 'late', 'excused'].includes(a.status)).length, // All who showed up
+      totalPresent: todayAggregated.filter(a => ['present', 'late', 'excused', 'incomplete'].includes(a.status)).length, // All who showed up
       present: todayAggregated.filter(a => a.status === 'present').length, // On time only
       late: todayAggregated.filter(a => a.status === 'late').length,
       absent: 0, // Will calculate based on total employees
