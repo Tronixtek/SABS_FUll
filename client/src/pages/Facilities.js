@@ -297,7 +297,7 @@ const Facilities = () => {
       // Call Java API directly to delete from device
       toast.loading('Deleting from device...', { id: loadingToast });
       
-      const javaResponse = await axios.post('http://localhost:8081/api/employee/delete', {
+      const javaResponse = await axios.post('http://143.198.150.26:8081/api/employee/delete', {
         employeeId: deleteEmployeeId,  // Use the employee ID directly
         deviceKey: deviceKey,
         secret: secret
