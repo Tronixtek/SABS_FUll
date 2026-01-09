@@ -55,6 +55,75 @@ exports.getAttendance = async (req, res) => {
     
     const skip = (page - 1) * limit;
     
+    // SPECIAL HANDLING FOR ON-LEAVE FILTER
+    if (status === 'on-leave') {
+      // Get approved leave requests for the date range
+      const LeaveRequest = require('../models/LeaveRequest');
+      const start = startDate ? new Date(startDate) : new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = endDate ? new Date(endDate) : new Date();
+      end.setHours(23, 59, 59, 999);
+      
+      const leaveQuery = {
+        status: 'approved',
+        $or: [
+          { startDate: { $lte: end }, endDate: { $gte: start } }
+        ]
+      };
+      
+      const approvedLeaves = await LeaveRequest.find(leaveQuery)
+        .populate({
+          path: 'employee',
+          populate: [
+            { path: 'facility', select: 'name code' },
+            { path: 'shift', select: 'name code' }
+          ]
+        });
+      
+      // Filter by facility if specified
+      let onLeaveRecords = approvedLeaves
+        .filter(leave => leave.employee)
+        .filter(leave => !facility || leave.employee.facility?._id.toString() === facility);
+      
+      // Generate leave records for each day
+      const leaveAttendanceRecords = [];
+      for (const leave of onLeaveRecords) {
+        const leaveStart = new Date(Math.max(leave.startDate, start));
+        const leaveEnd = new Date(Math.min(leave.endDate, end));
+        
+        for (let d = new Date(leaveStart); d <= leaveEnd; d.setDate(d.getDate() + 1)) {
+          leaveAttendanceRecords.push({
+            _id: `leave-${leave.employee._id}-${d.getTime()}`,
+            employee: leave.employee,
+            facility: leave.employee.facility,
+            shift: leave.employee.shift,
+            date: new Date(d),
+            status: leave.leaveType === 'half-day' ? 'half-day' : 'on-leave',
+            leaveType: leave.leaveType,
+            leaveReason: leave.reason,
+            workHours: 0,
+            checkIn: {},
+            checkOut: {},
+            breaks: []
+          });
+        }
+      }
+      
+      const total = leaveAttendanceRecords.length;
+      const paginatedLeave = leaveAttendanceRecords.slice(skip, skip + parseInt(limit));
+      
+      return res.json({
+        success: true,
+        data: paginatedLeave,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      });
+    }
+    
     // SPECIAL HANDLING FOR ABSENT FILTER
     if (status === 'absent') {
       // Get all employees for the facility and date range

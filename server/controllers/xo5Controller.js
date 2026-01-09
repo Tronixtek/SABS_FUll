@@ -334,11 +334,46 @@ async function processXO5Attendance(xo5Record, deviceId) {
         const workMinutes = moment(attendanceTime).diff(moment(todayCheckIn.timestamp), 'minutes');
         attendance.workDuration = Math.max(0, workMinutes);
         
-        // Calculate overtime/undertime
+        // Calculate overtime/undertime and detect half-day
         const expectedMinutes = employee.shift.workingHours * 60;
-        if (workMinutes > expectedMinutes + 30) { // 30 min grace for overtime
+        const halfDayThreshold = expectedMinutes / 2; // Half of expected hours
+        
+        // Check if employee has approved leave for today
+        const approvedLeave = await LeaveRequest.findOne({
+          employeeId: employee.employeeId,
+          status: 'approved',
+          startDate: { $lte: attendanceDate },
+          endDate: { $gte: attendanceDate }
+        });
+        
+        if (approvedLeave) {
+          // Employee has approved leave but still checked in/out
+          if (approvedLeave.leaveType === 'half-day') {
+            attendance.status = 'half-day';
+            todayCheckIn.status = 'half-day';
+            await todayCheckIn.save();
+          } else {
+            attendance.status = 'on-leave';
+            todayCheckIn.status = 'on-leave';
+            await todayCheckIn.save();
+          }
+        } else if (workMinutes >= halfDayThreshold && workMinutes < expectedMinutes - 30) {
+          // Worked between 4-7.5 hours (for 8-hour shift) = half-day
+          attendance.status = 'half-day';
+          todayCheckIn.status = 'half-day';
+          await todayCheckIn.save();
+          attendance.undertimeMinutes = expectedMinutes - workMinutes;
+        } else if (workMinutes < halfDayThreshold) {
+          // Worked less than half day
+          attendance.status = 'half-day';
+          todayCheckIn.status = 'half-day';
+          await todayCheckIn.save();
+          attendance.undertimeMinutes = expectedMinutes - workMinutes;
+        } else if (workMinutes > expectedMinutes + 30) {
+          // Overtime (30 min grace)
           attendance.overtimeMinutes = workMinutes - expectedMinutes;
-        } else if (workMinutes < expectedMinutes - 30) { // 30 min grace for undertime
+        } else if (workMinutes < expectedMinutes - 30) {
+          // Undertime (30 min grace)
           attendance.undertimeMinutes = expectedMinutes - workMinutes;
         }
       }
