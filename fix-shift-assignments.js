@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
-require('dotenv').config({ path: './server/.env' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, 'server', '.env') });
 
-mongoose.connect(process.env.MONGODB_URI).then(async () => {
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sabs_attendance';
+
+console.log('Connecting to:', MONGODB_URI);
+
+mongoose.connect(MONGODB_URI).then(async () => {
   const Employee = require('./server/models/Employee');
   const Shift = require('./server/models/Shift');
   
