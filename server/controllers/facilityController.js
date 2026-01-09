@@ -1,4 +1,5 @@
 const Facility = require('../models/Facility');
+const User = require('../models/User');
 const DataSyncService = require('../services/dataSyncService');
 
 // @desc    Get all facilities
