@@ -290,15 +290,9 @@ const Facilities = () => {
         targetFacility = employee.facility;
       }
 
-      // Check if facility has device configured
-      if (!targetFacility?.configuration?.deviceKey) {
-        toast.error(`Facility "${targetFacility?.name}" does not have a device configured`, { id: loadingToast });
-        setDeletingFromDevice(false);
-        return;
-      }
-
-      const deviceKey = targetFacility.configuration.deviceKey.toLowerCase();
-      const secret = targetFacility.configuration.deviceSecret || '';
+      // Use facility code as device key and convert to lowercase
+      const deviceKey = targetFacility.code.toLowerCase();
+      const secret = targetFacility.configuration?.deviceSecret || '';
 
       // Call Java API directly to delete from device
       toast.loading('Deleting from device...', { id: loadingToast });
@@ -410,7 +404,7 @@ const Facilities = () => {
                       <option value="">-- Select Facility --</option>
                       {facilities.map(facility => (
                         <option key={facility._id} value={facility._id}>
-                          {facility.name} ({facility.code}) {facility.configuration?.deviceKey ? '✓' : '⚠️ No device'}
+                          {facility.name}
                         </option>
                       ))}
                     </select>
