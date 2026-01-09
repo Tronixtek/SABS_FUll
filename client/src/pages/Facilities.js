@@ -13,6 +13,7 @@ const Facilities = () => {
   const [facilityManagers, setFacilityManagers] = useState([]);
   const [selectedManagers, setSelectedManagers] = useState([]);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState('');
+  const [selectedFacilityForDelete, setSelectedFacilityForDelete] = useState('');
   const [deletingFromDevice, setDeletingFromDevice] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -238,26 +239,44 @@ const Facilities = () => {
       return;
     }
 
+    // For admin, facility selection is required
+    if ((user.role === 'admin' || user.role === 'super-admin') && !selectedFacilityForDelete) {
+      toast.error('Please select a facility');
+      return;
+    }
+
     if (!window.confirm(`Are you sure you want to delete employee ${deleteEmployeeId} from the device? This will remove their biometric data and they will no longer be able to check in/out.`)) {
       return;
     }
 
-    const loadingToast = toast.loading('Fetching employee details...');
+    const loadingToast = toast.loading('Fetching employee and facility details...');
     setDeletingFromDevice(true);
 
     try {
-      // Step 1: Get employee details from Node.js backend
-      const employeeResponse = await axios.get(`/api/employees?employeeId=${deleteEmployeeId}`);
-      const employee = employeeResponse.data.data.find(emp => emp.employeeId === deleteEmployeeId);
+      let targetFacility;
       
-      if (!employee) {
-        toast.error(`Employee ${deleteEmployeeId} not found`, { id: loadingToast });
-        setDeletingFromDevice(false);
-        return;
-      }
+      // For admin: Use selected facility
+      if (user.role === 'admin' || user.role === 'super-admin') {
+        targetFacility = facilities.find(f => f._id === selectedFacilityForDelete);
+        
+        if (!targetFacility) {
+          toast.error('Selected facility not found', { id: loadingToast });
+          setDeletingFromDevice(false);
+          return;
+        }
+      } 
+      // For facility manager: Find facility from employee
+      else if (user.role === 'facility-manager') {
+        const employeeResponse = await axios.get(`/api/employees?employeeId=${deleteEmployeeId}`);
+        const employee = employeeResponse.data.data.find(emp => emp.employeeId === deleteEmployeeId);
+        
+        if (!employee) {
+          toast.error(`Employee ${deleteEmployeeId} not found`, { id: loadingToast });
+          setDeletingFromDevice(false);
+          return;
+        }
 
-      // Permission check: Facility managers can only delete from their facilities
-      if (user.role === 'facility-manager') {
+        // Check if facility manager has access to this employee's facility
         const canAccess = user.facilities.some(
           f => f._id === employee.facility._id
         );
@@ -267,24 +286,25 @@ const Facilities = () => {
           setDeletingFromDevice(false);
           return;
         }
+
+        targetFacility = employee.facility;
       }
 
       // Check if facility has device configured
-      if (!employee.facility?.configuration?.deviceKey) {
-        toast.error(`Facility "${employee.facility?.name}" does not have a device configured`, { id: loadingToast });
+      if (!targetFacility?.configuration?.deviceKey) {
+        toast.error(`Facility "${targetFacility?.name}" does not have a device configured`, { id: loadingToast });
         setDeletingFromDevice(false);
         return;
       }
 
-      const deviceKey = employee.facility.configuration.deviceKey.toLowerCase();
-      const secret = employee.facility.configuration.deviceSecret || '';
-      const personId = employee.biometricData?.xo5PersonSn || deleteEmployeeId;
+      const deviceKey = targetFacility.configuration.deviceKey.toLowerCase();
+      const secret = targetFacility.configuration.deviceSecret || '';
 
-      // Step 2: Call Java API directly to delete from device
+      // Call Java API directly to delete from device
       toast.loading('Deleting from device...', { id: loadingToast });
       
       const javaResponse = await axios.post('http://localhost:8081/api/employee/delete', {
-        employeeId: personId,  // Java API expects 'employeeId' field (which is the personId/personSn)
+        employeeId: deleteEmployeeId,  // Use the employee ID directly
         deviceKey: deviceKey,
         secret: secret
       }, {
@@ -292,18 +312,9 @@ const Facilities = () => {
       });
 
       if (javaResponse.data.success || javaResponse.data.code === '000') {
-        // Step 3: Update employee record in database to mark as not enrolled
-        await axios.put(`/api/employees/${employee._id}`, {
-          ...employee,
-          faceImageUploaded: false,
-          biometricData: {
-            ...employee.biometricData,
-            lastXO5Sync: null
-          }
-        });
-
-        toast.success(`Employee ${deleteEmployeeId} (${employee.firstName} ${employee.lastName}) deleted from device successfully`, { id: loadingToast });
+        toast.success(`Employee ${deleteEmployeeId} deleted from ${targetFacility.name} device successfully`, { id: loadingToast });
         setDeleteEmployeeId('');
+        setSelectedFacilityForDelete('');
       } else {
         toast.error(javaResponse.data.message || javaResponse.data.msg || 'Failed to delete from device', { id: loadingToast });
       }
@@ -382,10 +393,33 @@ const Facilities = () => {
               <p className="text-sm text-gray-600 mb-4">
                 {user?.role === 'facility-manager' 
                   ? 'Remove an employee\'s biometric data from devices in your assigned facilities only.'
-                  : 'Remove an employee\'s biometric data from any facility\'s device.'}
+                  : 'Select a facility and enter employee ID to remove their biometric data from the device.'}
               </p>
-              <form onSubmit={handleDeleteEmployeeFromDevice} className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
+              <form onSubmit={handleDeleteEmployeeFromDevice} className="space-y-3">
+                {/* Facility dropdown for admin */}
+                {(user?.role === 'admin' || user?.role === 'super-admin') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Facility</label>
+                    <select
+                      value={selectedFacilityForDelete}
+                      onChange={(e) => setSelectedFacilityForDelete(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      disabled={deletingFromDevice}
+                      required
+                    >
+                      <option value="">-- Select Facility --</option>
+                      {facilities.filter(f => f.configuration?.deviceKey).map(facility => (
+                        <option key={facility._id} value={facility._id}>
+                          {facility.name} ({facility.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
+                {/* Employee ID input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
                   <input
                     type="text"
                     value={deleteEmployeeId}
@@ -393,12 +427,14 @@ const Facilities = () => {
                     placeholder="Enter Employee ID (e.g., HOT00001)"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     disabled={deletingFromDevice}
+                    required
                   />
                 </div>
+                
                 <button
                   type="submit"
-                  disabled={deletingFromDevice || !deleteEmployeeId.trim()}
-                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  disabled={deletingFromDevice || !deleteEmployeeId.trim() || ((user?.role === 'admin' || user?.role === 'super-admin') && !selectedFacilityForDelete)}
+                  className="w-full px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                   <TrashIcon className="h-5 w-5" />
                   {deletingFromDevice ? 'Deleting...' : 'Delete from Device'}
