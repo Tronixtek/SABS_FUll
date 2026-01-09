@@ -297,6 +297,18 @@ async function processXO5Attendance(xo5Record, deviceId) {
       const actualCheckIn = moment(attendanceTime);
       const graceMinutes = employee.shift.graceTime?.checkIn || 15;
       
+      // DEBUG: Log all time calculations
+      console.log('\n=== LATE DETECTION DEBUG ===');
+      console.log('Employee:', employee.firstName, employee.lastName);
+      console.log('Shift Start Time:', employee.shift.startTime);
+      console.log('Scheduled Check-in:', scheduledCheckIn.format('YYYY-MM-DD HH:mm:ss'));
+      console.log('Actual Check-in:', actualCheckIn.format('YYYY-MM-DD HH:mm:ss'));
+      console.log('Grace Minutes:', graceMinutes);
+      console.log('Grace Period Ends:', scheduledCheckIn.clone().add(graceMinutes, 'minutes').format('YYYY-MM-DD HH:mm:ss'));
+      console.log('Is After Grace?:', actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes')));
+      console.log('Minutes Difference:', actualCheckIn.diff(scheduledCheckIn, 'minutes'));
+      console.log('===========================\n');
+      
       if (actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes'))) {
         const lateMinutes = actualCheckIn.diff(scheduledCheckIn, 'minutes');
         
@@ -318,6 +330,9 @@ async function processXO5Attendance(xo5Record, deviceId) {
           
           console.log(`⏰ Late arrival: ${employee.firstName} ${employee.lastName} - ${attendance.lateArrival} minutes late`);
         }
+      } else {
+        console.log(`✅ On-time arrival: ${employee.firstName} ${employee.lastName}`);
+      }
       }
       
       attendanceLogger.info(`✅ Check-in: ${employee.firstName} ${employee.lastName} at ${moment(attendanceTime).format('HH:mm:ss')}`);
