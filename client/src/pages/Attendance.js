@@ -67,7 +67,7 @@ const Attendance = () => {
   const calculateStats = (records) => {
     const stats = {
       total: records.length,
-      present: records.filter(r => r.status === 'present').length,
+      present: records.filter(r => r.status === 'present' || r.status === 'late' || r.status === 'incomplete').length,
       absent: records.filter(r => r.status === 'absent').length,
       late: records.filter(r => r.status === 'late').length,
       halfDay: records.filter(r => r.status === 'half-day').length
