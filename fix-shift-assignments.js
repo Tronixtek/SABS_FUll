@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, 'server', '.env') });
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sabs_attendance';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/attendance-tracking';
 
 console.log('Connecting to:', MONGODB_URI);
 
