@@ -55,6 +55,88 @@ exports.getAttendance = async (req, res) => {
     
     const skip = (page - 1) * limit;
     
+    // SPECIAL HANDLING FOR ABSENT FILTER
+    if (status === 'absent') {
+      // Get all employees for the facility and date range
+      const employeeQuery = {};
+      if (facility) employeeQuery.facility = facility;
+      if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+        if (req.user.facilities.length > 0) {
+          employeeQuery.facility = { $in: req.user.facilities };
+        }
+      }
+      employeeQuery.status = 'active';
+      
+      const allEmployees = await Employee.find(employeeQuery)
+        .populate('facility', 'name code')
+        .populate('shift', 'name code');
+      
+      // Get date range
+      const start = startDate ? new Date(startDate) : new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = endDate ? new Date(endDate) : new Date();
+      end.setHours(23, 59, 59, 999);
+      
+      // Generate dates array
+      const dates = [];
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dates.push(new Date(d));
+      }
+      
+      // Find all existing attendance records for this period
+      const existingAttendance = await Attendance.find({
+        ...query,
+        status: { $ne: 'absent' } // Exclude existing absent records
+      }).select('employee date');
+      
+      const attendedSet = new Set();
+      existingAttendance.forEach(att => {
+        const key = `${att.employee}-${att.date.toISOString().split('T')[0]}`;
+        attendedSet.add(key);
+      });
+      
+      // Generate absent records for employees who didn't check in
+      const absentRecords = [];
+      for (const emp of allEmployees) {
+        for (const date of dates) {
+          const key = `${emp._id}-${date.toISOString().split('T')[0]}`;
+          if (!attendedSet.has(key)) {
+            absentRecords.push({
+              _id: `absent-${emp._id}-${date.getTime()}`,
+              employee: emp,
+              facility: emp.facility,
+              shift: emp.shift,
+              date: new Date(date),
+              scheduledCheckIn: null,
+              scheduledCheckOut: null,
+              status: 'absent',
+              workHours: 0,
+              overtime: 0,
+              undertime: 0,
+              lateMinutes: 0,
+              checkIn: {},
+              checkOut: {},
+              breaks: []
+            });
+          }
+        }
+      }
+      
+      const total = absentRecords.length;
+      const paginatedAbsent = absentRecords.slice(skip, skip + parseInt(limit));
+      
+      return res.json({
+        success: true,
+        data: paginatedAbsent,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      });
+    }
+    
     // Get attendance records and group by employee+date to combine check-in/check-out
     const rawAttendance = await Attendance.find(query)
       .populate('employee', 'employeeId firstName lastName department profileImage')
