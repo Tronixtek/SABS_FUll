@@ -408,9 +408,9 @@ const Facilities = () => {
                       required
                     >
                       <option value="">-- Select Facility --</option>
-                      {facilities.filter(f => f.configuration?.deviceKey).map(facility => (
+                      {facilities.map(facility => (
                         <option key={facility._id} value={facility._id}>
-                          {facility.name} ({facility.code})
+                          {facility.name} ({facility.code}) {facility.configuration?.deviceKey ? '✓' : '⚠️ No device'}
                         </option>
                       ))}
                     </select>
