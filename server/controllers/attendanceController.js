@@ -213,6 +213,81 @@ exports.getAttendance = async (req, res) => {
       .populate('shift', 'name code')
       .sort({ date: -1, timestamp: -1 });
     
+    // GENERATE ABSENT RECORDS for employees who didn't check in (for "All Status" view)
+    // This ensures we always show all employees, not just those who checked in
+    let absentRecordsToAdd = [];
+    
+    // Only generate absent records if we're looking at a specific date range
+    if (startDate || endDate) {
+      const employeeQuery = {};
+      if (facility) employeeQuery.facility = facility;
+      if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+        if (req.user.facilities.length > 0) {
+          employeeQuery.facility = { $in: req.user.facilities };
+        }
+      }
+      employeeQuery.status = 'active';
+      
+      const allEmployees = await Employee.find(employeeQuery)
+        .populate('facility', 'name code')
+        .populate('shift', 'name code');
+      
+      // Get date range
+      const start = startDate ? new Date(startDate) : new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = endDate ? new Date(endDate) : new Date();
+      end.setHours(23, 59, 59, 999);
+      
+      // Generate dates array
+      const dates = [];
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dates.push(new Date(d));
+      }
+      
+      // Create a set of employee-date combinations that have attendance
+      const attendedSet = new Set();
+      rawAttendance.forEach(att => {
+        if (att.employee && att.date) {
+          const key = `${att.employee._id}-${att.date.toISOString().split('T')[0]}`;
+          attendedSet.add(key);
+        }
+      });
+      
+      // Generate absent records for employees who didn't check in
+      for (const emp of allEmployees) {
+        for (const date of dates) {
+          const key = `${emp._id}-${date.toISOString().split('T')[0]}`;
+          if (!attendedSet.has(key)) {
+            absentRecordsToAdd.push({
+              _id: `absent-${emp._id}-${date.getTime()}`,
+              employee: {
+                _id: emp._id,
+                employeeId: emp.employeeId,
+                firstName: emp.firstName,
+                lastName: emp.lastName,
+                department: emp.department,
+                profileImage: emp.profileImage
+              },
+              facility: emp.facility,
+              shift: emp.shift,
+              date: new Date(date),
+              scheduledCheckIn: null,
+              scheduledCheckOut: null,
+              status: 'absent',
+              workHours: 0,
+              overtime: 0,
+              undertime: 0,
+              lateMinutes: 0,
+              lateArrival: 0,
+              checkIn: {},
+              checkOut: {},
+              breaks: []
+            });
+          }
+        }
+      }
+    }
+    
     // Group records by employee+date and combine check-in/check-out into single records
     const attendanceMap = new Map();
     
@@ -298,6 +373,14 @@ exports.getAttendance = async (req, res) => {
         // If status is already 'late' or 'excused', preserve it
       }
     }
+    
+    // Add absent records to the map
+    absentRecordsToAdd.forEach(absentRecord => {
+      const key = `${absentRecord.employee._id}-${absentRecord.date.toISOString().split('T')[0]}`;
+      if (!attendanceMap.has(key)) {
+        attendanceMap.set(key, absentRecord);
+      }
+    });
     
     // Convert map to array and apply pagination
     const attendance = Array.from(attendanceMap.values())
