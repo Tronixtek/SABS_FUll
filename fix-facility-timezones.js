@@ -1,6 +1,12 @@
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config({ path: path.join(__dirname, 'server', '.env') });
+
+// Try to load .env from server directory if it exists
+const envPath = path.join(__dirname, 'server', '.env');
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+}
+
 const mongoose = require('mongoose');
 
 const facilitySchema = new mongoose.Schema({
@@ -20,19 +26,10 @@ const Facility = mongoose.model('Facility', facilitySchema);
 
 async function fixTimezones() {
   try {
-    // Check if MONGODB_URI is loaded
-    if (!process.env.MONGODB_URI) {
-      console.error('❌ MONGODB_URI not found in environment variables');
-      console.log('Checking .env file location...');
-      const envPath = path.join(__dirname, 'server', '.env');
-      console.log(`Looking for: ${envPath}`);
-      console.log(`File exists: ${fs.existsSync(envPath)}`);
-      process.exit(1);
-    }
-
-    // Connect to MongoDB
-    const dbName = 'attendance-tracking';
-    const mongoUri = process.env.MONGODB_URI.replace(/\/[^\/]*$/, `/${dbName}`);
+    // Use environment variable or default to localhost
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/attendance-tracking';
+    
+    console.log('🔌 Connecting to MongoDB...');
     
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
@@ -40,6 +37,9 @@ async function fixTimezones() {
     });
 
     console.log('✅ Connected to MongoDB');
+    
+    // Get the database name from the connection
+    const dbName = mongoose.connection.db.databaseName;
     console.log(`📊 Database: ${dbName}\n`);
 
     // Find all facilities
