@@ -31,7 +31,7 @@ const Facilities = () => {
     deviceApiKey: '',
     userApiUrl: '',
     addUserApiUrl: '',
-    timezone: 'Asia/Kolkata',
+    timezone: 'Africa/Lagos',
     configuration: {
       autoSync: true,
       syncInterval: 5,
@@ -457,6 +457,10 @@ const Facilities = () => {
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     >
+                      <option value="Africa/Lagos">Africa/Lagos (WAT - West Africa Time UTC+1)</option>
+                      <option value="Africa/Johannesburg">Africa/Johannesburg (SAST - South Africa UTC+2)</option>
+                      <option value="Africa/Cairo">Africa/Cairo (EET - Egypt UTC+2)</option>
+                      <option value="Africa/Nairobi">Africa/Nairobi (EAT - East Africa UTC+3)</option>
                       <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
                       <option value="America/New_York">America/New_York (EST)</option>
                       <option value="Europe/London">Europe/London (GMT)</option>
