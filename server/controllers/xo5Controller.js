@@ -333,7 +333,6 @@ async function processXO5Attendance(xo5Record, deviceId) {
       } else {
         console.log(`✅ On-time arrival: ${employee.firstName} ${employee.lastName}`);
       }
-      }
       
       attendanceLogger.info(`✅ Check-in: ${employee.firstName} ${employee.lastName} at ${moment(attendanceTime).format('HH:mm:ss')}`);
     } 
