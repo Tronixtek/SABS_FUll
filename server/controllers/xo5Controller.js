@@ -287,24 +287,28 @@ async function processXO5Attendance(xo5Record, deviceId) {
     
     // Add specific details based on check-in or check-out
     if (isCheckIn) {
-      // Calculate scheduled time for late arrival check
+      // Get the facility timezone (default to UTC if not set)
+      const facilityTimezone = employee.facility?.timezone || 'UTC';
+      
+      // Calculate scheduled time for late arrival check IN THE FACILITY'S TIMEZONE
       const [startHour, startMinute] = employee.shift.startTime.split(':');
-      const scheduledCheckIn = moment(attendanceDate)
+      const scheduledCheckIn = moment.tz(attendanceDate, facilityTimezone)
         .hour(parseInt(startHour))
         .minute(parseInt(startMinute))
         .second(0);
         
-      const actualCheckIn = moment(attendanceTime);
+      const actualCheckIn = moment.tz(attendanceTime, facilityTimezone);
       const graceMinutes = employee.shift.graceTime?.checkIn || 15;
       
       // DEBUG: Log all time calculations
       console.log('\n=== LATE DETECTION DEBUG ===');
+      console.log('Facility Timezone:', facilityTimezone);
       console.log('Employee:', employee.firstName, employee.lastName);
       console.log('Shift Start Time:', employee.shift.startTime);
-      console.log('Scheduled Check-in:', scheduledCheckIn.format('YYYY-MM-DD HH:mm:ss'));
-      console.log('Actual Check-in:', actualCheckIn.format('YYYY-MM-DD HH:mm:ss'));
+      console.log('Scheduled Check-in:', scheduledCheckIn.format('YYYY-MM-DD HH:mm:ss Z'));
+      console.log('Actual Check-in:', actualCheckIn.format('YYYY-MM-DD HH:mm:ss Z'));
       console.log('Grace Minutes:', graceMinutes);
-      console.log('Grace Period Ends:', scheduledCheckIn.clone().add(graceMinutes, 'minutes').format('YYYY-MM-DD HH:mm:ss'));
+      console.log('Grace Period Ends:', scheduledCheckIn.clone().add(graceMinutes, 'minutes').format('YYYY-MM-DD HH:mm:ss Z'));
       console.log('Is After Grace?:', actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes')));
       console.log('Minutes Difference:', actualCheckIn.diff(scheduledCheckIn, 'minutes'));
       console.log('===========================\n');
