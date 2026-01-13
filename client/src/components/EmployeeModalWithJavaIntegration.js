@@ -637,14 +637,14 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               <h4 className="text-lg font-medium text-gray-900 mb-4">Work Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Department/Service</label>
+                  <label className="block text-sm font-medium text-gray-700">Department/Service Unit</label>
                   <select
                     name="department"
                     value={formData.department}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select Department/Service</option>
+                    <option value="">Select Department/Service Unit</option>
                     {formData.facility && (() => {
                       const facility = facilities.find(f => f._id === formData.facility);
                       const departments = facility?.departments || [];
@@ -673,14 +673,14 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Designation/Unit</label>
+                  <label className="block text-sm font-medium text-gray-700">Designation/Rank</label>
                   <select
                     name="designation"
                     value={formData.designation}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select Designation/Unit</option>
+                    <option value="">Select Designation/Rank</option>
                     {formData.facility && (() => {
                       const facility = facilities.find(f => f._id === formData.facility);
                       const designations = facility?.designations || [];
