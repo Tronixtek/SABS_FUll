@@ -5,50 +5,113 @@ const Facility = require('../models/Facility');
 // Submit Leave/Excuse Request
 const submitLeaveRequest = async (req, res) => {
   try {
-    const {
+    // Handle both employee portal (uses employee ObjectId) and staff portal (uses employeeId string) formats
+    const isEmployeePortal = !!req.employee; // Employee authenticated
+    const isStaffPortal = !!req.user; // Staff authenticated
+    
+    console.log('[SUBMIT LEAVE] Request body:', req.body);
+    console.log('[SUBMIT LEAVE] Auth type:', isEmployeePortal ? 'Employee' : 'Staff');
+    
+    let {
       employeeId,
       type,
+      leaveType,
       affectedDate,
+      date,
+      startDate,
+      endDate,
       startTime,
       endTime,
       reason,
       category,
       urgency = 'medium',
-      isEmergency = false
+      isEmergency = false,
+      submittedBy
     } = req.body;
 
-    // Validate employee exists
-    const employee = await Employee.findOne({ employeeId });
+    // Normalize field names (employee portal uses different naming)
+    if (leaveType) type = leaveType;
+    if (date && !affectedDate) affectedDate = date;
+    
+    let employee;
+    
+    if (isEmployeePortal) {
+      // Employee portal - get employee from authenticated session
+      employee = await Employee.findById(req.employee.id);
+      employeeId = employee.employeeId;
+      submittedBy = req.employee.id; // Employee submitted for themselves
+      console.log('[SUBMIT LEAVE] Employee portal - found employee:', employee.employeeId);
+    } else {
+      // Staff portal - validate employee exists by employeeId
+      employee = await Employee.findOne({ 
+        $or: [
+          { employeeId: employeeId },
+          { _id: employeeId }
+        ]
+      });
+      console.log('[SUBMIT LEAVE] Staff portal - found employee:', employee?.employeeId);
+    }
+
     if (!employee) {
+      console.log('[SUBMIT LEAVE] Employee not found');
       return res.status(404).json({
         success: false,
         message: 'Employee not found'
       });
     }
 
+    // Determine if this is multi-day or time-based leave
+    const isMultiDay = startDate && endDate;
+    const isTimeBased = startTime && endTime && !isMultiDay;
+
     // Check if request is retroactive
     const now = new Date();
-    const affectedDateTime = new Date(affectedDate);
+    let affectedDateTime;
+    
+    if (isMultiDay) {
+      affectedDateTime = new Date(startDate);
+    } else if (isTimeBased || affectedDate) {
+      affectedDateTime = new Date(affectedDate || date);
+    }
+    
     const isRetroactive = affectedDateTime < now;
 
-    // Create leave request
-    const leaveRequest = new LeaveRequest({
+    // Create leave request data
+    const leaveData = {
       employee: employee._id,
       employeeId: employee.employeeId,
       facility: employee.facility,
-      type,
-      affectedDate: affectedDateTime,
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
+      type: type || leaveType,
       reason,
-      category,
-      urgency,
-      isEmergency,
-      isRetroactive
-    });
+      category: category || 'personal',
+      urgency: urgency || 'medium',
+      isEmergency: isEmergency || urgency === 'emergency',
+      isRetroactive,
+      submittedBy: submittedBy || req.user?.id || req.employee?.id
+    };
+
+    // Add date fields based on leave type
+    if (isMultiDay) {
+      leaveData.startDate = new Date(startDate);
+      leaveData.endDate = new Date(endDate);
+      leaveData.affectedDate = new Date(startDate); // For compatibility
+    } else if (isTimeBased) {
+      leaveData.affectedDate = affectedDateTime;
+      leaveData.date = affectedDateTime;
+      leaveData.startTime = startTime;
+      leaveData.endTime = endTime;
+    } else {
+      leaveData.affectedDate = affectedDateTime;
+    }
+
+    console.log('[SUBMIT LEAVE] Leave data to save:', JSON.stringify(leaveData, null, 2));
+
+    // Create leave request
+    const leaveRequest = new LeaveRequest(leaveData);
 
     // Calculate duration (will be done in pre-save middleware)
     await leaveRequest.save();
+    console.log('[SUBMIT LEAVE] Successfully saved:', leaveRequest._id);
 
     // Populate for response
     await leaveRequest.populate(['employee', 'facility']);
@@ -128,24 +191,54 @@ const emergencyExit = async (req, res) => {
 // Get Leave Requests for Employee
 const getEmployeeLeaveRequests = async (req, res) => {
   try {
-    const { employeeId } = req.params;
+    let query = {};
+    
+    // Check if this is employee self-service (protectEmployee middleware) or staff viewing (protect middleware)
+    if (req.employee) {
+      // Employee viewing their own requests - use employee ObjectId
+      query.employee = req.employee._id;
+    } else if (req.params.employeeId) {
+      // Staff viewing an employee's requests - support both employeeId string and ObjectId
+      const employeeIdParam = req.params.employeeId;
+      // Check if it's a MongoDB ObjectId or employeeId string
+      if (employeeIdParam.match(/^[0-9a-fA-F]{24}$/)) {
+        query.employee = employeeIdParam;
+      } else {
+        query.employeeId = employeeIdParam;
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Employee ID is required'
+      });
+    }
+    
     const { status, startDate, endDate, type } = req.query;
-
-    // Build query
-    const query = { employeeId };
     
     if (status) query.status = status;
     if (type) query.type = type;
     
     if (startDate || endDate) {
-      query.affectedDate = {};
-      if (startDate) query.affectedDate.$gte = new Date(startDate);
-      if (endDate) query.affectedDate.$lte = new Date(endDate);
+      query.$or = [
+        { affectedDate: {} },
+        { startDate: {} },
+        { date: {} }
+      ];
+      if (startDate) {
+        query.$or[0].affectedDate.$gte = new Date(startDate);
+        query.$or[1].startDate.$gte = new Date(startDate);
+        query.$or[2].date.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.$or[0].affectedDate.$lte = new Date(endDate);
+        query.$or[1].endDate.$lte = new Date(endDate);
+        query.$or[2].date.$lte = new Date(endDate);
+      }
     }
 
     const leaveRequests = await LeaveRequest.find(query)
       .populate(['employee', 'facility', 'approvedBy'])
-      .sort({ affectedDate: -1 });
+      .sort({ requestDate: -1 });
 
     res.json({
       success: true,
@@ -200,8 +293,11 @@ const processLeaveRequest = async (req, res) => {
     const { requestId } = req.params;
     const { action, managerNotes, approvedBy } = req.body; // action: 'approve' or 'reject'
 
+    console.log('[LEAVE PROCESS] Request:', { requestId, action, managerNotes, approvedBy, userId: req.user?.id });
+
     const leaveRequest = await LeaveRequest.findById(requestId);
     if (!leaveRequest) {
+      console.log('[LEAVE PROCESS] Leave request not found:', requestId);
       return res.status(404).json({
         success: false,
         message: 'Leave request not found'
@@ -209,6 +305,7 @@ const processLeaveRequest = async (req, res) => {
     }
 
     if (leaveRequest.status !== 'pending') {
+      console.log('[LEAVE PROCESS] Request already processed:', leaveRequest.status);
       return res.status(400).json({
         success: false,
         message: 'Request has already been processed'
@@ -218,18 +315,21 @@ const processLeaveRequest = async (req, res) => {
     // Update request status
     if (action === 'approve') {
       leaveRequest.status = 'approved';
-      leaveRequest.approvedBy = approvedBy;
+      leaveRequest.approvedBy = approvedBy || req.user?.id; // Use provided ID or fallback to current user
       leaveRequest.approvedAt = new Date();
+      console.log('[LEAVE PROCESS] Approving with user:', leaveRequest.approvedBy);
     } else if (action === 'reject') {
       leaveRequest.status = 'rejected';
       leaveRequest.rejectionReason = managerNotes;
+      console.log('[LEAVE PROCESS] Rejecting with reason:', managerNotes);
     }
 
     if (managerNotes) {
       leaveRequest.managerNotes = managerNotes;
     }
 
-    await leaveRequest.save();
+    await leaveRequest.save({ validateModifiedOnly: true });
+    console.log('[LEAVE PROCESS] Successfully saved:', leaveRequest._id);
 
     // Send notifications
     // await sendApprovalNotification(leaveRequest);
@@ -241,7 +341,7 @@ const processLeaveRequest = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error processing leave request:', error);
+    console.error('[LEAVE PROCESS] Error processing leave request:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to process leave request',
@@ -342,6 +442,11 @@ const getLeaveStatistics = async (req, res) => {
       }
     ]);
 
+    // Get all requests for the Leave Management page
+    const allRequests = await LeaveRequest.find(matchQuery)
+      .populate(['employee', 'facility', 'approvedBy'])
+      .sort({ requestDate: -1 });
+
     res.json({
       success: true,
       data: {
@@ -355,7 +460,8 @@ const getLeaveStatistics = async (req, res) => {
           earlyDepartures: 0,
           totalExcusedHours: 0
         },
-        breakdown: typeBreakdown
+        breakdown: typeBreakdown,
+        allRequests: allRequests
       }
     });
 

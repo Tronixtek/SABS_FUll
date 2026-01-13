@@ -23,6 +23,16 @@ const leaveRequestSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: [
+      // Full Leave Types
+      'annual',              // Annual leave
+      'sick',                // Sick leave
+      'emergency',           // Emergency leave
+      'maternity',           // Maternity leave
+      'paternity',           // Paternity leave
+      'bereavement',         // Bereavement leave
+      'study',               // Study leave
+      'unpaid',              // Unpaid leave
+      // Partial Day/Excuse Types
       'early-departure',     // Need to leave early
       'late-arrival',        // Will arrive late
       'partial-day',         // Few hours off
@@ -42,20 +52,27 @@ const leaveRequestSchema = new mongoose.Schema({
   },
   affectedDate: {
     type: Date,
-    required: true,
     index: true
   },
+  // For multi-day leave
+  startDate: {
+    type: Date
+  },
+  endDate: {
+    type: Date
+  },
+  // For time-based/partial day
+  date: {
+    type: Date
+  },
   startTime: {
-    type: Date,  // When the leave/excuse starts
-    required: true
+    type: String  // Time string like "09:00" or "14:30"
   },
   endTime: {
-    type: Date,  // When they return/should have been back
-    required: true
+    type: String  // Time string like "17:00" or "18:00"
   },
   duration: {
-    type: Number, // Duration in minutes
-    required: true
+    type: Number // Duration in minutes or days depending on leave type
   },
   
   // Request Details
@@ -111,7 +128,7 @@ const leaveRequestSchema = new mongoose.Schema({
   // Approval Details
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee'
+    ref: 'User'  // References User (staff) not Employee
   },
   approvedAt: Date,
   rejectionReason: String,

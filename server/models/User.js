@@ -55,7 +55,11 @@ const userSchema = new mongoose.Schema({
       'manage_users',
       'system_settings',
       'enroll_users',
-      'manage_devices'
+      'manage_devices',
+      'view_leave_requests',
+      'submit_leave',
+      'approve_leave',
+      'manage_leave'
     ]
   }],
   status: {

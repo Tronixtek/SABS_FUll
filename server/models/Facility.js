@@ -152,6 +152,14 @@ const facilitySchema = new mongoose.Schema({
       }
     }
   },
+  departments: [{
+    type: String,
+    trim: true
+  }],
+  designations: [{
+    type: String,
+    trim: true
+  }],
   metadata: {
     type: Map,
     of: String

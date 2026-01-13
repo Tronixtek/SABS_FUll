@@ -13,7 +13,8 @@ import {
   ArrowRightOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
-  BellIcon
+  BellIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline';
 
 const Layout = () => {
@@ -38,6 +39,7 @@ const Layout = () => {
     { name: 'Dashboard', to: '/app/dashboard', icon: HomeIcon },
     { name: 'Employees', to: '/app/employees', icon: UsersIcon },
     { name: 'Attendance', to: '/app/attendance', icon: ClipboardDocumentCheckIcon },
+    { name: 'Leave Management', to: '/app/leave', icon: CalendarIcon, permission: 'view_leave_requests' },
     { name: 'Facilities', to: '/app/facilities', icon: BuildingOfficeIcon },
     { name: 'Shifts', to: '/app/shifts', icon: ClockIcon },
     { name: 'Reports', to: '/app/reports', icon: DocumentTextIcon },
@@ -58,12 +60,12 @@ const Layout = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between h-16 px-6 bg-gray-900">
+        <div className="flex items-center justify-between h-16 px-6 bg-gray-900 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
               <span className="text-blue-600 font-bold text-lg">S</span>
@@ -78,8 +80,8 @@ const Layout = () => {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="mt-6 px-4 pb-20">
+        {/* Navigation - Scrollable */}
+        <nav className="flex-1 overflow-y-auto mt-6 px-4 pb-4">
           <div className="space-y-1">
             {navigation
               .filter(item => !item.permission || hasPermission(item.permission))
@@ -104,7 +106,7 @@ const Layout = () => {
         </nav>
 
         {/* User Profile Section */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gray-900 border-t border-gray-700">
+        <div className="p-4 bg-gray-900 border-t border-gray-700 flex-shrink-0">
           <div className="flex items-center mb-3 p-3 bg-gray-700 rounded-lg">
             <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
               {user?.firstName?.[0]}{user?.lastName?.[0]}

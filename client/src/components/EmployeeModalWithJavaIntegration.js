@@ -6,6 +6,7 @@ import { XMarkIcon, CameraIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon } fr
 const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClose }) => {
   const [formData, setFormData] = useState({
     employeeId: employee?.employeeId || '',
+    staffId: employee?.staffId || '',
     firstName: employee?.firstName || '',
     lastName: employee?.lastName || '',
     email: employee?.email || '',
@@ -18,6 +19,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     dateOfBirth: employee?.dateOfBirth ? employee.dateOfBirth.split('T')[0] : '',
     nationality: employee?.nationality || '',
     nationalId: employee?.nationalId || '',
+    gender: employee?.gender || '',
+    education: employee?.education || '',
     status: employee?.status || 'active'
   });
   
@@ -229,7 +232,38 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               message: '✅ Employee registration completed successfully!' 
             }));
             
-            toast.success('Employee registered successfully!', { duration: 4000 });
+            // Display generated PIN if available
+            if (response.data.data.selfServiceCredentials) {
+              const credentials = response.data.data.selfServiceCredentials;
+              const employee = response.data.data.employee;
+              
+              // Show PIN in an alert with copy functionality
+              const pinMessage = 
+                `✅ EMPLOYEE CREATED SUCCESSFULLY!\n\n` +
+                `Employee: ${employee.firstName} ${employee.lastName}\n` +
+                `Employee ID: ${employee.employeeId}\n` +
+                `Staff ID: ${credentials.staffId}\n\n` +
+                `🔑 SELF-SERVICE PORTAL CREDENTIALS:\n` +
+                `Staff ID: ${credentials.staffId}\n` +
+                `PIN: ${credentials.pin}\n\n` +
+                `⚠️ IMPORTANT:\n` +
+                `• This PIN will only be shown ONCE\n` +
+                `• Please save it securely\n` +
+                `• Give this PIN to the employee\n` +
+                `• Employee will be required to change PIN on first login\n\n` +
+                `Employee Portal: ${window.location.origin}/employee-login`;
+              
+              alert(pinMessage);
+              
+              // Also show a success toast
+              toast.success(
+                `Employee created! PIN: ${credentials.pin} (shown in alert)`, 
+                { duration: 10000 }
+              );
+            } else {
+              toast.success('Employee registered successfully!', { duration: 4000 });
+            }
+            
             return { success: true, data: response.data };
           }
         }
@@ -475,7 +509,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Employee ID *
+                    Device ID (System) *
                     {!employee && <span className="text-xs text-gray-500 ml-1">(Auto-generated)</span>}
                   </label>
                   <input
@@ -486,8 +520,32 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                     required
                     readOnly={!employee}
                     className={`mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${!employee ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                    placeholder={!employee ? "Select facility to generate ID" : "e.g., EMP001"}
+                    placeholder={!employee ? "Select facility to generate" : "e.g., EMP001"}
                   />
+                  <p className="mt-1 text-xs text-gray-500">For biometric device only</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Staff ID / Card Number *
+                  </label>
+                  <div className="mt-1 flex">
+                    <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md">
+                      KNLG
+                    </span>
+                    <input
+                      type="text"
+                      name="staffId"
+                      value={formData.staffId.replace(/^KNLG/, '')}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, ''); // Only allow numbers
+                        setFormData({ ...formData, staffId: `KNLG${value}` });
+                      }}
+                      required
+                      className="flex-1 block w-full border border-gray-300 rounded-r-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="001"
+                    />
+                  </div>
                 </div>
                 
                 <div>
@@ -535,6 +593,42 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Gender</label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Highest Educational Qualification</label>
+                  <select
+                    name="education"
+                    value={formData.education}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Education Level</option>
+                    <option value="Primary School Leaving Certificate">Primary School Leaving Certificate</option>
+                    <option value="SSCE/WAEC/NECO">SSCE/WAEC/NECO</option>
+                    <option value="OND">OND (Ordinary National Diploma)</option>
+                    <option value="NCE">NCE (National Certificate in Education)</option>
+                    <option value="HND">HND (Higher National Diploma)</option>
+                    <option value="B.Sc/B.A/B.Eng">B.Sc/B.A/B.Eng (Bachelor's Degree)</option>
+                    <option value="M.Sc/M.A/MBA">M.Sc/M.A/MBA (Master's Degree)</option>
+                    <option value="PhD/Doctorate">PhD/Doctorate</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -543,25 +637,81 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               <h4 className="text-lg font-medium text-gray-900 mb-4">Work Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Department</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700">Department/Service</label>
+                  <select
                     name="department"
                     value={formData.department}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  >
+                    <option value="">Select Department/Service</option>
+                    {formData.facility && (() => {
+                      const facility = facilities.find(f => f._id === formData.facility);
+                      const departments = facility?.departments || [];
+                      if (departments.length === 0) {
+                        // Default PHC departments if facility has none configured
+                        return [
+                          'General Outpatient',
+                          'Maternal & Child Health',
+                          'Immunization',
+                          'Laboratory Services',
+                          'Pharmacy',
+                          'Emergency Services',
+                          'Environmental Health',
+                          'Health Education',
+                          'Medical Records',
+                          'Administration'
+                        ].map(dept => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ));
+                      }
+                      return departments.map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ));
+                    })()}
+                  </select>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Designation</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700">Designation/Unit</label>
+                  <select
                     name="designation"
                     value={formData.designation}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  >
+                    <option value="">Select Designation/Unit</option>
+                    {formData.facility && (() => {
+                      const facility = facilities.find(f => f._id === formData.facility);
+                      const designations = facility?.designations || [];
+                      if (designations.length === 0) {
+                        // Default PHC designations if facility has none configured
+                        return [
+                          'Medical Officer',
+                          'Nurse',
+                          'Midwife',
+                          'Community Health Officer (CHO)',
+                          'Community Health Extension Worker (CHEW)',
+                          'Laboratory Technician',
+                          'Pharmacist',
+                          'Pharmacy Technician',
+                          'Health Records Officer',
+                          'Environmental Health Officer',
+                          'Health Educator',
+                          'Ward Attendant',
+                          'Security Officer',
+                          'Administrative Officer',
+                          'Cleaner',
+                          'Driver'
+                        ].map(desig => (
+                          <option key={desig} value={desig}>{desig}</option>
+                        ));
+                      }
+                      return designations.map(desig => (
+                        <option key={desig} value={desig}>{desig}</option>
+                      ));
+                    })()}
+                  </select>
                 </div>
 
                 <div>

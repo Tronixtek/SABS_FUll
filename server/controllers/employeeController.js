@@ -89,6 +89,7 @@ exports.getEmployees = async (req, res) => {
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
         { employeeId: { $regex: search, $options: 'i' } },
+        { staffId: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } }
       ];
     }
@@ -160,11 +161,18 @@ exports.createEmployee = async (req, res) => {
       req.body.employeeId = await generateEmployeeId(req.body.facility);
     }
 
+    // Auto-generate PIN for self-service portal
+    const generatedPin = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit PIN
+    req.body.pin = generatedPin;
+    req.body.employeeSelfServiceEnabled = true;
+    req.body.pinMustChange = true; // Force change on first login
+
     // Create employee in MERN database
     const employee = await Employee.create(req.body);
     await employee.populate('facility shift');
 
     console.log('✅ Employee created in MERN database:', employee.employeeId);
+    console.log('🔑 Generated PIN:', generatedPin);
 
     // 🔄 Sync with Java service if integration is enabled
     if (javaServiceClient.isEnabled()) {
@@ -197,10 +205,16 @@ exports.createEmployee = async (req, res) => {
       }
     }
     
+    // Return employee data with generated PIN (only shown once)
     res.status(201).json({
       success: true,
       data: employee,
-      message: 'Employee created successfully'
+      message: 'Employee created successfully',
+      selfServiceCredentials: {
+        staffId: employee.staffId || employee.employeeId,
+        pin: generatedPin,
+        note: 'This PIN will only be displayed once. Please save it securely and provide it to the employee.'
+      }
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -408,6 +422,9 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     // ✅ STEP 4: SAVE TO DATABASE ONLY AFTER SUCCESSFUL DEVICE ENROLLMENT
     console.log(`💾 Device enrollment successful - Now saving to database...`);
     
+    // Auto-generate PIN for self-service portal
+    const generatedPin = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit PIN
+    
     const employeeData = {
       employeeId, firstName, lastName, email, phone, facility,
       department, designation, shift, joiningDate,
@@ -416,6 +433,9 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       faceImageUploaded: true,
       status: 'active',
       deviceId: facilityDeviceId, // Facility's device ID (shared by all employees)
+      pin: generatedPin, // Auto-generated PIN
+      employeeSelfServiceEnabled: true,
+      pinMustChange: true, // Force change on first login
       biometricData: {
         faceId: personId, // Employee's unique person ID within device
         xo5PersonSn: personId,
@@ -428,6 +448,7 @@ exports.registerEmployeeWithDevice = async (req, res) => {
 
     const newEmployee = await Employee.create(employeeData);
     console.log(`✅ Employee saved to database with ID: ${newEmployee._id}`);
+    console.log(`🔑 Generated PIN: ${generatedPin}`);
 
     // Populate related documents
     await newEmployee.populate([
@@ -447,6 +468,11 @@ exports.registerEmployeeWithDevice = async (req, res) => {
           personId: personId, // Employee's person ID within device
           status: 'enrolled',
           facilityName: facilityDoc.name
+        },
+        selfServiceCredentials: {
+          staffId: newEmployee.staffId || newEmployee.employeeId,
+          pin: generatedPin,
+          note: 'This PIN will only be displayed once. Please save it securely and provide it to the employee.'
         },
         steps: {
           validation: 'completed',
@@ -503,6 +529,9 @@ exports.registerEmployeeWithDevice = async (req, res) => {
           console.log(`✅ TIMEOUT RECOVERY: Employee was successfully enrolled despite timeout!`);
           console.log(`   Proceeding with database save...`);
           
+          // Auto-generate PIN for self-service portal
+          const recoveryGeneratedPin = Math.floor(100000 + Math.random() * 900000).toString();
+          
           // Continue with database save since device enrollment actually succeeded
           const employeeData = {
             employeeId, firstName, lastName, email, phone, facility,
@@ -512,6 +541,9 @@ exports.registerEmployeeWithDevice = async (req, res) => {
             faceImageUploaded: true,
             status: 'active',
             deviceId: facilityDeviceId,
+            pin: recoveryGeneratedPin,
+            employeeSelfServiceEnabled: true,
+            pinMustChange: true,
             biometricData: {
               faceId: personId,
               xo5PersonSn: personId,
@@ -541,6 +573,11 @@ exports.registerEmployeeWithDevice = async (req, res) => {
                 status: 'enrolled',
                 facilityName: facilityDoc.name,
                 note: 'Enrollment succeeded despite initial timeout'
+              },
+              selfServiceCredentials: {
+                staffId: newEmployee.staffId || newEmployee.employeeId,
+                pin: recoveryGeneratedPin,
+                note: 'This PIN will only be displayed once. Please save it securely and provide it to the employee.'
               },
               steps: {
                 validation: 'completed',

@@ -270,6 +270,50 @@ exports.getDashboardAnalytics = async (req, res) => {
     
     console.log('⏰ Frequent late arrivals:', frequentLateArrivalsList.length);
     
+    // Facility-grouped late arrivals
+    const facilityGroupedLateArrivals = monthAggregated
+      .filter(record => record.status === 'late' && record.facility)
+      .reduce((acc, record) => {
+        const facId = record.facility._id.toString();
+        const empId = record.employee._id.toString();
+        
+        if (!acc[facId]) {
+          acc[facId] = {
+            facility: record.facility,
+            totalLateCount: 0,
+            employees: {}
+          };
+        }
+        
+        if (!acc[facId].employees[empId]) {
+          acc[facId].employees[empId] = {
+            employee: record.employee,
+            lateCount: 0,
+            totalLateMinutes: 0
+          };
+        }
+        
+        acc[facId].employees[empId].lateCount++;
+        acc[facId].employees[empId].totalLateMinutes += record.lateArrival || 0;
+        acc[facId].totalLateCount++;
+        
+        return acc;
+      }, {});
+    
+    const facilityGroupedLateArrivalsList = Object.values(facilityGroupedLateArrivals).map(facilityData => ({
+      facility: facilityData.facility,
+      totalLateCount: facilityData.totalLateCount,
+      topLateEmployees: Object.values(facilityData.employees)
+        .map(empData => ({
+          ...empData,
+          avgLateMinutes: empData.lateCount > 0 ? Math.round(empData.totalLateMinutes / empData.lateCount) : 0
+        }))
+        .sort((a, b) => b.lateCount - a.lateCount)
+        .slice(0, 10) // Top 10 per facility
+    })).sort((a, b) => b.totalLateCount - a.totalLateCount);
+    
+    console.log('🏢 Facility-grouped late arrivals:', facilityGroupedLateArrivalsList.length);
+    
     // Facility-wise performance
     const facilityWise = monthAggregated.reduce((acc, record) => {
       if (!record.facility) return acc;
@@ -380,7 +424,8 @@ exports.getDashboardAnalytics = async (req, res) => {
         // Dashboard-compatible data
         attendanceTrend: attendanceTrend,
         facilityWiseAttendance: facilityWiseList, // Same data, different property name
-        topLateComers: frequentLateArrivalsList // Same data, different property name
+        topLateComers: frequentLateArrivalsList, // Same data, different property name
+        facilityGroupedLateArrivals: facilityGroupedLateArrivalsList // NEW: Late arrivals grouped by facility
       }
     });
   } catch (error) {

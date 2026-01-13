@@ -2,11 +2,14 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { EmployeeAuthProvider } from './context/EmployeeAuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import EmployeePrivateRoute from './components/EmployeePrivateRoute';
 
 // Pages
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
+import EmployeeLogin from './pages/EmployeeLogin';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
@@ -16,6 +19,13 @@ import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
+import LeaveManagement from './pages/LeaveManagement';
+
+// Employee Portal Pages
+import EmployeeDashboard from './pages/employee/EmployeeDashboard';
+import RequestLeave from './pages/employee/RequestLeave';
+import AttendanceHistory from './pages/employee/AttendanceHistory';
+import EmployeeProfile from './pages/employee/EmployeeProfile';
 
 // Layout
 import Layout from './components/Layout';
@@ -23,26 +33,45 @@ import Layout from './components/Layout';
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Toaster position="top-right" />
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<Login />} />
-          
-          <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="employees" element={<Employees />} />
-            <Route path="attendance" element={<Attendance />} />
-            <Route path="facilities" element={<Facilities />} />
-            <Route path="shifts" element={<Shifts />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="users" element={<Users />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </Router>
+      <EmployeeAuthProvider>
+        <Router>
+          <Toaster position="top-right" />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            
+            {/* Staff Portal */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="employees" element={<Employees />} />
+              <Route path="attendance" element={<Attendance />} />
+              <Route path="leave" element={<LeaveManagement />} />
+              <Route path="facilities" element={<Facilities />} />
+              <Route path="shifts" element={<Shifts />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="users" element={<Users />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+
+            {/* Employee Portal */}
+            <Route path="/employee-login" element={<EmployeeLogin />} />
+            <Route path="/employee-app/*" element={
+              <EmployeePrivateRoute>
+                <Routes>
+                  <Route index element={<Navigate to="dashboard" replace />} />
+                  <Route path="dashboard" element={<EmployeeDashboard />} />
+                  <Route path="request-leave" element={<RequestLeave />} />
+                  <Route path="attendance" element={<AttendanceHistory />} />
+                  <Route path="profile" element={<EmployeeProfile />} />
+                </Routes>
+              </EmployeePrivateRoute>
+            } />
+          </Routes>
+        </Router>
+      </EmployeeAuthProvider>
     </AuthProvider>
   );
 }

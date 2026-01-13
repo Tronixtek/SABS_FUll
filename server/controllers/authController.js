@@ -110,7 +110,7 @@ exports.register = async (req, res) => {
           'view_attendance', 'edit_attendance', 'delete_attendance',
           'manage_employees', 'manage_facilities', 'manage_shifts',
           'view_reports', 'export_data', 'manage_users', 'system_settings',
-          'enroll_users', 'manage_devices'
+          'enroll_users', 'manage_devices', 'manage_leave'
         ];
         break;
       case 'admin':
@@ -119,7 +119,8 @@ exports.register = async (req, res) => {
           'view_attendance', 'edit_attendance', 'delete_attendance',
           'manage_employees', 'manage_facilities', 'manage_shifts',
           'view_reports', 'export_data', 'manage_users', 'system_settings',
-          'enroll_users', 'manage_devices'
+          'enroll_users', 'manage_devices', 'manage_leave',
+          'view_leave_requests', 'submit_leave', 'approve_leave'
         ];
         break;
       case 'facility-manager':
@@ -129,13 +130,14 @@ exports.register = async (req, res) => {
           'view_attendance', 'edit_attendance',
           'manage_employees', 'manage_shifts',
           'view_reports', 'export_data',
-          'enroll_users', 'manage_devices', 'edit_facilities'
+          'enroll_users', 'manage_devices', 'edit_facilities',
+          'view_leave_requests', 'submit_leave', 'approve_leave'
         ];
         break;
       case 'hr':
         // HR can view all records and download only (read-only access)
         permissions = [
-          'view_attendance', 'view_reports', 'export_data'
+          'view_attendance', 'view_reports', 'export_data', 'view_leave_requests'
         ];
         break;
       default:

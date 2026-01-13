@@ -26,6 +26,8 @@ import toast from 'react-hot-toast';
 const Dashboard = () => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedFacility, setSelectedFacility] = useState(null);
+  const [showLateArrivalsModal, setShowLateArrivalsModal] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -272,56 +274,239 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Top Late Comers */}
+      {/* Top Late Comers - Facility Grouped */}
       <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-200">
         <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">
-          Top Late Arrivals This Month
+          Top Late Arrivals by Facility
         </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-2 text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wider">Employee ID</th>
-                <th className="text-left py-3 px-2 text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wider">Name</th>
-                <th className="text-left py-3 px-2 text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wider">Late Count</th>
-                <th className="text-left py-3 px-2 text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wider hidden sm:table-cell">Total Late Minutes</th>
-                <th className="text-left py-3 px-2 text-xs sm:text-sm font-medium text-gray-600 uppercase tracking-wider hidden lg:table-cell">Avg Late Minutes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {analytics?.topLateComers?.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 px-2 text-sm font-medium text-gray-900">{item.employee.employeeId}</td>
-                  <td className="py-3 px-2 text-sm text-gray-900">
-                    <div className="flex flex-col">
-                      <span className="font-medium">{item.employee.firstName} {item.employee.lastName}</span>
-                      <span className="text-xs text-gray-500 sm:hidden">{item.totalLateMinutes} min total</span>
+        <div className="space-y-4">
+          {analytics?.facilityGroupedLateArrivals?.length > 0 ? (
+            analytics.facilityGroupedLateArrivals.map((facilityData, index) => (
+              <div 
+                key={index} 
+                onClick={() => {
+                  setSelectedFacility(facilityData);
+                  setShowLateArrivalsModal(true);
+                }}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer bg-gradient-to-r from-orange-50 to-white"
+              >
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-orange-100 p-3 rounded-lg">
+                      <BuildingOfficeIcon className="h-6 w-6 text-orange-600" />
                     </div>
-                  </td>
-                  <td className="py-3 px-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      {item.lateCount}
-                    </span>
-                  </td>
-                  <td className="py-3 px-2 text-sm text-gray-700 hidden sm:table-cell">{item.totalLateMinutes} min</td>
-                  <td className="py-3 px-2 text-sm text-gray-700 hidden lg:table-cell">{Math.round(item.avgLateMinutes)} min</td>
-                </tr>
-              )) || (
-                <tr>
-                  <td colSpan="5" className="py-8 text-center text-gray-500">
-                    <div className="flex flex-col items-center">
-                      <svg className="w-12 h-12 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <div>
+                      <h4 className="font-semibold text-gray-900">
+                        {facilityData.facility.name}
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {facilityData.facility.code}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+                        {facilityData.totalLateCount} Late Arrivals
+                      </span>
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                      <p>No data available</p>
                     </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {facilityData.topLateEmployees.length} employees affected
+                    </p>
+                  </div>
+                </div>
+                {/* Preview of top 3 late employees */}
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 mb-2">Top late comers:</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {facilityData.topLateEmployees.slice(0, 3).map((emp, idx) => (
+                      <span 
+                        key={idx}
+                        className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                      >
+                        {emp.employee.firstName} {emp.employee.lastName} ({emp.lateCount}x)
+                      </span>
+                    ))}
+                    {facilityData.topLateEmployees.length > 3 && (
+                      <span className="text-xs text-gray-500 px-2 py-1">
+                        +{facilityData.topLateEmployees.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-8 text-center text-gray-500">
+              <div className="flex flex-col items-center">
+                <svg className="w-12 h-12 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="font-medium">No late arrivals this month</p>
+                <p className="text-sm mt-1">All employees are punctual! 🎉</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Late Arrivals Modal */}
+      {showLateArrivalsModal && selectedFacility && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    Late Arrivals - {selectedFacility.facility.name}
+                  </h2>
+                  <p className="text-orange-100 mt-1">
+                    {selectedFacility.facility.code} • {selectedFacility.totalLateCount} total late arrivals this month
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowLateArrivalsModal(false);
+                    setSelectedFacility(null);
+                  }}
+                  className="text-white hover:text-orange-100 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                  Top {selectedFacility.topLateEmployees.length} Late Employees
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Employees with the most late arrivals this month
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b-2 border-gray-200 bg-gray-50">
+                      <th className="text-left py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                        Rank
+                      </th>
+                      <th className="text-left py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                        Employee ID
+                      </th>
+                      <th className="text-left py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th className="text-left py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                        Late Count
+                      </th>
+                      <th className="text-left py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider hidden sm:table-cell">
+                        Total Late Minutes
+                      </th>
+                      <th className="text-left py-3 px-4 text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider hidden lg:table-cell">
+                        Avg Late Minutes
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedFacility.topLateEmployees.map((item, index) => (
+                      <tr key={index} className="hover:bg-orange-50 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white font-bold text-sm">
+                            {index + 1}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-sm font-medium text-gray-900">
+                          {item.employee.employeeId}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-900">
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {item.employee.firstName} {item.employee.lastName}
+                            </span>
+                            <span className="text-xs text-gray-500 sm:hidden">
+                              {item.totalLateMinutes} min total
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+                            {item.lateCount}x
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-700 hidden sm:table-cell">
+                          <span className="font-semibold text-orange-600">
+                            {item.totalLateMinutes}
+                          </span> min
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-700 hidden lg:table-cell">
+                          <span className="font-semibold text-orange-600">
+                            {item.avgLateMinutes}
+                          </span> min
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary Stats */}
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                  <div className="text-sm text-orange-600 font-medium mb-1">
+                    Total Late Arrivals
+                  </div>
+                  <div className="text-2xl font-bold text-orange-700">
+                    {selectedFacility.totalLateCount}
+                  </div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                  <div className="text-sm text-orange-600 font-medium mb-1">
+                    Affected Employees
+                  </div>
+                  <div className="text-2xl font-bold text-orange-700">
+                    {selectedFacility.topLateEmployees.length}
+                  </div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                  <div className="text-sm text-orange-600 font-medium mb-1">
+                    Avg Late/Employee
+                  </div>
+                  <div className="text-2xl font-bold text-orange-700">
+                    {selectedFacility.topLateEmployees.length > 0
+                      ? Math.round(selectedFacility.totalLateCount / selectedFacility.topLateEmployees.length)
+                      : 0}x
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowLateArrivalsModal(false);
+                    setSelectedFacility(null);
+                  }}
+                  className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
