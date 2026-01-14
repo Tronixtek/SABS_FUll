@@ -54,40 +54,10 @@ app.use(express.json({ limit: '50mb' })); // Increased from default 1mb to 50mb
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS - Allow network access
-// Always include production URLs, plus any additional from env variable
-const defaultOrigins = [
-  'http://localhost:3000',
-  'https://sabs-dashboard.web.app',
-  'https://sabs-dashboard.firebaseapp.com'
-];
-
-const additionalOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) 
-  : [];
-
-const allowedOrigins = [...new Set([...defaultOrigins, ...additionalOrigins])];
-
-console.log('🔒 CORS allowed origins:', allowedOrigins);
-
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, or curl)
-    if (!origin) return callback(null, true);
-    
-    // In development, allow all origins
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    
-    // Check against allowed origins
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`❌ CORS blocked origin: ${origin}`);
-      console.warn(`   Allowed origins:`, allowedOrigins);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000']
+    : true, // Allow all origins in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
