@@ -225,11 +225,25 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   }, []);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    // Handle nested fields (e.g., address.street, address.city)
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setFormData({
+        ...formData,
+        [parent]: {
+          ...formData[parent],
+          [child]: value
+        }
+      });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
     
     // Auto-generate employee ID when facility is selected
-    if (e.target.name === 'facility' && e.target.value && !employee) {
-      generateEmployeeId(e.target.value);
+    if (name === 'facility' && value && !employee) {
+      generateEmployeeId(value);
     }
   };
 

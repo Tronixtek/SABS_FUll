@@ -241,19 +241,20 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     console.log(`\n🚀 ===== EMPLOYEE REGISTRATION STARTED (Device-First) =====`);
     
     const {
-      employeeId, firstName, lastName, email, phone, facility,
-      department, designation, shift, joiningDate,
-      dateOfBirth, nationality, nationalId, profileImage, faceImage
+      employeeId, staffId, firstName, lastName, email, phone, facility,
+      department, designation, cadre, shift, joiningDate,
+      dateOfBirth, nationality, nationalId, gender, education,
+      bloodGroup, allergies, address, profileImage, faceImage
     } = req.body;
 
     // ✅ STEP 1: VALIDATE INPUT DATA (NO deviceId required)
     console.log(`📋 Validating registration data...`);
     
-    if (!employeeId || !firstName || !lastName || !email || !facility || !shift) {
+    if (!employeeId || !staffId || !firstName || !lastName || !email || !facility || !shift) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields',
-        required: ['employeeId', 'firstName', 'lastName', 'email', 'facility', 'shift']
+        required: ['employeeId', 'staffId', 'firstName', 'lastName', 'email', 'facility', 'shift']
       });
     }
 
@@ -426,9 +427,10 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     const defaultPin = '123456'; // Default PIN for all new employees
     
     const employeeData = {
-      employeeId, firstName, lastName, email, phone, facility,
-      department, designation, shift, joiningDate,
-      dateOfBirth, nationality, nationalId,
+      employeeId, staffId, firstName, lastName, email, phone, facility,
+      department, designation, cadre, shift, joiningDate,
+      dateOfBirth, nationality, nationalId, gender, education,
+      bloodGroup, allergies, address,
       profileImage,
       faceImageUploaded: true,
       status: 'active',
