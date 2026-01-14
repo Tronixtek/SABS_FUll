@@ -46,6 +46,9 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [designationSearch, setDesignationSearch] = useState(employee?.designation || '');
   const [showDesignationDropdown, setShowDesignationDropdown] = useState(false);
+  const [customDepartment, setCustomDepartment] = useState('');
+  const [customDesignation, setCustomDesignation] = useState('');
+  const [customCadre, setCustomCadre] = useState('');
   const [registrationStatus, setRegistrationStatus] = useState({
     deviceSync: null,    // null, 'loading', 'success', 'error'
     databaseSave: null,  // null, 'loading', 'success', 'error'
@@ -185,7 +188,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     'Technician',
     'Artisan',
     'Protocol Officer',
-    'Messenger/Dispatch Rider'
+    'Messenger/Dispatch Rider',
+    'Other'
   ];
 
   useEffect(() => {
@@ -248,18 +252,27 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   };
 
   const handleCadreSelect = (cadre) => {
+    if (cadre === 'Other') {
+      setCustomCadre('');
+    }
     setFormData({ ...formData, cadre });
     setCadreSearch(cadre);
     setShowCadreDropdown(false);
   };
 
   const handleDepartmentSelect = (department) => {
+    if (department === 'Other') {
+      setCustomDepartment('');
+    }
     setFormData({ ...formData, department });
     setDepartmentSearch(department);
     setShowDepartmentDropdown(false);
   };
 
   const handleDesignationSelect = (designation) => {
+    if (designation === 'Other') {
+      setCustomDesignation('');
+    }
     setFormData({ ...formData, designation });
     setDesignationSearch(designation);
     setShowDesignationDropdown(false);
@@ -285,7 +298,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         'Environmental Health',
         'Health Education',
         'Medical Records',
-        'Administration'
+        'Administration',
+        'Other'
       ];
     }
     return departments;
@@ -317,7 +331,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         'Security Officer',
         'Administrative Officer',
         'Cleaner',
-        'Driver'
+        'Driver',
+        'Other'
       ];
     }
     return designations;
@@ -659,9 +674,18 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         
         const updatePayload = { ...formData };
         
-        // Handle custom allergy if "Other" is selected
+        // Handle custom fields if "Other" is selected
         if (formData.allergies === 'Other' && formData.customAllergy) {
           updatePayload.allergies = formData.customAllergy;
+        }
+        if (formData.department === 'Other' && formData.customDepartment) {
+          updatePayload.department = formData.customDepartment;
+        }
+        if (formData.designation === 'Other' && formData.customDesignation) {
+          updatePayload.designation = formData.customDesignation;
+        }
+        if (formData.cadre === 'Other' && formData.customCadre) {
+          updatePayload.cadre = formData.customCadre;
         }
         
         if (capturedImage) {
@@ -681,10 +705,19 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         // NEW employee registration with enhanced device-first flow
         console.log('🚀 Starting enhanced employee registration...');
         
-        // Prepare form data with custom allergy if "Other" is selected
+        // Prepare form data with custom fields if "Other" is selected
         const submissionData = { ...formData };
         if (formData.allergies === 'Other' && formData.customAllergy) {
           submissionData.allergies = formData.customAllergy;
+        }
+        if (formData.department === 'Other' && formData.customDepartment) {
+          submissionData.department = formData.customDepartment;
+        }
+        if (formData.designation === 'Other' && formData.customDesignation) {
+          submissionData.designation = formData.customDesignation;
+        }
+        if (formData.cadre === 'Other' && formData.customCadre) {
+          submissionData.cadre = formData.customCadre;
         }
         
         await registerEmployeeWithEnhancedFlow(submissionData, capturedImage);
@@ -1091,6 +1124,18 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                       </div>
                     )}
                   </div>
+                  
+                  {/* Custom Department Input - Shows when "Other" is selected */}
+                  {formData.department === 'Other' && (
+                    <input
+                      type="text"
+                      value={formData.customDepartment || ''}
+                      onChange={(e) => setFormData({ ...formData, customDepartment: e.target.value })}
+                      placeholder="Enter custom department name"
+                      className="mt-2 block w-full border border-blue-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  )}
                 </div>
                 
                 <div>
@@ -1144,6 +1189,18 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                       </div>
                     )}
                   </div>
+                  
+                  {/* Custom Designation Input - Shows when "Other" is selected */}
+                  {formData.designation === 'Other' && (
+                    <input
+                      type="text"
+                      value={formData.customDesignation || ''}
+                      onChange={(e) => setFormData({ ...formData, customDesignation: e.target.value })}
+                      placeholder="Enter custom designation name"
+                      className="mt-2 block w-full border border-blue-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  )}
                 </div>
 
                 <div>
@@ -1197,6 +1254,18 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                       </div>
                     )}
                   </div>
+                  
+                  {/* Custom Cadre Input - Shows when "Other" is selected */}
+                  {formData.cadre === 'Other' && (
+                    <input
+                      type="text"
+                      value={formData.customCadre || ''}
+                      onChange={(e) => setFormData({ ...formData, customCadre: e.target.value })}
+                      placeholder="Enter custom cadre name"
+                      className="mt-2 block w-full border border-blue-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  )}
                 </div>
 
                 <div>
