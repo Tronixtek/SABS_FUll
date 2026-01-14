@@ -231,3 +231,41 @@ exports.getMe = async (req, res) => {
     });
   }
 };
+
+// @desc    Get employee's own attendance records
+// @route   GET /api/employee-auth/my-attendance
+// @access  Private (Employee)
+exports.getMyAttendance = async (req, res) => {
+  try {
+    const Attendance = require('../models/Attendance');
+    const { startDate, endDate } = req.query;
+
+    // Build query
+    const query = { employeeId: req.employee.employeeId };
+
+    // Add date range if provided
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    // Fetch attendance records
+    const attendance = await Attendance.find(query)
+      .sort({ date: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: attendance.length,
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Get my attendance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching attendance records'
+    });
+  }
+};

@@ -337,6 +337,13 @@ const EmployeeDashboard = () => {
                         {request.reason && (
                           <p className="text-sm line-clamp-2">{request.reason}</p>
                         )}
+                        
+                        {request.status === 'rejected' && request.managerNotes && (
+                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                            <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
+                            <p className="text-xs text-red-700 mt-1">{request.managerNotes}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     

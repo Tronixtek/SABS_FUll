@@ -458,6 +458,12 @@ const LeaveManagement = () => {
                     <td className="px-6 py-4 max-w-xs">
                       <p className="text-sm text-gray-900 truncate">{request.reason}</p>
                       <p className="text-xs text-gray-500">{request.category}</p>
+                      {request.status === 'rejected' && request.managerNotes && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                          <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
+                          <p className="text-xs text-red-700 mt-1">{request.managerNotes}</p>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getUrgencyBadge(request.urgency)}`}>

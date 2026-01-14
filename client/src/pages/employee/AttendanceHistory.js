@@ -38,9 +38,8 @@ const AttendanceHistory = () => {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/attendance`, {
+      const response = await axios.get(`${API_URL}/api/employee-auth/my-attendance`, {
         params: {
-          employeeId: employee.employeeId,
           startDate: dateRange.startDate,
           endDate: dateRange.endDate
         }
