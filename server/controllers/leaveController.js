@@ -43,12 +43,7 @@ const submitLeaveRequest = async (req, res) => {
       console.log('[SUBMIT LEAVE] Employee portal - found employee:', employee.employeeId);
     } else {
       // Staff portal - validate employee exists by employeeId
-      employee = await Employee.findOne({ 
-        $or: [
-          { employeeId: employeeId },
-          { _id: employeeId }
-        ]
-      });
+      employee = await Employee.findOne({ employeeId: employeeId });
       console.log('[SUBMIT LEAVE] Staff portal - found employee:', employee?.employeeId);
     }
 
