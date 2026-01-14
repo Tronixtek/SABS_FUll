@@ -14,6 +14,8 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const EmployeeDashboard = () => {
   const navigate = useNavigate();
   const { employee, employeeLogout, changePin } = useEmployeeAuth();
@@ -40,7 +42,7 @@ const EmployeeDashboard = () => {
   const fetchLeaveRequests = async () => {
     try {
       setLoadingLeave(true);
-      const response = await axios.get('http://localhost:5000/api/leave/my-requests');
+      const response = await axios.get(`${API_URL}/api/leave/my-requests`);
       if (response.data.success) {
         setLeaveRequests(response.data.data.leaveRequests || []);
       }

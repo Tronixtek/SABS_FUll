@@ -10,6 +10,8 @@ import {
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const RequestLeave = () => {
   const navigate = useNavigate();
   const { employee } = useEmployeeAuth();
@@ -91,7 +93,7 @@ const RequestLeave = () => {
         requestData.endDate = formData.endDate;
       }
 
-      const response = await axios.post('http://localhost:5000/api/leave', requestData);
+      const response = await axios.post(`${API_URL}/api/leave`, requestData);
 
       if (response.data.success) {
         setSuccess(true);

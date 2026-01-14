@@ -11,6 +11,8 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const AttendanceHistory = () => {
   const navigate = useNavigate();
   const { employee } = useEmployeeAuth();
@@ -36,7 +38,7 @@ const AttendanceHistory = () => {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/attendance', {
+      const response = await axios.get(`${API_URL}/api/attendance`, {
         params: {
           employeeId: employee.employeeId,
           startDate: dateRange.startDate,
