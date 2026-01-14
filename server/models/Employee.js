@@ -28,13 +28,15 @@ const employeeSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true,
     lowercase: true,
     trim: true
   },
   phone: {
     type: String,
+    required: true,
     trim: true
   },
   faceImageUploaded: {
@@ -58,7 +60,7 @@ const employeeSchema = new mongoose.Schema({
   },
   cadre: {
     type: String,
-    required: false,
+    required: true,
     trim: true
   },
   shift: {
@@ -78,22 +80,22 @@ const employeeSchema = new mongoose.Schema({
   },
   dateOfBirth: {
     type: Date,
-    required: false
+    required: true
   },
   nationality: {
     type: String,
-    required: false,
+    required: true,
     trim: true
   },
   nationalId: {
     type: String,
-    required: false,
+    required: true,
     trim: true
   },
   gender: {
     type: String,
     enum: ['Male', 'Female', 'Other'],
-    required: false
+    required: true
   },
   education: {
     type: String,
@@ -108,7 +110,7 @@ const employeeSchema = new mongoose.Schema({
       'PhD/Doctorate',
       'Other'
     ],
-    required: false
+    required: true
   },
   bloodGroup: {
     type: String,
@@ -166,11 +168,11 @@ const employeeSchema = new mongoose.Schema({
     relationship: String
   },
   address: {
-    street: String,
-    city: String,
-    state: String,
-    zipCode: String,
-    country: String
+    street: { type: String, required: true },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
+    zipCode: { type: String, required: false },
+    country: { type: String, required: true }
   },
   metadata: {
     type: Map,
