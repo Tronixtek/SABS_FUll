@@ -62,7 +62,8 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
-app.use(cors(corsOptions));
+// Commented out to use only the hidden CORS configuration
+//app.use(cors(corsOptions));
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
