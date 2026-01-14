@@ -858,22 +858,24 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <label className="block text-sm font-medium text-gray-700">Phone *</label>
                   <input
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Gender</label>
+                  <label className="block text-sm font-medium text-gray-700">Gender *</label>
                   <select
                     name="gender"
                     value={formData.gender}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Gender</option>
@@ -884,11 +886,12 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Highest Educational Qualification</label>
+                  <label className="block text-sm font-medium text-gray-700">Highest Educational Qualification *</label>
                   <select
                     name="education"
                     value={formData.education}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Education Level</option>
@@ -968,36 +971,39 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               <h4 className="text-lg font-medium text-gray-900 mb-4">Address Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="lg:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700">Street Address</label>
+                  <label className="block text-sm font-medium text-gray-700">Street Address *</label>
                   <input
                     type="text"
                     name="address.street"
                     value={formData.address.street}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="123 Main Street"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">City</label>
+                  <label className="block text-sm font-medium text-gray-700">City *</label>
                   <input
                     type="text"
                     name="address.city"
                     value={formData.address.city}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Kano"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">State</label>
+                  <label className="block text-sm font-medium text-gray-700">State *</label>
                   <input
                     type="text"
                     name="address.state"
                     value={formData.address.state}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Kano State"
                   />
@@ -1016,12 +1022,13 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
                 
                 <div className="lg:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">Country</label>
+                  <label className="block text-sm font-medium text-gray-700">Country *</label>
                   <input
                     type="text"
                     name="address.country"
                     value={formData.address.country}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nigeria"
                   />
@@ -1260,12 +1267,13 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth *</label>
                   <input
                     type="date"
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
