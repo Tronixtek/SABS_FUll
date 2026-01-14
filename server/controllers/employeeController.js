@@ -250,11 +250,11 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     // ✅ STEP 1: VALIDATE INPUT DATA (NO deviceId required)
     console.log(`📋 Validating registration data...`);
     
-    if (!employeeId || !staffId || !firstName || !lastName || !email || !facility || !shift) {
+    if (!employeeId || !staffId || !firstName || !lastName || !email || !facility || !department || !designation || !shift) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields',
-        required: ['employeeId', 'staffId', 'firstName', 'lastName', 'email', 'facility', 'shift']
+        required: ['employeeId', 'staffId', 'firstName', 'lastName', 'email', 'facility', 'department', 'designation', 'shift']
       });
     }
 
