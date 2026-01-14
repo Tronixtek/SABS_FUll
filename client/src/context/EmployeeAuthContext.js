@@ -3,6 +3,9 @@ import axios from 'axios';
 
 const EmployeeAuthContext = createContext();
 
+// Use environment variable for API URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 export const useEmployeeAuth = () => {
   const context = useContext(EmployeeAuthContext);
   if (!context) {
@@ -26,7 +29,7 @@ export const EmployeeAuthProvider = ({ children }) => {
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           // Fetch employee data
-          const response = await axios.get('http://localhost:5000/api/employee-auth/me');
+          const response = await axios.get(`${API_URL}/api/employee-auth/me`);
           
           if (response.data.success) {
             setEmployee(response.data.employee);
@@ -51,7 +54,7 @@ export const EmployeeAuthProvider = ({ children }) => {
   // Employee login function
   const employeeLogin = async (staffId, pin) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/employee-auth/login', {
+      const response = await axios.post(`${API_URL}/api/employee-auth/login`, {
         staffId,
         pin
       });
@@ -91,7 +94,7 @@ export const EmployeeAuthProvider = ({ children }) => {
   // Change PIN function
   const changePin = async (currentPin, newPin) => {
     try {
-      const response = await axios.put('http://localhost:5000/api/employee-auth/change-pin', {
+      const response = await axios.put(`${API_URL}/api/employee-auth/change-pin`, {
         currentPin,
         newPin
       });
