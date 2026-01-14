@@ -14,6 +14,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     facility: employee?.facility?._id || '',
     department: employee?.department || '',
     designation: employee?.designation || '',
+    cadre: employee?.cadre || '',
     shift: employee?.shift?._id || '',
     joiningDate: employee?.joiningDate ? employee.joiningDate.split('T')[0] : '',
     dateOfBirth: employee?.dateOfBirth ? employee.dateOfBirth.split('T')[0] : '',
@@ -21,6 +22,16 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     nationalId: employee?.nationalId || '',
     gender: employee?.gender || '',
     education: employee?.education || '',
+    bloodGroup: employee?.bloodGroup || '',
+    allergies: employee?.allergies || '',
+    customAllergy: employee?.allergies && !['None', 'Penicillin Allergy', 'Latex Allergy', 'Food Allergies', 'Asthma', 'Diabetes', 'Hypertension', 'Epilepsy', 'Sickle Cell Disease'].includes(employee?.allergies) ? employee?.allergies : '',
+    address: {
+      street: employee?.address?.street || '',
+      city: employee?.address?.city || '',
+      state: employee?.address?.state || '',
+      zipCode: employee?.address?.zipCode || '',
+      country: employee?.address?.country || ''
+    },
     status: employee?.status || 'active'
   });
   
@@ -29,6 +40,12 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const [cameraLoading, setCameraLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState(employee?.profileImage || null);
   const [stream, setStream] = useState(null);
+  const [cadreSearch, setCadreSearch] = useState(employee?.cadre || '');
+  const [showCadreDropdown, setShowCadreDropdown] = useState(false);
+  const [departmentSearch, setDepartmentSearch] = useState(employee?.department || '');
+  const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
+  const [designationSearch, setDesignationSearch] = useState(employee?.designation || '');
+  const [showDesignationDropdown, setShowDesignationDropdown] = useState(false);
   const [registrationStatus, setRegistrationStatus] = useState({
     deviceSync: null,    // null, 'loading', 'success', 'error'
     databaseSave: null,  // null, 'loading', 'success', 'error'
@@ -37,6 +54,139 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const cadreDropdownRef = useRef(null);
+  const departmentDropdownRef = useRef(null);
+  const designationDropdownRef = useRef(null);
+
+  // Comprehensive cadre list for both facility and board levels
+  const allCadres = [
+    // FACILITY LEVEL CADRES
+    'Community Health Officer (CHO)',
+    'Community Health Extension Worker (CHEW)',
+    'Junior Community Health Extension Worker (JCHEW)',
+    'Registered Nurse',
+    'Enrolled Nurse',
+    'Midwife',
+    'Nurse/Midwife Assistant',
+    'Medical Officer',
+    'Medical Officer of Health (MOH)',
+    'Laboratory Scientist',
+    'Laboratory Technician',
+    'Laboratory Assistant',
+    'Pharmacist',
+    'Pharmacy Technician',
+    'Pharmacy Assistant',
+    'Environmental Health Officer (EHO)',
+    'Health Assistant (Environmental)',
+    'Health Records Officer',
+    'Health Information Manager',
+    'Records Assistant',
+    'Health Educator',
+    'Community Health Promoter',
+    'Administrative Officer',
+    'Secretary/Clerical Officer',
+    'Accountant',
+    'Accounts Clerk',
+    'Driver',
+    'Cleaner',
+    'Security Guard',
+    'Ward Attendant/Orderly',
+    'Gateman',
+    'Gardener',
+    
+    // BOARD LEVEL CADRES
+    'Executive Secretary/Executive Director',
+    'Director',
+    'Deputy Director',
+    'Assistant Director',
+    'Principal Administrative Officer',
+    'Senior Administrative Officer',
+    'Administrative Officer I',
+    'Administrative Officer II',
+    'Assistant Administrative Officer',
+    'Executive Assistant',
+    'Director of Finance & Accounts',
+    'Principal Accountant',
+    'Senior Accountant',
+    'Accountant I',
+    'Accountant II',
+    'Accounts Assistant',
+    'Cashier',
+    'Director of Planning, Research & Statistics',
+    'Principal Planning Officer',
+    'Senior Planning Officer',
+    'Planning Officer I',
+    'Planning Officer II',
+    'Statistician',
+    'Data Analyst',
+    'M&E Officer (Monitoring & Evaluation)',
+    'Director of Medical Services',
+    'Consultant Physician',
+    'Principal Medical Officer',
+    'Senior Medical Officer',
+    'Medical Officer I',
+    'Medical Officer II',
+    'Director of Nursing Services',
+    'Assistant Director of Nursing',
+    'Principal Nursing Officer',
+    'Senior Nursing Officer',
+    'Nursing Officer I',
+    'Nursing Officer II',
+    'Director of Public Health',
+    'Principal Public Health Officer',
+    'Senior Public Health Officer',
+    'Disease Surveillance & Notification Officer (DSNO)',
+    'Epidemiologist',
+    'Health Promotion Officer',
+    'Director of Pharmaceutical Services',
+    'Principal Pharmacist',
+    'Senior Pharmacist',
+    'Pharmacist I',
+    'Pharmacist II',
+    'Director of Laboratory Services',
+    'Principal Laboratory Scientist',
+    'Senior Laboratory Scientist',
+    'Laboratory Scientist I',
+    'Laboratory Scientist II',
+    'Director of PHC Services',
+    'PHC Coordinator (LGA)',
+    'CHEW Supervisor',
+    'Director of Procurement/Supplies',
+    'Principal Procurement Officer',
+    'Senior Procurement Officer',
+    'Store Officer',
+    'Supply Chain Officer',
+    'Director of ICT/Health Information',
+    'Principal ICT Officer',
+    'Senior ICT Officer',
+    'Database Administrator',
+    'System Analyst',
+    'Director of Human Resources',
+    'Principal HR Officer',
+    'Senior HR Officer',
+    'HR Officer I',
+    'HR Officer II',
+    'Training Officer',
+    'Director of Legal Services',
+    'Principal Legal Officer',
+    'Legal Officer I',
+    'Legal Officer II',
+    'Director of Internal Audit',
+    'Principal Auditor',
+    'Senior Auditor',
+    'Internal Auditor',
+    'Director of Public Relations',
+    'Public Relations Officer',
+    'Information Officer',
+    'Director of Works/Engineering',
+    'Civil Engineer',
+    'Electrical Engineer',
+    'Mechanical Engineer',
+    'Technician',
+    'Artisan',
+    'Protocol Officer',
+    'Messenger/Dispatch Rider'
+  ];
 
   useEffect(() => {
     return () => {
@@ -56,6 +206,24 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     }
   }, [showCamera, stream]);
 
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (cadreDropdownRef.current && !cadreDropdownRef.current.contains(event.target)) {
+        setShowCadreDropdown(false);
+      }
+      if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(event.target)) {
+        setShowDepartmentDropdown(false);
+      }
+      if (designationDropdownRef.current && !designationDropdownRef.current.contains(event.target)) {
+        setShowDesignationDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     
@@ -64,6 +232,86 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       generateEmployeeId(e.target.value);
     }
   };
+
+  const handleCadreSelect = (cadre) => {
+    setFormData({ ...formData, cadre });
+    setCadreSearch(cadre);
+    setShowCadreDropdown(false);
+  };
+
+  const handleDepartmentSelect = (department) => {
+    setFormData({ ...formData, department });
+    setDepartmentSearch(department);
+    setShowDepartmentDropdown(false);
+  };
+
+  const handleDesignationSelect = (designation) => {
+    setFormData({ ...formData, designation });
+    setDesignationSearch(designation);
+    setShowDesignationDropdown(false);
+  };
+
+  const filteredCadres = allCadres.filter(cadre =>
+    cadre.toLowerCase().includes(cadreSearch.toLowerCase())
+  );
+
+  // Get departments for selected facility
+  const getDepartments = () => {
+    if (!formData.facility) return [];
+    const facility = facilities.find(f => f._id === formData.facility);
+    const departments = facility?.departments || [];
+    if (departments.length === 0) {
+      return [
+        'General Outpatient',
+        'Maternal & Child Health',
+        'Immunization',
+        'Laboratory Services',
+        'Pharmacy',
+        'Emergency Services',
+        'Environmental Health',
+        'Health Education',
+        'Medical Records',
+        'Administration'
+      ];
+    }
+    return departments;
+  };
+
+  const filteredDepartments = getDepartments().filter(dept =>
+    dept.toLowerCase().includes(departmentSearch.toLowerCase())
+  );
+
+  // Get designations for selected facility
+  const getDesignations = () => {
+    if (!formData.facility) return [];
+    const facility = facilities.find(f => f._id === formData.facility);
+    const designations = facility?.designations || [];
+    if (designations.length === 0) {
+      return [
+        'Medical Officer',
+        'Nurse',
+        'Midwife',
+        'Community Health Officer (CHO)',
+        'Community Health Extension Worker (CHEW)',
+        'Laboratory Technician',
+        'Pharmacist',
+        'Pharmacy Technician',
+        'Health Records Officer',
+        'Environmental Health Officer',
+        'Health Educator',
+        'Ward Attendant',
+        'Security Officer',
+        'Administrative Officer',
+        'Cleaner',
+        'Driver'
+      ];
+    }
+    return designations;
+  };
+
+  const filteredDesignations = getDesignations().filter(desig =>
+    desig.toLowerCase().includes(designationSearch.toLowerCase())
+  );
 
   const generateEmployeeId = async (facilityId) => {
     try {
@@ -396,6 +644,12 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         console.log('📝 Updating existing employee...');
         
         const updatePayload = { ...formData };
+        
+        // Handle custom allergy if "Other" is selected
+        if (formData.allergies === 'Other' && formData.customAllergy) {
+          updatePayload.allergies = formData.customAllergy;
+        }
+        
         if (capturedImage) {
           updatePayload.profileImage = capturedImage;
         }
@@ -413,7 +667,13 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         // NEW employee registration with enhanced device-first flow
         console.log('🚀 Starting enhanced employee registration...');
         
-        await registerEmployeeWithEnhancedFlow(formData, capturedImage);
+        // Prepare form data with custom allergy if "Other" is selected
+        const submissionData = { ...formData };
+        if (formData.allergies === 'Other' && formData.customAllergy) {
+          submissionData.allergies = formData.customAllergy;
+        }
+        
+        await registerEmployeeWithEnhancedFlow(submissionData, capturedImage);
         
         // If we get here, registration was successful
         setTimeout(() => {
@@ -629,6 +889,129 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                     <option value="Other">Other</option>
                   </select>
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Blood Group</label>
+                  <select
+                    name="bloodGroup"
+                    value={formData.bloodGroup}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Blood Group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+                
+                <div className="md:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700">Allergies / Medical Conditions</label>
+                  <select
+                    name="allergies"
+                    value={formData.allergies}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Allergy/Medical Condition</option>
+                    <option value="None">None</option>
+                    <option value="Penicillin Allergy">Penicillin Allergy</option>
+                    <option value="Latex Allergy">Latex Allergy</option>
+                    <option value="Food Allergies">Food Allergies (Nuts, Eggs, etc.)</option>
+                    <option value="Asthma">Asthma</option>
+                    <option value="Diabetes">Diabetes</option>
+                    <option value="Hypertension">Hypertension (High Blood Pressure)</option>
+                    <option value="Epilepsy">Epilepsy</option>
+                    <option value="Sickle Cell Disease">Sickle Cell Disease</option>
+                    <option value="Other">Other (Please Specify)</option>
+                  </select>
+                </div>
+                
+                {formData.allergies === 'Other' && (
+                  <div className="md:col-span-3">
+                    <label className="block text-sm font-medium text-gray-700">Please Specify Allergy/Medical Condition</label>
+                    <textarea
+                      name="customAllergy"
+                      value={formData.customAllergy}
+                      onChange={handleChange}
+                      rows="2"
+                      required
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Please describe the allergy or medical condition..."
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Address Information Section */}
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h4 className="text-lg font-medium text-gray-900 mb-4">Address Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700">Street Address</label>
+                  <input
+                    type="text"
+                    name="address.street"
+                    value={formData.address.street}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="123 Main Street"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">City</label>
+                  <input
+                    type="text"
+                    name="address.city"
+                    value={formData.address.city}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Kano"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">State</label>
+                  <input
+                    type="text"
+                    name="address.state"
+                    value={formData.address.state}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Kano State"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Zip Code</label>
+                  <input
+                    type="text"
+                    name="address.zipCode"
+                    value={formData.address.zipCode}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="700001"
+                  />
+                </div>
+                
+                <div className="lg:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700">Country</label>
+                  <input
+                    type="text"
+                    name="address.country"
+                    value={formData.address.country}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nigeria"
+                  />
+                </div>
               </div>
             </div>
 
@@ -638,80 +1021,161 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Department/Service Unit</label>
-                  <select
-                    name="department"
-                    value={formData.department}
-                    onChange={handleChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Department/Service Unit</option>
-                    {formData.facility && (() => {
-                      const facility = facilities.find(f => f._id === formData.facility);
-                      const departments = facility?.departments || [];
-                      if (departments.length === 0) {
-                        // Default PHC departments if facility has none configured
-                        return [
-                          'General Outpatient',
-                          'Maternal & Child Health',
-                          'Immunization',
-                          'Laboratory Services',
-                          'Pharmacy',
-                          'Emergency Services',
-                          'Environmental Health',
-                          'Health Education',
-                          'Medical Records',
-                          'Administration'
-                        ].map(dept => (
-                          <option key={dept} value={dept}>{dept}</option>
-                        ));
-                      }
-                      return departments.map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
-                      ));
-                    })()}
-                  </select>
+                  <div className="relative" ref={departmentDropdownRef}>
+                    <input
+                      type="text"
+                      value={departmentSearch}
+                      onChange={(e) => {
+                        setDepartmentSearch(e.target.value);
+                        setShowDepartmentDropdown(true);
+                      }}
+                      onFocus={() => setShowDepartmentDropdown(true)}
+                      placeholder="Search department..."
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {formData.department && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 mt-0.5">
+                        <svg className="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    {showDepartmentDropdown && filteredDepartments.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredDepartments.map((dept, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleDepartmentSelect(dept)}
+                            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.department === dept ? 'bg-blue-100' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-900">{dept}</span>
+                              {formData.department === dept && (
+                                <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {showDepartmentDropdown && departmentSearch && filteredDepartments.length === 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3">
+                        <p className="text-sm text-gray-500">No departments found matching "{departmentSearch}"</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Designation/Rank</label>
-                  <select
-                    name="designation"
-                    value={formData.designation}
-                    onChange={handleChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Designation/Rank</option>
-                    {formData.facility && (() => {
-                      const facility = facilities.find(f => f._id === formData.facility);
-                      const designations = facility?.designations || [];
-                      if (designations.length === 0) {
-                        // Default PHC designations if facility has none configured
-                        return [
-                          'Medical Officer',
-                          'Nurse',
-                          'Midwife',
-                          'Community Health Officer (CHO)',
-                          'Community Health Extension Worker (CHEW)',
-                          'Laboratory Technician',
-                          'Pharmacist',
-                          'Pharmacy Technician',
-                          'Health Records Officer',
-                          'Environmental Health Officer',
-                          'Health Educator',
-                          'Ward Attendant',
-                          'Security Officer',
-                          'Administrative Officer',
-                          'Cleaner',
-                          'Driver'
-                        ].map(desig => (
-                          <option key={desig} value={desig}>{desig}</option>
-                        ));
-                      }
-                      return designations.map(desig => (
-                        <option key={desig} value={desig}>{desig}</option>
-                      ));
-                    })()}
-                  </select>
+                  <div className="relative" ref={designationDropdownRef}>
+                    <input
+                      type="text"
+                      value={designationSearch}
+                      onChange={(e) => {
+                        setDesignationSearch(e.target.value);
+                        setShowDesignationDropdown(true);
+                      }}
+                      onFocus={() => setShowDesignationDropdown(true)}
+                      placeholder="Search designation..."
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {formData.designation && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 mt-0.5">
+                        <svg className="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    {showDesignationDropdown && filteredDesignations.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredDesignations.map((desig, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleDesignationSelect(desig)}
+                            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.designation === desig ? 'bg-blue-100' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-900">{desig}</span>
+                              {formData.designation === desig && (
+                                <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {showDesignationDropdown && designationSearch && filteredDesignations.length === 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3">
+                        <p className="text-sm text-gray-500">No designations found matching "{designationSearch}"</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Cadre</label>
+                  <div className="relative" ref={cadreDropdownRef}>
+                    <input
+                      type="text"
+                      value={cadreSearch}
+                      onChange={(e) => {
+                        setCadreSearch(e.target.value);
+                        setShowCadreDropdown(true);
+                      }}
+                      onFocus={() => setShowCadreDropdown(true)}
+                      placeholder="Search cadre..."
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {formData.cadre && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 mt-0.5">
+                        <svg className="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    {showCadreDropdown && filteredCadres.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredCadres.map((cadre, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleCadreSelect(cadre)}
+                            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.cadre === cadre ? 'bg-blue-100' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-900">{cadre}</span>
+                              {formData.cadre === cadre && (
+                                <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {showCadreDropdown && cadreSearch && filteredCadres.length === 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3">
+                        <p className="text-sm text-gray-500">No cadres found matching "{cadreSearch}"</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>

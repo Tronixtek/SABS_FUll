@@ -56,6 +56,11 @@ const employeeSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  cadre: {
+    type: String,
+    required: false,
+    trim: true
+  },
   shift: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shift',
@@ -104,6 +109,16 @@ const employeeSchema = new mongoose.Schema({
       'Other'
     ],
     required: false
+  },
+  bloodGroup: {
+    type: String,
+    enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+    required: false
+  },
+  allergies: {
+    type: String,
+    required: false,
+    trim: true
   },
   status: {
     type: String,

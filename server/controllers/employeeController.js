@@ -161,9 +161,9 @@ exports.createEmployee = async (req, res) => {
       req.body.employeeId = await generateEmployeeId(req.body.facility);
     }
 
-    // Auto-generate PIN for self-service portal
-    const generatedPin = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit PIN
-    req.body.pin = generatedPin;
+    // Set default PIN for self-service portal
+    const defaultPin = '123456'; // Default PIN for all new employees
+    req.body.pin = defaultPin;
     req.body.employeeSelfServiceEnabled = true;
     req.body.pinMustChange = true; // Force change on first login
 
@@ -172,7 +172,7 @@ exports.createEmployee = async (req, res) => {
     await employee.populate('facility shift');
 
     console.log('✅ Employee created in MERN database:', employee.employeeId);
-    console.log('🔑 Generated PIN:', generatedPin);
+    console.log('🔑 Default PIN:', defaultPin);
 
     // 🔄 Sync with Java service if integration is enabled
     if (javaServiceClient.isEnabled()) {
@@ -205,15 +205,15 @@ exports.createEmployee = async (req, res) => {
       }
     }
     
-    // Return employee data with generated PIN (only shown once)
+    // Return employee data with default PIN
     res.status(201).json({
       success: true,
       data: employee,
       message: 'Employee created successfully',
       selfServiceCredentials: {
         staffId: employee.staffId || employee.employeeId,
-        pin: generatedPin,
-        note: 'This PIN will only be displayed once. Please save it securely and provide it to the employee.'
+        pin: defaultPin,
+        note: 'Default PIN is 123456. Employee must change it on first login.'
       }
     });
   } catch (error) {
@@ -422,8 +422,8 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     // ✅ STEP 4: SAVE TO DATABASE ONLY AFTER SUCCESSFUL DEVICE ENROLLMENT
     console.log(`💾 Device enrollment successful - Now saving to database...`);
     
-    // Auto-generate PIN for self-service portal
-    const generatedPin = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit PIN
+    // Set default PIN for self-service portal
+    const defaultPin = '123456'; // Default PIN for all new employees
     
     const employeeData = {
       employeeId, firstName, lastName, email, phone, facility,
@@ -433,7 +433,7 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       faceImageUploaded: true,
       status: 'active',
       deviceId: facilityDeviceId, // Facility's device ID (shared by all employees)
-      pin: generatedPin, // Auto-generated PIN
+      pin: defaultPin, // Default PIN (123456)
       employeeSelfServiceEnabled: true,
       pinMustChange: true, // Force change on first login
       biometricData: {
@@ -448,7 +448,7 @@ exports.registerEmployeeWithDevice = async (req, res) => {
 
     const newEmployee = await Employee.create(employeeData);
     console.log(`✅ Employee saved to database with ID: ${newEmployee._id}`);
-    console.log(`🔑 Generated PIN: ${generatedPin}`);
+    console.log(`🔑 Default PIN: ${defaultPin}`);
 
     // Populate related documents
     await newEmployee.populate([
@@ -471,8 +471,8 @@ exports.registerEmployeeWithDevice = async (req, res) => {
         },
         selfServiceCredentials: {
           staffId: newEmployee.staffId || newEmployee.employeeId,
-          pin: generatedPin,
-          note: 'This PIN will only be displayed once. Please save it securely and provide it to the employee.'
+          pin: defaultPin,
+          note: 'Default PIN is 123456. Employee must change it on first login.'
         },
         steps: {
           validation: 'completed',

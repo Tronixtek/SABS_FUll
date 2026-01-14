@@ -41,7 +41,7 @@ const facilitySchema = new mongoose.Schema({
   },
   deviceApiUrl: {
     type: String,
-    required: true,
+    required: false,
     trim: true
   },
   deviceApiKey: {
