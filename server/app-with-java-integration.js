@@ -11,7 +11,8 @@ const analyticsRoutes = require('./routes/analytics');
 const app = express();
 
 // Middleware
-app.use(cors());
+// CORS commented out - handled by main server.js
+//app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
