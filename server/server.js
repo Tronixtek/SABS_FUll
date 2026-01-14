@@ -55,9 +55,9 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS - Allow network access
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000']
-    : true, // Allow all origins in development
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.CORS_ORIGIN || 'http://localhost:3000'
+    : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
