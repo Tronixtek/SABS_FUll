@@ -56,7 +56,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // CORS - Allow network access
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000']
+    ? process.env.CORS_ORIGIN?.split(',') || ['https://sabs-dashboard.web.app', 'http://localhost:3000']
     : true, // Allow all origins in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
