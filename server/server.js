@@ -54,13 +54,20 @@ app.use(express.json({ limit: '50mb' })); // Increased from default 1mb to 50mb
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS - Allow network access
-const allowedOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',') 
-  : [
-      'http://localhost:3000',
-      'https://sabs-dashboard.web.app',
-      'https://sabs-dashboard.firebaseapp.com'
-    ];
+// Always include production URLs, plus any additional from env variable
+const defaultOrigins = [
+  'http://localhost:3000',
+  'https://sabs-dashboard.web.app',
+  'https://sabs-dashboard.firebaseapp.com'
+];
+
+const additionalOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) 
+  : [];
+
+const allowedOrigins = [...new Set([...defaultOrigins, ...additionalOrigins])];
+
+console.log('🔒 CORS allowed origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -72,11 +79,12 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // In production, check against allowed origins
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Check against allowed origins
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn(`CORS blocked origin: ${origin}`);
+      console.warn(`❌ CORS blocked origin: ${origin}`);
+      console.warn(`   Allowed origins:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
