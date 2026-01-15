@@ -307,7 +307,8 @@ exports.registerEmployeeWithDevice = async (req, res) => {
 
     // ✅ STEP 2: USE FACILITY'S DEVICE ID (NOT PER-EMPLOYEE)
     // All employees at this facility inherit the same device ID (physical device)
-    const facilityDeviceId = facilityDoc.deviceInfo?.deviceId || facilityDoc.code || facility;
+    // IMPORTANT: Convert to lowercase - device is case-sensitive!
+    const facilityDeviceId = (facilityDoc.deviceInfo?.deviceId || facilityDoc.code || facility).toLowerCase();
     
     // Employee gets unique person ID within the device (not device ID)
     // XO5 device has max 32 character limit for person IDs
@@ -329,7 +330,8 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     console.log(`   Facility: ${facilityDoc.name}`);
 
     // Prepare payload for Java device service - matches the expected format
-    const deviceKey = (facilityDoc.configuration?.deviceKey || facilityDeviceId).toLowerCase();
+    // Device key is already lowercase from facilityDeviceId
+    const deviceKey = facilityDoc.configuration?.deviceKey?.toLowerCase() || facilityDeviceId;
     console.log(`   Device Key: ${deviceKey}`);
     console.log(`   Verification Style: 0 (any verification method)`);
     

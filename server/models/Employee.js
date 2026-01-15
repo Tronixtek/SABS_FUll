@@ -53,6 +53,11 @@ const employeeSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  unit: {
+    type: String,
+    required: false,
+    trim: true
+  },
   designation: {
     type: String,
     required: true,

@@ -13,6 +13,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     phone: employee?.phone || '',
     facility: employee?.facility?._id || '',
     department: employee?.department || '',
+    unit: employee?.unit || '', // Add unit field
     designation: employee?.designation || '',
     cadre: employee?.cadre || '',
     shift: employee?.shift?._id || '',
@@ -47,6 +48,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const [showCadreDropdown, setShowCadreDropdown] = useState(false);
   const [departmentSearch, setDepartmentSearch] = useState(employee?.department || '');
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
+  const [unitSearch, setUnitSearch] = useState(employee?.unit || ''); // Add unit search state
+  const [showUnitDropdown, setShowUnitDropdown] = useState(false); // Add unit dropdown state
   const [designationSearch, setDesignationSearch] = useState(employee?.designation || '');
   const [showDesignationDropdown, setShowDesignationDropdown] = useState(false);
   const [nationalitySearch, setNationalitySearch] = useState(employee?.nationality || '');
@@ -64,6 +67,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const canvasRef = useRef(null);
   const cadreDropdownRef = useRef(null);
   const departmentDropdownRef = useRef(null);
+  const unitDropdownRef = useRef(null); // Add unit dropdown ref
   const designationDropdownRef = useRef(null);
   const nationalityDropdownRef = useRef(null);
 
@@ -246,6 +250,233 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
   ];
 
+  // Generic/Old Departments (previously used)
+  const genericDepartments = [
+    'Medical Department',
+    'Nursing Department',
+    'Laboratory Department',
+    'Pharmacy Department',
+    'Administration Department',
+    'Finance Department',
+    'Human Resources',
+    'IT Department',
+    'Public Health',
+    'Environmental Health',
+    'Records Department',
+    'Maintenance Department',
+    'Security Department',
+    'Other'
+  ];
+
+  // KANO STATE PHCMB - Official Departments (with hierarchy)
+  const kanoDepartments = [
+    'Administration and Human Resources',
+    'Finance and Account',
+    'Environmental and Public Health',
+    'Medical Services',
+    'Pharmaceutical Service',
+    'Disease Control and Immunization',
+    'Family Health',
+    'Planning, Monitoring and Evaluation'
+  ];
+
+  // All departments combined (KANO + Generic)
+  const allDepartments = [...kanoDepartments, ...genericDepartments];
+
+  // Department → Units mapping
+  const departmentUnits = {
+    'Administration and Human Resources': [
+      'Human Resources for Health',
+      'General Service',
+      'Maintainance',
+      'Security',
+      'Registry',
+      'Floating Assembly'
+    ],
+    'Finance and Account': [
+      'Cashier',
+      'Payroll'
+    ],
+    'Environmental and Public Health': [
+      'ACSM',
+      'Community Engagement',
+      'Environmental Health',
+      'WASH'
+    ],
+    'Medical Services': [
+      'Mental Health',
+      'MSP',
+      'NCD',
+      'Referral',
+      'School Health Services',
+      'Oral Health care',
+      'KSCHMA',
+      'Laboratory',
+      'Primary Eye Care'
+    ],
+    'Pharmaceutical Service': [
+      'Cold Chain',
+      'Logistic',
+      'SHCSS',
+      'DRF',
+      'Drugs Supply'
+    ],
+    'Disease Control and Immunization': [
+      'Immunization',
+      'Surveillance',
+      'Malaria Control',
+      'TB/HIV',
+      'NTD'
+    ],
+    'Family Health': [
+      'MCH',
+      'Nutrition',
+      'Family Planning',
+      'Adolescent health',
+      'Gender'
+    ],
+    'Planning, Monitoring and Evaluation': [
+      'HMIS',
+      'ICT',
+      'QOC',
+      'RMNCAH',
+      'Planning and Budget'
+    ]
+  };
+
+  // Unit → Designations mapping
+  const unitDesignations = {
+    // Administration and Human Resources
+    'Human Resources for Health': [
+      'HRH Coordinator',
+      'Deputy HRH Coordinator',
+      'HR Workforce Relation Officer',
+      'Routine Training Officer'
+    ],
+    'General Service': [
+      'Staff Officer',
+      'Security Officer',
+      'Under Secretary',
+      'Record officer',
+      'PAS',
+      'Maintainance Officer',
+      'In-service Training officer'
+    ],
+    'Floating Assembly': [
+      'Floating Manager',
+      'Refrigerator TO',
+      'Electrical TO',
+      'Biomedical TO',
+      'Technical Assistant'
+    ],
+    // Finance and Account
+    'Cashier': [
+      'Director Finance and Account',
+      'Deputy Director Finance and Account',
+      'Deputy Director Finance and Account (Auditor)',
+      'Cashier'
+    ],
+    'Payroll': [
+      'RI Accountant',
+      'Operation Accountant',
+      'BHCPF Accountant',
+      'UNICEF Accountant',
+      'PHC Accountant',
+      'HMOU Accountant',
+      'Payroll accountant'
+    ],
+    // Environmental and Public Health
+    'ACSM': [
+      'Director Environmental and Public Health',
+      'Deputy Director Environmental and Public Health',
+      'SMO'
+    ],
+    'Community Engagement': [
+      'CE FP',
+      'Assistant CE FP',
+      'SBCC FP',
+      'CBHW FP'
+    ],
+    'Environmental Health': [
+      'WDC FP',
+      'Assistant WDC FP'
+    ],
+    'WASH': [
+      'WASH FP',
+      'Climate Change FP',
+      'Waste Manager'
+    ],
+    // Medical Services
+    'Mental Health': ['Mental Health FP'],
+    'MSP': [
+      'MSPMT Coordinator',
+      'Deputy MSPMT Coordinator',
+      'MSPMT M&E'
+    ],
+    'NCD': ['NCD FP'],
+    'School Health Services': ['SHS FP'],
+    'Referral': ['RP FP'],
+    'Oral Health care': ['Oral Health Care FP'],
+    'Primary Eye Care': ['Primary Eye Care FP'],
+    'Laboratory': ['Laboratory FP'],
+    'KSCHMA': ['KSCHMA Desk Officer'],
+    // Pharmaceutical Service
+    'SHCSS': ['SHCSS FP'],
+    'Cold Chain': [
+      'SCCO',
+      'Assistant SCCO'
+    ],
+    'Logistic': [
+      'SLO',
+      'Assistant SLO'
+    ],
+    'Drugs Supply': ['Drugs Supply FP'],
+    // Disease Control and Immunization
+    'Immunization': [
+      'Director Disease Control and Immunization',
+      'SIO',
+      'Deputy SIO',
+      'PM SERICC',
+      'Deputy PM SERICC',
+      'RIO FP'
+    ],
+    'Surveillance': [
+      'DSNO',
+      'Surveillance Officer'
+    ],
+    'Malaria Control': [
+      'Malaria Program FP',
+      'Deputy Malaria Program FP'
+    ],
+    'TB/HIV': ['TBL FP'],
+    'NTD': ['NTD FP'],
+    // Family Health
+    'MCH': [
+      'Director Family Health',
+      'MNCH Coordinator'
+    ],
+    'Nutrition': ['Deputy Director Nutrition', 'Nutrition FP'],
+    'Family Planning': ['Family Planning FP', 'Reproductive Health FP'],
+    'Adolescent health': ['Adolescent Health FP'],
+    'Gender': ['Gender Health FP'],
+    // Planning, Monitoring and Evaluation
+    'HMIS': [
+      'Director Planning, Monitoring, and Evaluation',
+      'Deputy Director Planning, Monitoring and Evaluation',
+      'HMIS Officer'
+    ],
+    'ICT': [
+      'ICT Manager',
+      'Deputy ICT Manager'
+    ],
+    'QOC': ['QOC FP', 'ISS Coordinator'],
+    'RMNCAH': ['M&E'],
+    'Planning and Budget': [
+      'CPO',
+      'Assistant CPO'
+    ]
+  };
+
   useEffect(() => {
     return () => {
       if (stream) {
@@ -285,6 +516,9 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       }
       if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(event.target)) {
         setShowDepartmentDropdown(false);
+      }
+      if (unitDropdownRef.current && !unitDropdownRef.current.contains(event.target)) {
+        setShowUnitDropdown(false);
       }
       if (designationDropdownRef.current && !designationDropdownRef.current.contains(event.target)) {
         setShowDesignationDropdown(false);
@@ -331,18 +565,23 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   };
 
   const handleDepartmentSelect = (department) => {
-    if (department === 'Other') {
-      setCustomDepartment('');
-    }
-    setFormData({ ...formData, department });
+    // When department changes, reset unit and designation
+    setFormData({ ...formData, department, unit: '', designation: '' });
     setDepartmentSearch(department);
+    setUnitSearch(''); // Reset unit search
+    setDesignationSearch(''); // Reset designation search
     setShowDepartmentDropdown(false);
   };
 
+  const handleUnitSelect = (unit) => {
+    // When unit changes, reset designation
+    setFormData({ ...formData, unit, designation: '' });
+    setUnitSearch(unit);
+    setDesignationSearch(''); // Reset designation search
+    setShowUnitDropdown(false);
+  };
+
   const handleDesignationSelect = (designation) => {
-    if (designation === 'Other') {
-      setCustomDesignation('');
-    }
     setFormData({ ...formData, designation });
     setDesignationSearch(designation);
     setShowDesignationDropdown(false);
@@ -362,63 +601,28 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     country.toLowerCase().includes(nationalitySearch.toLowerCase())
   );
 
-  // Get departments for selected facility
-  const getDepartments = () => {
-    if (!formData.facility) return [];
-    const facility = facilities.find(f => f._id === formData.facility);
-    const departments = facility?.departments || [];
-    if (departments.length === 0) {
-      return [
-        'General Outpatient',
-        'Maternal & Child Health',
-        'Immunization',
-        'Laboratory Services',
-        'Pharmacy',
-        'Emergency Services',
-        'Environmental Health',
-        'Health Education',
-        'Medical Records',
-        'Administration',
-        'Other'
-      ];
-    }
-    return departments;
-  };
-
-  const filteredDepartments = getDepartments().filter(dept =>
+  // Use all departments (KANO + Generic)
+  const filteredDepartments = allDepartments.filter(dept =>
     dept.toLowerCase().includes(departmentSearch.toLowerCase())
   );
 
-  // Get designations for selected facility
-  const getDesignations = () => {
-    if (!formData.facility) return [];
-    const facility = facilities.find(f => f._id === formData.facility);
-    const designations = facility?.designations || [];
-    if (designations.length === 0) {
-      return [
-        'Medical Officer',
-        'Nurse',
-        'Midwife',
-        'Community Health Officer (CHO)',
-        'Community Health Extension Worker (CHEW)',
-        'Laboratory Technician',
-        'Pharmacist',
-        'Pharmacy Technician',
-        'Health Records Officer',
-        'Environmental Health Officer',
-        'Health Educator',
-        'Ward Attendant',
-        'Security Officer',
-        'Administrative Officer',
-        'Cleaner',
-        'Driver',
-        'Other'
-      ];
-    }
-    return designations;
+  // Check if selected department is a KANO department (has hierarchy)
+  const isKanoDepartment = kanoDepartments.includes(formData.department);
+
+  // Get units for selected department
+  const getUnitsForDepartment = (department) => {
+    if (!department) return [];
+    return departmentUnits[department] || [];
   };
 
-  const filteredDesignations = getDesignations().filter(desig =>
+  const availableUnits = getUnitsForDepartment(formData.department);
+  const filteredUnits = availableUnits.filter(unit =>
+    unit.toLowerCase().includes(unitSearch.toLowerCase())
+  );
+
+  // Show ALL designations (independent of unit)
+  const availableDesignations = allCadres;
+  const filteredDesignations = availableDesignations.filter(desig =>
     desig.toLowerCase().includes(designationSearch.toLowerCase())
   );
 
@@ -1218,8 +1422,65 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                   )}
                 </div>
                 
+                {/* Only show Unit field for KANO departments */}
+                {isKanoDepartment && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Designation/Rank</label>
+                  <label className="block text-sm font-medium text-gray-700">Unit *</label>
+                  <div className="relative" ref={unitDropdownRef}>
+                    <input
+                      type="text"
+                      value={unitSearch}
+                      onChange={(e) => {
+                        setUnitSearch(e.target.value);
+                        setShowUnitDropdown(true);
+                      }}
+                      onFocus={() => setShowUnitDropdown(true)}
+                      placeholder={formData.department ? "Search unit..." : "Select department first"}
+                      disabled={!formData.department}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                    {formData.unit && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 mt-0.5">
+                        <svg className="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    {showUnitDropdown && filteredUnits.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredUnits.map((unit, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleUnitSelect(unit)}
+                            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.unit === unit ? 'bg-blue-100' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-900">{unit}</span>
+                              {formData.unit === unit && (
+                                <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {showUnitDropdown && unitSearch && filteredUnits.length === 0 && formData.department && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3">
+                        <p className="text-sm text-gray-500">No units found matching "{unitSearch}"</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Designation/Rank *</label>
                   <div className="relative" ref={designationDropdownRef}>
                     <input
                       type="text"
@@ -1229,7 +1490,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                         setShowDesignationDropdown(true);
                       }}
                       onFocus={() => setShowDesignationDropdown(true)}
-                      placeholder="Search designation..."
+                      placeholder={"Search designation/rank..."}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {formData.designation && (
