@@ -4,7 +4,9 @@ const {
   getDailyReport,
   getMonthlyReport,
   getCustomReport,
-  generatePDFReport
+  generatePDFReport,
+  getPayrollReport,
+  generatePayrollPDF
 } = require('../controllers/reportController');
 const { protect, checkPermission } = require('../middleware/auth');
 
@@ -15,5 +17,7 @@ router.get('/daily', getDailyReport);
 router.get('/monthly', getMonthlyReport);
 router.get('/custom', getCustomReport);
 router.get('/pdf', generatePDFReport);
+router.get('/payroll', getPayrollReport);
+router.get('/payroll-pdf', generatePayrollPDF);
 
 module.exports = router;

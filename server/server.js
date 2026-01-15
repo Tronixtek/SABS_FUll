@@ -21,6 +21,9 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const xo5Routes = require('./routes/xo5Routes');
 const integrationRoutes = require('./routes/integrationRoutes');
 const leaveRoutes = require('./routes/leave');
+const payrollRoutes = require('./routes/payrollRoutes');
+const payrollSettingsRoutes = require('./routes/payrollSettingsRoutes');
+const salaryGradeRoutes = require('./routes/salaryGradeRoutes');
 
 // Models
 const Employee = require('./models/Employee');
@@ -103,6 +106,9 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/xo5', xo5Routes);
 app.use('/api/integration', integrationRoutes);
 app.use('/api/leave', leaveRoutes);
+app.use('/api/payroll', payrollRoutes);
+app.use('/api/payroll-settings', payrollSettingsRoutes);
+app.use('/api/salary-grades', salaryGradeRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {

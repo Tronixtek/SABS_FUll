@@ -70,6 +70,10 @@ const Reports = () => {
             facility: filters.facility 
           };
           break;
+        case 'payroll':
+          endpoint = '/api/reports/payroll';
+          params = { month: filters.month, year: filters.year, facility: filters.facility };
+          break;
         default:
           break;
       }
@@ -85,6 +89,43 @@ const Reports = () => {
   };
 
   const exportToCSV = () => {
+    // Handle payroll report CSV export
+    if (reportType === 'payroll') {
+      if (!reportData || !reportData.payrolls || reportData.payrolls.length === 0) {
+        toast.error('No data to export');
+        return;
+      }
+
+      const headers = ['Employee ID', 'Name', 'Department', 'Hours', 'Overtime', 'Basic Pay', 'Overtime Pay', 'Gross Earnings', 'Tax', 'Pension', 'Deductions', 'Net Pay', 'Status'];
+      const rows = reportData.payrolls.map(payroll => [
+        payroll.employee?.employeeId || '',
+        `${payroll.employee?.firstName || ''} ${payroll.employee?.lastName || ''}`.trim(),
+        payroll.employee?.department || '',
+        payroll.workHours.totalHours.toFixed(2),
+        payroll.workHours.overtimeHours.toFixed(2),
+        payroll.earnings.basicPay.toFixed(2),
+        payroll.earnings.overtimePay.toFixed(2),
+        payroll.earnings.total.toFixed(2),
+        payroll.deductions.tax.toFixed(2),
+        payroll.deductions.pension.toFixed(2),
+        payroll.deductions.total.toFixed(2),
+        payroll.netPay.toFixed(2),
+        payroll.status
+      ]);
+
+      const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payroll_report_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success('Payroll report exported successfully');
+      return;
+    }
+
+    // Handle attendance report CSV export
     if (!reportData || !reportData.records || reportData.records.length === 0) {
       toast.error('No data to export');
       return;
@@ -138,7 +179,41 @@ const Reports = () => {
     try {
       toast.loading('Generating PDF report...');
       
-      // Prepare query parameters for PDF generation
+      // Handle payroll PDF export
+      if (reportType === 'payroll') {
+        const params = new URLSearchParams({
+          month: filters.month,
+          year: filters.year,
+          ...(filters.facility && { facility: filters.facility })
+        });
+
+        const response = await fetch(`/api/reports/payroll-pdf?${params.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate PDF');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `payroll-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        toast.dismiss();
+        toast.success('Payroll PDF report downloaded successfully!');
+        return;
+      }
+      
+      // Prepare query parameters for attendance PDF generation
       const params = new URLSearchParams({
         type: reportType,
         ...(reportType === 'daily' && { date: filters.date }),
@@ -219,7 +294,7 @@ const Reports = () => {
       {/* Report Type Selection */}
       <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Select Report Type</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <button
             onClick={() => handleReportTypeChange('daily')}
             className={`p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
@@ -268,6 +343,22 @@ const Reports = () => {
               </div>
             </div>
           </button>
+          <button
+            onClick={() => handleReportTypeChange('payroll')}
+            className={`p-3 sm:p-4 rounded-lg border-2 transition-all text-left ${
+              reportType === 'payroll'
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="w-5 h-5" />
+              <div>
+                <p className="font-medium">Payroll Report</p>
+                <p className="text-sm opacity-75">Salary & payments</p>
+              </div>
+            </div>
+          </button>
         </div>
 
         {/* Filters based on report type */}
@@ -284,7 +375,7 @@ const Reports = () => {
             </div>
           )}
 
-          {reportType === 'monthly' && (
+          {(reportType === 'monthly' || reportType === 'payroll') && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
@@ -378,7 +469,7 @@ const Reports = () => {
       </div>
 
       {/* Statistics Cards */}
-      {reportData && (
+      {reportData && reportType !== 'payroll' && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-blue-50 to-blue-100">
             <div className="flex items-center justify-between">
@@ -493,8 +584,53 @@ const Reports = () => {
         </div>
       )}
 
+      {/* Payroll Statistics Cards */}
+      {reportData && reportType === 'payroll' && reportData.summary && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100 bg-gradient-to-br from-blue-50 to-blue-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Total Employees</p>
+                <p className="text-3xl font-bold text-blue-700 mt-1">{reportData.summary.totalEmployees}</p>
+              </div>
+              <Users className="w-8 h-8 text-blue-700" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100 bg-gradient-to-br from-green-50 to-green-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-600 font-medium">Gross Earnings</p>
+                <p className="text-2xl font-bold text-green-700 mt-1">
+                  ₦{reportData.summary.totalGrossEarnings.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100 bg-gradient-to-br from-red-50 to-red-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-red-600 font-medium">Total Deductions</p>
+                <p className="text-2xl font-bold text-red-700 mt-1">
+                  ₦{reportData.summary.totalDeductions.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100 bg-gradient-to-br from-purple-50 to-purple-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-purple-600 font-medium">Net Pay</p>
+                <p className="text-2xl font-bold text-purple-700 mt-1">
+                  ₦{reportData.summary.totalNetPay.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Report Display */}
-      {reportData && (
+      {reportData && reportType !== 'payroll' && (
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800">
@@ -646,6 +782,85 @@ const Reports = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Payroll Report Table */}
+      {reportData && reportType === 'payroll' && (
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Payroll Report - {reportData.period?.monthName} {reportData.period?.year}
+            </h3>
+            <div className="text-sm text-gray-500">
+              {reportData.payrolls?.length || 0} employees
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hours</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">OT</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Earnings</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Deductions</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Net Pay</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {reportData.payrolls?.length > 0 ? (
+                  reportData.payrolls.map((payroll, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {payroll.employee?.employeeId}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {payroll.employee?.firstName} {payroll.employee?.lastName}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {payroll.employee?.department}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                        {payroll.workHours.totalHours.toFixed(1)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                        {payroll.workHours.overtimeHours.toFixed(1)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-medium text-green-600">
+                        ₦{payroll.earnings.total.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-medium text-red-600">
+                        ₦{payroll.deductions.total.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
+                        ₦{payroll.netPay.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          payroll.status === 'paid' ? 'bg-green-100 text-green-800' :
+                          payroll.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {payroll.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                      No payroll records found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

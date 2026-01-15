@@ -158,9 +158,15 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   }],
+  salaryGrade: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SalaryGrade',
+    required: false
+  },
   salary: {
     type: Number,
     required: false
+    // Can be manually set to override salary grade, or left empty to use grade's base salary
   },
   emergencyContact: {
     name: String,

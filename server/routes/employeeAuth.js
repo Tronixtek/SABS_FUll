@@ -6,6 +6,7 @@ const {
   getMe,
   getMyAttendance
 } = require('../controllers/employeeAuthController');
+const { getMyPayroll } = require('../controllers/payrollController');
 const { protectEmployee } = require('../middleware/employeeAuth');
 
 // Public routes
@@ -15,5 +16,6 @@ router.post('/login', employeeLogin);
 router.put('/change-pin', protectEmployee, changePin);
 router.get('/me', protectEmployee, getMe);
 router.get('/my-attendance', protectEmployee, getMyAttendance);
+router.get('/my-payroll', protectEmployee, getMyPayroll);
 
 module.exports = router;

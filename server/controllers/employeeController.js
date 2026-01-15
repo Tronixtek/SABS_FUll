@@ -392,26 +392,36 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     console.log(`   Device service response: ${javaResponse.status}`);
     console.log(`   Full Java service response:`, JSON.stringify(javaResponse.data, null, 2));
 
-    // Debug the success property specifically
-    console.log(`   Java response success property: ${javaResponse.data.success}`);
+    // Debug the response structure
     console.log(`   Java response code: ${javaResponse.data.code}`);
-    console.log(`   Java response message: ${javaResponse.data.msg || javaResponse.data.message}`);
-    console.log(`   Java response success type: ${typeof javaResponse.data.success}`);
+    console.log(`   Java response msg: ${javaResponse.data.msg}`);
     
-    // Check success using Java service's actual response format
-    const isJavaServiceSuccess = javaResponse.data.success === true || 
-                                javaResponse.data.code === "000" ||
-                                (javaResponse.data.code && javaResponse.data.code.toString() === "000");
+    // Check success using Java service's BaseResult format
+    // Success is indicated by code "000"
+    const isJavaServiceSuccess = javaResponse.data.code === "000";
     
     if (!isJavaServiceSuccess) {
-      const errorMsg = javaResponse.data.msg || javaResponse.data.message || javaResponse.data.error || 'Unknown device error';
-      console.error(`❌ Device enrollment failed: ${errorMsg}`);
+      const errorCode = javaResponse.data.code || 'UNKNOWN';
+      const errorMsg = javaResponse.data.msg || 'Unknown device error';
+      
+      console.error(`❌ Device enrollment failed [Code: ${errorCode}]: ${errorMsg}`);
       console.error(`   Full error response:`, javaResponse.data);
+      
+      // Provide more user-friendly error messages
+      let userMessage = errorMsg;
+      if (errorCode === '1002') {
+        userMessage = `Device connection failed: ${errorMsg}. Please ensure the attendance device is powered on and connected to the network.`;
+      } else if (errorCode === '1001') {
+        userMessage = `Invalid data: ${errorMsg}`;
+      } else if (errorCode === 'DUPLICATE_EMPLOYEE') {
+        userMessage = `Employee is already enrolled on the device.`;
+      }
       
       return res.status(502).json({
         success: false,
-        message: 'Device enrollment failed',
+        message: userMessage,
         deviceError: errorMsg,
+        deviceErrorCode: errorCode,
         deviceResponse: javaResponse.data,
         step: 'device_enrollment'
       });

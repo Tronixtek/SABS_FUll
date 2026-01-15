@@ -10,7 +10,8 @@ import {
   Save,
   RefreshCw,
   Mail,
-  Send
+  Send,
+  DollarSign
 } from 'lucide-react';
 
 const Settings = () => {
@@ -19,6 +20,17 @@ const Settings = () => {
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [activeTab, setActiveTab] = useState('general');
+  const [payrollSettings, setPayrollSettings] = useState({
+    overtimeRate: 1.5,
+    taxRate: 0.10,
+    pensionRate: 0.08,
+    insuranceRate: 0,
+    insuranceType: 'none',
+    workingDaysPerMonth: 22,
+    hoursPerDay: 8,
+    companyName: '',
+    payrollCurrency: 'NGN'
+  });
   const [settings, setSettings] = useState({
     // General Settings
     companyName: '',
@@ -60,6 +72,7 @@ const Settings = () => {
 
   useEffect(() => {
     fetchSettings();
+    fetchPayrollSettings();
   }, []);
 
   const fetchSettings = async () => {
@@ -82,9 +95,41 @@ const Settings = () => {
     }
   };
 
+  const fetchPayrollSettings = async () => {
+    try {
+      const response = await axios.get('/api/payroll-settings');
+      if (response.data.success) {
+        setPayrollSettings(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch payroll settings:', error);
+    }
+  };
+
+  const handleSavePayrollSettings = async () => {
+    setSaving(true);
+    try {
+      const response = await axios.put('/api/payroll-settings', payrollSettings);
+      if (response.data.success) {
+        toast.success('Payroll settings saved successfully');
+        fetchPayrollSettings();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save payroll settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Handle payroll settings separately
+      if (activeTab === 'payroll') {
+        await handleSavePayrollSettings();
+        return;
+      }
+
       // Get settings for active tab
       const tabSettings = getTabSettings();
       
@@ -191,6 +236,7 @@ const Settings = () => {
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
     { id: 'attendance', label: 'Attendance', icon: Clock },
+    { id: 'payroll', label: 'Payroll', icon: DollarSign },
     { id: 'notification', label: 'Notifications', icon: Bell },
     { id: 'reporting', label: 'Reporting', icon: FileText },
     { id: 'system', label: 'System', icon: Database }
@@ -427,6 +473,244 @@ const Settings = () => {
                     </span>
                   </label>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Payroll Settings */}
+          {activeTab === 'payroll' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Payroll Configuration</h3>
+                  <p className="text-sm text-gray-600 mt-1">Configure payroll calculation parameters and rates</p>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Last updated: {payrollSettings.updatedAt ? new Date(payrollSettings.updatedAt).toLocaleDateString() : 'Never'}
+                </div>
+              </div>
+
+              {/* Working Schedule */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 mb-4 flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Working Schedule
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Working Days Per Month</label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={payrollSettings.workingDaysPerMonth}
+                      onChange={(e) => setPayrollSettings(prev => ({ ...prev, workingDaysPerMonth: Number(e.target.value) }))}
+                      min="20"
+                      max="31"
+                    />
+                    <p className="text-xs text-gray-600 mt-1">Standard working days in a month (typically 22)</p>
+                  </div>
+
+                  <div>
+                    <label className="label">Hours Per Day</label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={payrollSettings.hoursPerDay}
+                      onChange={(e) => setPayrollSettings(prev => ({ ...prev, hoursPerDay: Number(e.target.value) }))}
+                      min="6"
+                      max="12"
+                      step="0.5"
+                    />
+                    <p className="text-xs text-gray-600 mt-1">Standard working hours per day (typically 8)</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Earnings Rates */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-semibold text-green-900 mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  Earnings & Rates
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Overtime Rate Multiplier</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        className="input flex-1"
+                        value={payrollSettings.overtimeRate}
+                        onChange={(e) => setPayrollSettings(prev => ({ ...prev, overtimeRate: Number(e.target.value) }))}
+                        min="1.0"
+                        max="3.0"
+                        step="0.1"
+                      />
+                      <span className="text-sm font-medium text-gray-700">×</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Overtime pay = Hourly rate × {payrollSettings.overtimeRate}</p>
+                  </div>
+
+                  <div>
+                    <label className="label">Currency</label>
+                    <select
+                      className="input"
+                      value={payrollSettings.payrollCurrency}
+                      onChange={(e) => setPayrollSettings(prev => ({ ...prev, payrollCurrency: e.target.value }))}
+                    >
+                      <option value="NGN">NGN (₦) - Nigerian Naira</option>
+                      <option value="USD">USD ($) - US Dollar</option>
+                      <option value="EUR">EUR (€) - Euro</option>
+                      <option value="GBP">GBP (£) - British Pound</option>
+                    </select>
+                    <p className="text-xs text-gray-600 mt-1">Currency for payroll calculations</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deduction Rates */}
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <h4 className="font-semibold text-orange-900 mb-4">Deduction Rates</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">Tax Rate (%)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        className="input flex-1"
+                        value={(payrollSettings.taxRate * 100).toFixed(1)}
+                        onChange={(e) => setPayrollSettings(prev => ({ ...prev, taxRate: Number(e.target.value) / 100 }))}
+                        min="0"
+                        max="50"
+                        step="0.5"
+                      />
+                      <span className="text-sm font-medium text-gray-700">%</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Tax deduction from gross pay</p>
+                  </div>
+
+                  <div>
+                    <label className="label">Pension Rate (%)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        className="input flex-1"
+                        value={(payrollSettings.pensionRate * 100).toFixed(1)}
+                        onChange={(e) => setPayrollSettings(prev => ({ ...prev, pensionRate: Number(e.target.value) / 100 }))}
+                        min="0"
+                        max="20"
+                        step="0.5"
+                      />
+                      <span className="text-sm font-medium text-gray-700">%</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Pension contribution from gross pay</p>
+                  </div>
+
+                  <div>
+                    <label className="label">Insurance Rate (%)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        className="input flex-1"
+                        value={(payrollSettings.insuranceRate * 100).toFixed(1)}
+                        onChange={(e) => setPayrollSettings(prev => ({ ...prev, insuranceRate: Number(e.target.value) / 100 }))}
+                        min="0"
+                        max="10"
+                        step="0.1"
+                      />
+                      <span className="text-sm font-medium text-gray-700">%</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Insurance deduction from gross pay</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Insurance Settings */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h4 className="font-semibold text-purple-900 mb-4">Insurance Configuration</h4>
+                <div>
+                  <label className="label">Insurance Type</label>
+                  <select
+                    className="input"
+                    value={payrollSettings.insuranceType}
+                    onChange={(e) => setPayrollSettings(prev => ({ ...prev, insuranceType: e.target.value }))}
+                  >
+                    <option value="none">No Insurance</option>
+                    <option value="health">Health Insurance</option>
+                    <option value="life">Life Insurance</option>
+                    <option value="both">Health & Life Insurance</option>
+                  </select>
+                  <p className="text-xs text-gray-600 mt-1">Type of insurance coverage provided</p>
+                </div>
+              </div>
+
+              {/* Company Information */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-4">Company Information</h4>
+                <div>
+                  <label className="label">Company Name (for Payslips)</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={payrollSettings.companyName}
+                    onChange={(e) => setPayrollSettings(prev => ({ ...prev, companyName: e.target.value }))}
+                    placeholder="Enter company name"
+                  />
+                  <p className="text-xs text-gray-600 mt-1">Company name that appears on payslips</p>
+                </div>
+              </div>
+
+              {/* Calculation Preview */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
+                <h4 className="font-semibold text-gray-900 mb-4">💡 Calculation Example</h4>
+                <p className="text-sm text-gray-700 mb-3">Based on current settings, for a ₦100,000 monthly salary:</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Base Salary:</span>
+                    <span className="font-semibold">₦100,000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Hourly Rate:</span>
+                    <span className="font-semibold">
+                      ₦{(100000 / (payrollSettings.workingDaysPerMonth * payrollSettings.hoursPerDay)).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Overtime Rate (per hour):</span>
+                    <span className="font-semibold">
+                      ₦{((100000 / (payrollSettings.workingDaysPerMonth * payrollSettings.hoursPerDay)) * payrollSettings.overtimeRate).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="border-t border-gray-300 my-2"></div>
+                  <div className="flex justify-between text-red-600">
+                    <span>Tax ({(payrollSettings.taxRate * 100).toFixed(1)}%):</span>
+                    <span className="font-semibold">-₦{(100000 * payrollSettings.taxRate).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-600">
+                    <span>Pension ({(payrollSettings.pensionRate * 100).toFixed(1)}%):</span>
+                    <span className="font-semibold">-₦{(100000 * payrollSettings.pensionRate).toFixed(2)}</span>
+                  </div>
+                  {payrollSettings.insuranceRate > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>Insurance ({(payrollSettings.insuranceRate * 100).toFixed(1)}%):</span>
+                      <span className="font-semibold">-₦{(100000 * payrollSettings.insuranceRate).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-gray-300 my-2"></div>
+                  <div className="flex justify-between text-green-600 text-base font-bold">
+                    <span>Net Pay:</span>
+                    <span>
+                      ₦{(100000 - (100000 * payrollSettings.taxRate) - (100000 * payrollSettings.pensionRate) - (100000 * payrollSettings.insuranceRate)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Warning Message */}
+              <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>⚠️ Important:</strong> Changes to these settings will affect all future payroll calculations. 
+                  Existing payroll records will not be automatically recalculated.
+                </p>
               </div>
             </div>
           )}

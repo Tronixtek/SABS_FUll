@@ -224,7 +224,7 @@ const EmployeeDashboard = () => {
         {/* Quick Actions */}
         <div className="bg-white shadow rounded-lg p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <button
               onClick={() => navigate('/employee-app/attendance')}
               className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -238,6 +238,13 @@ const EmployeeDashboard = () => {
             >
               <CalendarIcon className="h-5 w-5 text-gray-600 mr-2" />
               <span className="text-sm font-medium text-gray-700">Request Leave</span>
+            </button>
+            <button
+              onClick={() => navigate('/employee-app/payslip')}
+              className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <CalendarIcon className="h-5 w-5 text-gray-600 mr-2" />
+              <span className="text-sm font-medium text-gray-700">My Payslips</span>
             </button>
             <button
               onClick={() => navigate('/employee-app/profile')}

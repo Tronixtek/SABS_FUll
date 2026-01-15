@@ -19,6 +19,8 @@ const EmployeeModal = ({ employee, facilities, shifts, onClose }) => {
     dateOfBirth: employee?.dateOfBirth ? employee.dateOfBirth.split('T')[0] : '',
     nationality: employee?.nationality || '',
     nationalId: employee?.nationalId || '',
+    salaryGrade: employee?.salaryGrade?._id || '',
+    salary: employee?.salary || '',
     status: employee?.status || 'active'
   });
   const [loading, setLoading] = useState(false);
@@ -26,6 +28,7 @@ const EmployeeModal = ({ employee, facilities, shifts, onClose }) => {
   const [cameraLoading, setCameraLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState(employee?.profileImage || null);
   const [stream, setStream] = useState(null);
+  const [salaryGrades, setSalaryGrades] = useState([]);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -37,6 +40,19 @@ const EmployeeModal = ({ employee, facilities, shifts, onClose }) => {
       }
     };
   }, [stream]);
+
+  // Fetch salary grades
+  useEffect(() => {
+    const fetchSalaryGrades = async () => {
+      try {
+        const response = await axios.get('/api/salary-grades?active=true');
+        setSalaryGrades(response.data.data);
+      } catch (error) {
+        console.error('Failed to fetch salary grades:', error);
+      }
+    };
+    fetchSalaryGrades();
+  }, []);
 
   // Setup video element when camera starts
   useEffect(() => {
@@ -535,6 +551,39 @@ const EmployeeModal = ({ employee, facilities, shifts, onClose }) => {
                 onChange={handleChange}
                 placeholder="National ID or Passport Number"
               />
+            </div>
+
+            <div>
+              <label className="label">Salary Grade</label>
+              <select
+                name="salaryGrade"
+                className="input"
+                value={formData.salaryGrade}
+                onChange={handleChange}
+              >
+                <option value="">Select Salary Grade (Optional)</option>
+                {salaryGrades.map(grade => (
+                  <option key={grade._id} value={grade._id}>
+                    {grade.code} - {grade.name} (₦{grade.baseSalary.toLocaleString()})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Automatic salary from grade level</p>
+            </div>
+
+            <div>
+              <label className="label">Manual Salary Override</label>
+              <input
+                type="number"
+                name="salary"
+                className="input"
+                value={formData.salary}
+                onChange={handleChange}
+                placeholder="Leave empty to use salary grade"
+                min="0"
+                step="1000"
+              />
+              <p className="text-xs text-gray-500 mt-1">Overrides salary grade if set</p>
             </div>
 
             <div>

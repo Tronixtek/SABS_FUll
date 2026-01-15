@@ -25,6 +25,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     bloodGroup: employee?.bloodGroup || '',
     allergies: employee?.allergies || '',
     customAllergy: employee?.allergies && !['None', 'Penicillin Allergy', 'Latex Allergy', 'Food Allergies', 'Asthma', 'Diabetes', 'Hypertension', 'Epilepsy', 'Sickle Cell Disease'].includes(employee?.allergies) ? employee?.allergies : '',
+    salaryGrade: employee?.salaryGrade?._id || '',
+    salary: employee?.salary || '',
     address: {
       street: employee?.address?.street || '',
       city: employee?.address?.city || '',
@@ -40,12 +42,15 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const [cameraLoading, setCameraLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState(employee?.profileImage || null);
   const [stream, setStream] = useState(null);
+  const [salaryGrades, setSalaryGrades] = useState([]);
   const [cadreSearch, setCadreSearch] = useState(employee?.cadre || '');
   const [showCadreDropdown, setShowCadreDropdown] = useState(false);
   const [departmentSearch, setDepartmentSearch] = useState(employee?.department || '');
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [designationSearch, setDesignationSearch] = useState(employee?.designation || '');
   const [showDesignationDropdown, setShowDesignationDropdown] = useState(false);
+  const [nationalitySearch, setNationalitySearch] = useState(employee?.nationality || '');
+  const [showNationalityDropdown, setShowNationalityDropdown] = useState(false);
   const [customDepartment, setCustomDepartment] = useState('');
   const [customDesignation, setCustomDesignation] = useState('');
   const [customCadre, setCustomCadre] = useState('');
@@ -60,6 +65,21 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const cadreDropdownRef = useRef(null);
   const departmentDropdownRef = useRef(null);
   const designationDropdownRef = useRef(null);
+  const nationalityDropdownRef = useRef(null);
+
+  // List of nationalities/countries
+  const nationalities = [
+    'Nigerian', 'Ghanaian', 'South African', 'Kenyan', 'Egyptian', 'Ethiopian',
+    'Ugandan', 'Tanzanian', 'Zimbabwean', 'Moroccan', 'Algerian', 'Tunisian',
+    'Sudanese', 'Senegalese', 'Cameroonian', 'Ivorian', 'Rwandan', 'Zambian',
+    'American', 'British', 'Canadian', 'Australian', 'French', 'German',
+    'Italian', 'Spanish', 'Portuguese', 'Dutch', 'Belgian', 'Swiss',
+    'Indian', 'Pakistani', 'Bangladeshi', 'Sri Lankan', 'Chinese', 'Japanese',
+    'Korean', 'Filipino', 'Indonesian', 'Malaysian', 'Thai', 'Vietnamese',
+    'Brazilian', 'Mexican', 'Argentinian', 'Colombian', 'Chilean', 'Peruvian',
+    'Saudi Arabian', 'Emirati', 'Lebanese', 'Jordanian', 'Turkish', 'Iranian',
+    'Other'
+  ];
 
   // Comprehensive cadre list for both facility and board levels
   const allCadres = [
@@ -192,6 +212,40 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     'Other'
   ];
 
+  const allCountries = [
+    'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
+    'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain',
+    'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+    'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria',
+    'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada',
+    'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
+    'Congo (Congo-Brazzaville)', 'Congo (DRC)', 'Costa Rica', 'Croatia', 'Cuba',
+    'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic',
+    'East Timor (Timor-Leste)', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea',
+    'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France',
+    'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala',
+    'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland',
+    'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Ivory Coast',
+    'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'Kosovo',
+    'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia',
+    'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar', 'Malawi',
+    'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania',
+    'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro',
+    'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands',
+    'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia',
+    'Norway', 'Oman', 'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea',
+    'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania',
+    'Russia', 'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines',
+    'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia',
+    'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands',
+    'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka',
+    'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan',
+    'Tanzania', 'Thailand', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey',
+    'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom',
+    'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
+    'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
+  ];
+
   useEffect(() => {
     return () => {
       if (stream) {
@@ -199,6 +253,19 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       }
     };
   }, [stream]);
+
+  // Fetch salary grades
+  useEffect(() => {
+    const fetchSalaryGrades = async () => {
+      try {
+        const response = await axios.get('/api/salary-grades?active=true');
+        setSalaryGrades(response.data.data);
+      } catch (error) {
+        console.error('Failed to fetch salary grades:', error);
+      }
+    };
+    fetchSalaryGrades();
+  }, []);
 
   useEffect(() => {
     if (showCamera && stream && videoRef.current) {
@@ -221,6 +288,9 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       }
       if (designationDropdownRef.current && !designationDropdownRef.current.contains(event.target)) {
         setShowDesignationDropdown(false);
+      }
+      if (nationalityDropdownRef.current && !nationalityDropdownRef.current.contains(event.target)) {
+        setShowNationalityDropdown(false);
       }
     };
 
@@ -278,8 +348,18 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     setShowDesignationDropdown(false);
   };
 
+  const handleNationalitySelect = (nationality) => {
+    setFormData({ ...formData, nationality });
+    setNationalitySearch(nationality);
+    setShowNationalityDropdown(false);
+  };
+
   const filteredCadres = allCadres.filter(cadre =>
     cadre.toLowerCase().includes(cadreSearch.toLowerCase())
+  );
+
+  const filteredCountries = allCountries.filter(country =>
+    country.toLowerCase().includes(nationalitySearch.toLowerCase())
   );
 
   // Get departments for selected facility
@@ -1204,7 +1284,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Cadre</label>
+                  <label className="block text-sm font-medium text-gray-700">Cadre *</label>
                   <div className="relative" ref={cadreDropdownRef}>
                     <input
                       type="text"
@@ -1215,6 +1295,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                       }}
                       onFocus={() => setShowCadreDropdown(true)}
                       placeholder="Search cadre..."
+                      required
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {formData.cadre && (
@@ -1325,16 +1406,75 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Joining Date</label>
+                  <label className="block text-sm font-medium text-gray-700">Joining Date *</label>
                   <input
                     type="date"
                     name="joiningDate"
                     value={formData.joiningDate}
                     onChange={handleChange}
+                    required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Nationality *</label>
+                  <div className="relative" ref={nationalityDropdownRef}>
+                    <input
+                      type="text"
+                      value={nationalitySearch}
+                      onChange={(e) => {
+                        setNationalitySearch(e.target.value);
+                        setShowNationalityDropdown(true);
+                      }}
+                      onFocus={() => setShowNationalityDropdown(true)}
+                      required
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Search nationality..."
+                    />
+                    
+                    {showNationalityDropdown && filteredCountries.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredCountries.map((country, index) => (
+                          <div
+                            key={index}
+                            onClick={() => handleNationalitySelect(country)}
+                            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 flex items-center justify-between ${
+                              formData.nationality === country ? 'bg-blue-100' : ''
+                            }`}
+                          >
+                            <span>{country}</span>
+                            {formData.nationality === country && (
+                              <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {showNationalityDropdown && nationalitySearch && filteredCountries.length === 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg px-3 py-2 text-gray-500">
+                        No matching countries found
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">National ID / Passport *</label>
+                  <input
+                    type="text"
+                    name="nationalId"
+                    value={formData.nationalId}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="National ID or Passport Number"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Date of Birth *</label>
                   <input
@@ -1359,6 +1499,39 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                     <option value="inactive">Inactive</option>
                     <option value="suspended">Suspended</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Salary Grade</label>
+                  <select
+                    name="salaryGrade"
+                    value={formData.salaryGrade}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Salary Grade (Optional)</option>
+                    {salaryGrades.map(grade => (
+                      <option key={grade._id} value={grade._id}>
+                        {grade.code} - {grade.name} (₦{grade.baseSalary.toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Automatic salary from grade level</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Manual Salary Override</label>
+                  <input
+                    type="number"
+                    name="salary"
+                    value={formData.salary}
+                    onChange={handleChange}
+                    placeholder="Leave empty to use salary grade"
+                    min="0"
+                    step="1000"
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Overrides salary grade if set</p>
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 const Attendance = require('../models/Attendance');
 const Employee = require('../models/Employee');
+const Payroll = require('../models/Payroll');
 const moment = require('moment');
 const PDFDocument = require('pdfkit');
 
@@ -813,6 +814,284 @@ exports.generatePDFReport = async (req, res) => {
       } catch (endError) {
         console.error('Error ending response:', endError);
       }
+    }
+  }
+};
+
+// @desc    Generate payroll report
+// @route   GET /api/reports/payroll
+// @access  Private
+exports.getPayrollReport = async (req, res) => {
+  try {
+    const { month, year, facility, status } = req.query;
+    
+    if (!month || !year) {
+      return res.status(400).json({
+        success: false,
+        message: 'Month and year are required'
+      });
+    }
+
+    const query = {
+      'payPeriod.month': parseInt(month),
+      'payPeriod.year': parseInt(year)
+    };
+
+    if (facility) {
+      query.facility = facility;
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Fetch payroll records
+    const payrolls = await Payroll.find(query)
+      .populate('employee', 'employeeId firstName lastName department designation email phone')
+      .populate('facility', 'name location')
+      .sort({ employeeId: 1 });
+
+    // Calculate summary statistics
+    const summary = {
+      totalEmployees: payrolls.length,
+      totalGrossEarnings: payrolls.reduce((sum, p) => sum + p.earnings.total, 0),
+      totalDeductions: payrolls.reduce((sum, p) => sum + p.deductions.total, 0),
+      totalNetPay: payrolls.reduce((sum, p) => sum + p.netPay, 0),
+      totalOvertimeHours: payrolls.reduce((sum, p) => sum + p.workHours.overtimeHours, 0),
+      totalOvertimePay: payrolls.reduce((sum, p) => sum + p.earnings.overtimePay, 0),
+      totalPresentDays: payrolls.reduce((sum, p) => sum + p.attendance.presentDays, 0),
+      totalAbsentDays: payrolls.reduce((sum, p) => sum + p.attendance.absentDays, 0),
+      byStatus: {
+        draft: payrolls.filter(p => p.status === 'draft').length,
+        approved: payrolls.filter(p => p.status === 'approved').length,
+        paid: payrolls.filter(p => p.status === 'paid').length
+      }
+    };
+
+    res.json({
+      success: true,
+      data: {
+        payrolls,
+        summary,
+        period: {
+          month: parseInt(month),
+          year: parseInt(year),
+          monthName: moment().month(parseInt(month) - 1).format('MMMM')
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Payroll report error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate payroll report',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Generate payroll PDF report
+// @route   GET /api/reports/payroll-pdf
+// @access  Private
+exports.generatePayrollPDF = async (req, res) => {
+  try {
+    const { month, year, facility, status } = req.query;
+    
+    if (!month || !year) {
+      return res.status(400).json({
+        success: false,
+        message: 'Month and year are required'
+      });
+    }
+
+    const query = {
+      'payPeriod.month': parseInt(month),
+      'payPeriod.year': parseInt(year)
+    };
+
+    if (facility) {
+      query.facility = facility;
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Fetch payroll records
+    const payrolls = await Payroll.find(query)
+      .populate('employee', 'employeeId firstName lastName department designation')
+      .populate('facility', 'name')
+      .sort({ employeeId: 1 });
+
+    if (payrolls.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No payroll records found for the specified period'
+      });
+    }
+
+    // Calculate summary
+    const summary = {
+      totalEmployees: payrolls.length,
+      totalGrossEarnings: payrolls.reduce((sum, p) => sum + p.earnings.total, 0),
+      totalDeductions: payrolls.reduce((sum, p) => sum + p.deductions.total, 0),
+      totalNetPay: payrolls.reduce((sum, p) => sum + p.netPay, 0),
+      totalOvertimeHours: payrolls.reduce((sum, p) => sum + p.workHours.overtimeHours, 0),
+      totalOvertimePay: payrolls.reduce((sum, p) => sum + p.earnings.overtimePay, 0)
+    };
+
+    const monthName = moment().month(parseInt(month) - 1).format('MMMM');
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=payroll-report-${monthName}-${year}.pdf`);
+
+    // Pipe the PDF to the response
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).font('Helvetica-Bold').text('PAYROLL REPORT', { align: 'center' });
+    doc.fontSize(12).font('Helvetica').text(`${monthName} ${year}`, { align: 'center' });
+    doc.moveDown();
+
+    // Summary Section
+    doc.fontSize(14).font('Helvetica-Bold').text('Summary', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(10).font('Helvetica');
+    
+    const summaryY = doc.y;
+    // Left column
+    doc.text(`Total Employees: ${summary.totalEmployees}`, 40, summaryY);
+    doc.text(`Total Overtime Hours: ${summary.totalOvertimeHours.toFixed(2)}h`, 40, summaryY + 15);
+    doc.text(`Total Overtime Pay: ₦${summary.totalOvertimePay.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, 40, summaryY + 30);
+    
+    // Right column
+    doc.text(`Total Gross Earnings: ₦${summary.totalGrossEarnings.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, 400, summaryY);
+    doc.text(`Total Deductions: ₦${summary.totalDeductions.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, 400, summaryY + 15);
+    doc.text(`Total Net Pay: ₦${summary.totalNetPay.toLocaleString('en-NG', { minimumFractionDigits: 2 })}`, 400, summaryY + 30);
+    
+    doc.moveDown(3);
+
+    // Table Header
+    const tableTop = doc.y;
+    const colWidths = {
+      empId: 50,
+      name: 100,
+      dept: 80,
+      hours: 50,
+      overtime: 50,
+      earnings: 80,
+      deductions: 80,
+      netPay: 80
+    };
+
+    let currentX = 40;
+    
+    doc.fontSize(9).font('Helvetica-Bold');
+    doc.text('Emp ID', currentX, tableTop, { width: colWidths.empId, align: 'left' });
+    currentX += colWidths.empId;
+    doc.text('Name', currentX, tableTop, { width: colWidths.name, align: 'left' });
+    currentX += colWidths.name;
+    doc.text('Department', currentX, tableTop, { width: colWidths.dept, align: 'left' });
+    currentX += colWidths.dept;
+    doc.text('Hours', currentX, tableTop, { width: colWidths.hours, align: 'right' });
+    currentX += colWidths.hours;
+    doc.text('OT', currentX, tableTop, { width: colWidths.overtime, align: 'right' });
+    currentX += colWidths.overtime;
+    doc.text('Earnings', currentX, tableTop, { width: colWidths.earnings, align: 'right' });
+    currentX += colWidths.earnings;
+    doc.text('Deductions', currentX, tableTop, { width: colWidths.deductions, align: 'right' });
+    currentX += colWidths.deductions;
+    doc.text('Net Pay', currentX, tableTop, { width: colWidths.netPay, align: 'right' });
+
+    // Draw line under header
+    doc.moveTo(40, tableTop + 12).lineTo(760, tableTop + 12).stroke();
+
+    // Table Rows
+    let y = tableTop + 20;
+    doc.font('Helvetica').fontSize(8);
+
+    for (const payroll of payrolls) {
+      // Check if we need a new page
+      if (y > 500) {
+        doc.addPage({ margin: 40, size: 'A4', layout: 'landscape' });
+        y = 40;
+        
+        // Redraw header on new page
+        currentX = 40;
+        doc.fontSize(9).font('Helvetica-Bold');
+        doc.text('Emp ID', currentX, y, { width: colWidths.empId, align: 'left' });
+        currentX += colWidths.empId;
+        doc.text('Name', currentX, y, { width: colWidths.name, align: 'left' });
+        currentX += colWidths.name;
+        doc.text('Department', currentX, y, { width: colWidths.dept, align: 'left' });
+        currentX += colWidths.dept;
+        doc.text('Hours', currentX, y, { width: colWidths.hours, align: 'right' });
+        currentX += colWidths.hours;
+        doc.text('OT', currentX, y, { width: colWidths.overtime, align: 'right' });
+        currentX += colWidths.overtime;
+        doc.text('Earnings', currentX, y, { width: colWidths.earnings, align: 'right' });
+        currentX += colWidths.earnings;
+        doc.text('Deductions', currentX, y, { width: colWidths.deductions, align: 'right' });
+        currentX += colWidths.deductions;
+        doc.text('Net Pay', currentX, y, { width: colWidths.netPay, align: 'right' });
+        
+        doc.moveTo(40, y + 12).lineTo(760, y + 12).stroke();
+        y += 20;
+        doc.font('Helvetica').fontSize(8);
+      }
+
+      currentX = 40;
+      
+      doc.text(payroll.employee?.employeeId || '', currentX, y, { width: colWidths.empId, align: 'left' });
+      currentX += colWidths.empId;
+      
+      const fullName = `${payroll.employee?.firstName || ''} ${payroll.employee?.lastName || ''}`.trim();
+      doc.text(fullName, currentX, y, { width: colWidths.name, align: 'left' });
+      currentX += colWidths.name;
+      
+      doc.text(payroll.employee?.department || '', currentX, y, { width: colWidths.dept, align: 'left' });
+      currentX += colWidths.dept;
+      
+      doc.text(payroll.workHours.totalHours.toFixed(1), currentX, y, { width: colWidths.hours, align: 'right' });
+      currentX += colWidths.hours;
+      
+      doc.text(payroll.workHours.overtimeHours.toFixed(1), currentX, y, { width: colWidths.overtime, align: 'right' });
+      currentX += colWidths.overtime;
+      
+      doc.text(payroll.earnings.total.toLocaleString('en-NG', { minimumFractionDigits: 2 }), currentX, y, { width: colWidths.earnings, align: 'right' });
+      currentX += colWidths.earnings;
+      
+      doc.text(payroll.deductions.total.toLocaleString('en-NG', { minimumFractionDigits: 2 }), currentX, y, { width: colWidths.deductions, align: 'right' });
+      currentX += colWidths.deductions;
+      
+      doc.text(payroll.netPay.toLocaleString('en-NG', { minimumFractionDigits: 2 }), currentX, y, { width: colWidths.netPay, align: 'right' });
+
+      y += 15;
+    }
+
+    // Footer
+    doc.fontSize(8).font('Helvetica').fillColor('gray');
+    doc.text(
+      `Generated on ${moment().format('MMMM D, YYYY [at] h:mm A')}`,
+      40,
+      doc.page.height - 50,
+      { align: 'center' }
+    );
+
+    // Finalize the PDF
+    doc.end();
+
+  } catch (error) {
+    console.error('Payroll PDF generation error:', error);
+    
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate payroll PDF report',
+        error: error.message
+      });
     }
   }
 };

@@ -20,12 +20,15 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 import LeaveManagement from './pages/LeaveManagement';
+import PayrollManagement from './pages/PayrollManagement';
+import SalaryGrades from './pages/SalaryGrades';
 
 // Employee Portal Pages
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 import RequestLeave from './pages/employee/RequestLeave';
 import AttendanceHistory from './pages/employee/AttendanceHistory';
 import EmployeeProfile from './pages/employee/EmployeeProfile';
+import EmployeePayslip from './pages/employee/EmployeePayslip';
 
 // Layout
 import Layout from './components/Layout';
@@ -48,6 +51,8 @@ function App() {
               <Route path="employees" element={<Employees />} />
               <Route path="attendance" element={<Attendance />} />
               <Route path="leave" element={<LeaveManagement />} />
+              <Route path="payroll" element={<PayrollManagement />} />
+              <Route path="salary-grades" element={<SalaryGrades />} />
               <Route path="facilities" element={<Facilities />} />
               <Route path="shifts" element={<Shifts />} />
               <Route path="reports" element={<Reports />} />
@@ -65,6 +70,7 @@ function App() {
                   <Route path="dashboard" element={<EmployeeDashboard />} />
                   <Route path="request-leave" element={<RequestLeave />} />
                   <Route path="attendance" element={<AttendanceHistory />} />
+                  <Route path="payslip" element={<EmployeePayslip />} />
                   <Route path="profile" element={<EmployeeProfile />} />
                 </Routes>
               </EmployeePrivateRoute>

@@ -14,7 +14,9 @@ import {
   Bars3Icon,
   XMarkIcon,
   BellIcon,
-  CalendarIcon
+  CalendarIcon,
+  BanknotesIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 
 const Layout = () => {
@@ -40,6 +42,8 @@ const Layout = () => {
     { name: 'Employees', to: '/app/employees', icon: UsersIcon },
     { name: 'Attendance', to: '/app/attendance', icon: ClipboardDocumentCheckIcon },
     { name: 'Leave Management', to: '/app/leave', icon: CalendarIcon, permission: 'view_leave_requests' },
+    { name: 'Payroll', to: '/app/payroll', icon: BanknotesIcon },
+    { name: 'Salary Grades', to: '/app/salary-grades', icon: AcademicCapIcon },
     { name: 'Facilities', to: '/app/facilities', icon: BuildingOfficeIcon },
     { name: 'Shifts', to: '/app/shifts', icon: ClockIcon },
     { name: 'Reports', to: '/app/reports', icon: DocumentTextIcon },
