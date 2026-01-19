@@ -873,10 +873,10 @@ public class EmployeeController extends BaseController {
             System.out.println("Enhanced validation checks:");
             System.out.println("   Image size: " + imageSizeKB + "KB");
             
-            // Size recommendations based on XO5 device testing
-            if (imageSizeKB < 30) {
+            // Size recommendations based on XO5 device testing - relaxed threshold
+            if (imageSizeKB < 20) {
                 throw new RuntimeException("Image too small for reliable face detection: " + imageSizeKB + "KB. " +
-                    "Please capture a higher quality image with better lighting. Minimum recommended: 30KB");
+                    "Please capture a higher quality image with better lighting. Minimum recommended: 20KB");
             }
             
             if (imageSizeKB > 400) {
