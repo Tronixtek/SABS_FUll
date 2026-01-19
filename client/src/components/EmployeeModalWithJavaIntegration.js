@@ -43,6 +43,9 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const [cameraLoading, setCameraLoading] = useState(false);
   const [capturedImage, setCapturedImage] = useState(employee?.profileImage || null);
   const [stream, setStream] = useState(null);
+  const [availableCameras, setAvailableCameras] = useState([]);
+  const [selectedCamera, setSelectedCamera] = useState('');
+  const [uploadMethod, setUploadMethod] = useState('camera'); // 'camera' or 'file'
   const [salaryGrades, setSalaryGrades] = useState([]);
   const [cadreSearch, setCadreSearch] = useState(employee?.cadre || '');
   const [showCadreDropdown, setShowCadreDropdown] = useState(false);
@@ -639,17 +642,42 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     }
   };
 
+  // Get available cameras
+  const getAvailableCameras = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setAvailableCameras(videoDevices);
+      if (videoDevices.length > 0 && !selectedCamera) {
+        setSelectedCamera(videoDevices[0].deviceId);
+      }
+    } catch (error) {
+      console.error('Error enumerating cameras:', error);
+    }
+  };
+
   const startCamera = async () => {
     setCameraLoading(true);
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+      // Get available cameras first
+      await getAvailableCameras();
+      
+      const constraints = { 
         video: { 
           width: { ideal: 640 }, 
-          height: { ideal: 480 },
-          facingMode: 'user'
+          height: { ideal: 480 }
         },
         audio: false
-      });
+      };
+      
+      // Use selected camera if available
+      if (selectedCamera) {
+        constraints.video.deviceId = { exact: selectedCamera };
+      } else {
+        constraints.video.facingMode = 'user';
+      }
+      
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       
       setStream(mediaStream);
       setShowCamera(true);
@@ -741,7 +769,79 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const retakeImage = () => {
     setCapturedImage(null);
     setRegistrationStatus({ deviceSync: null, databaseSave: null, message: '' });
-    startCamera();
+    if (uploadMethod === 'camera') {
+      startCamera();
+    }
+  };
+
+  // Handle file upload
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image file too large. Maximum size is 5MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas to resize and optimize image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Target size for XO5 device
+        const targetWidth = 640;
+        const targetHeight = 480;
+        
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        
+        // Draw image scaled to fit
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        
+        // Apply same brightness enhancement as camera
+        const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+        const data = imageData.data;
+        
+        for (let i = 0; i < data.length; i += 4) {
+          data[i] = Math.min(255, Math.max(0, data[i] * 1.15 + 15));
+          data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.15 + 15));
+          data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.15 + 15));
+        }
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Convert to JPEG with 0.75 quality
+        const dataURL = canvas.toDataURL('image/jpeg', 0.75);
+        const imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
+        
+        console.log(`Uploaded image optimized: ${targetWidth}x${targetHeight}, ${imageSizeKB}KB`);
+        
+        if (imageSizeKB < 30) {
+          toast.error('Image quality too low. Please use a clearer photo.');
+          return;
+        }
+        
+        if (imageSizeKB > 200) {
+          toast.error('Image file too large after optimization. Please use a smaller photo.');
+          return;
+        }
+        
+        setCapturedImage(dataURL);
+        toast.success('Photo uploaded and optimized successfully!');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   /**
@@ -1826,8 +1926,69 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                         <li>• Make sure face is clearly visible</li>
                       </ul>
                     </div>
-                    
-                    {!showCamera && (
+
+                    {/* Upload Method Toggle */}
+                    <div className="bg-white rounded-lg p-4 border border-blue-200">
+                      <h5 className="font-medium text-gray-900 mb-3">Choose Photo Method</h5>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadMethod('camera');
+                            setCapturedImage(null);
+                            if (showCamera) stopCamera();
+                            setShowCamera(false);
+                          }}
+                          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            uploadMethod === 'camera'
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          📷 Live Camera
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadMethod('file');
+                            if (showCamera) stopCamera();
+                            setShowCamera(false);
+                          }}
+                          className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            uploadMethod === 'file'
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          📤 Upload Photo
+                        </button>
+                      </div>
+                    </div>
+
+                    {uploadMethod === 'camera' && availableCameras.length > 1 && (
+                      <div className="bg-white rounded-lg p-4 border border-blue-200">
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Select Camera</label>
+                        <select
+                          value={selectedCamera}
+                          onChange={(e) => {
+                            setSelectedCamera(e.target.value);
+                            if (showCamera) {
+                              stopCamera();
+                              setTimeout(() => startCamera(), 100);
+                            }
+                          }}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {availableCameras.map((camera, index) => (
+                            <option key={camera.deviceId} value={camera.deviceId}>
+                              {camera.label || `Camera ${index + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {uploadMethod === 'camera' && !showCamera && (
                       <button
                         type="button"
                         onClick={startCamera}
@@ -1846,6 +2007,27 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                           </>
                         )}
                       </button>
+                    )}
+
+                    {uploadMethod === 'file' && (
+                      <div className="bg-white rounded-lg p-4 border border-blue-200">
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Upload Passport Photo</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="w-full text-sm text-gray-500
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-md file:border-0
+                            file:text-sm file:font-medium
+                            file:bg-blue-50 file:text-blue-700
+                            hover:file:bg-blue-100
+                            cursor-pointer"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">
+                          Supported: JPG, PNG (Max 5MB)
+                        </p>
+                      </div>
                     )}
 
                     {/* Registration Status */}
