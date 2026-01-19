@@ -1511,7 +1511,7 @@ public class EmployeeController extends BaseController {
                 
                 for (Object person : personList) {
                     Map<String, Object> employeeData = extractEmployeeFromResponse(person);
-                    String deviceEmployeeId = (String) employeeData.get("sn");
+                    String deviceEmployeeId = (String) employeeData.get("employeeId");
                     String deviceEmployeeName = (String) employeeData.get("name");
                     
                     System.out.println("  Checking device employee: ID=" + deviceEmployeeId + ", Name=" + deviceEmployeeName);
@@ -1532,7 +1532,7 @@ public class EmployeeController extends BaseController {
                 Map<String, Object> personData = (Map<String, Object>) responseData;
                 
                 Map<String, Object> employeeData = extractEmployeeFromResponse(personData);
-                String deviceEmployeeId = (String) employeeData.get("sn");
+                String deviceEmployeeId = (String) employeeData.get("employeeId");
                 
                 System.out.println("📋 Single person response - ID: " + deviceEmployeeId);
                 
@@ -1705,6 +1705,7 @@ public class EmployeeController extends BaseController {
             
             // Map fields to expected format
             employee.put("employeeId", sn);
+            employee.put("sn", sn); // Keep original field name for backwards compatibility
             employee.put("name", name);
             employee.put("fullName", name); // For compatibility
             
