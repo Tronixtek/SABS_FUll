@@ -99,7 +99,19 @@ public class EmployeeController extends BaseController {
                     faceMergeSucceeded = true;
                     faceMergeMessage = "Face merge successful (device returned null response)";
                 } else {
-                    throw e; // Re-throw other exceptions
+                    // Face merge failed - cleanup the person record to avoid conflicts
+                    System.out.println("❌ Face merge failed, cleaning up person record from device...");
+                    try {
+                        HfDeviceResp deleteResponse = deletePersonFromDevice(request.getEmployeeId(), request.getDeviceKey(), request.getSecret());
+                        if ("000".equals(deleteResponse.getCode())) {
+                            System.out.println("✅ Person record cleaned up successfully after face merge failure");
+                        } else {
+                            System.out.println("⚠️ Failed to cleanup person record: " + deleteResponse.getMsg());
+                        }
+                    } catch (Exception cleanupError) {
+                        System.out.println("⚠️ Cleanup failed: " + cleanupError.getMessage());
+                    }
+                    throw e; // Re-throw original exception
                 }
             }
             
@@ -111,7 +123,19 @@ public class EmployeeController extends BaseController {
                     faceMergeSucceeded = true;
                     faceMergeMessage = "Face already exists - " + faceResponse.getMsg();
                 } else {
-                    return ResultWrapper.wrapFailure("1006", "Face enrollment failed: " + faceResponse.getMsg());
+                    // Face merge failed - cleanup the person record to avoid conflicts
+                    System.out.println("❌ Face merge failed with code " + faceResponse.getCode() + ", cleaning up person record...");
+                    try {
+                        HfDeviceResp deleteResponse = deletePersonFromDevice(request.getEmployeeId(), request.getDeviceKey(), request.getSecret());
+                        if ("000".equals(deleteResponse.getCode())) {
+                            System.out.println("✅ Person record cleaned up successfully after face merge failure");
+                        } else {
+                            System.out.println("⚠️ Failed to cleanup person record: " + deleteResponse.getMsg());
+                        }
+                    } catch (Exception cleanupError) {
+                        System.out.println("⚠️ Cleanup failed: " + cleanupError.getMessage());
+                    }
+                    return ResultWrapper.wrapFailure("1006", "Face enrollment failed: " + faceResponse.getMsg() + " (person record cleaned up, you can retry)");
                 }
             }
 
@@ -403,8 +427,12 @@ public class EmployeeController extends BaseController {
      * Handles face merge with retry logic for better success rates
      */
     private HfDeviceResp handleFaceMergeWithRetry(EmployeeRegistrationRequest request, String faceImage) throws Exception {
-        int maxRetries = 3;
-        int retryDelayMs = 1000; // 1 second delay between retries
+        int maxRetries = 5; // Increased from 3 to 5 retries
+        int retryDelayMs = 2000; // Increased from 1000ms to 2000ms (2 seconds)
+        
+        // Add initial delay to let device buffer clear after person creation
+        System.out.println("⏳ Waiting 1.5 seconds before face merge to allow device buffer to clear...");
+        Thread.sleep(1500);
         
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             System.out.println("🔄 Face merge attempt " + attempt + "/" + maxRetries);
@@ -417,7 +445,7 @@ public class EmployeeController extends BaseController {
                     if (attempt < maxRetries) {
                         System.out.println("❌ Null response from face merge on attempt " + attempt + ". Retrying...");
                         Thread.sleep(retryDelayMs);
-                        retryDelayMs *= 2;
+                        retryDelayMs = Math.min(retryDelayMs * 2, 10000); // Cap at 10 seconds
                         continue;
                     } else {
                         System.out.println("❌ Null response from face merge on final attempt " + attempt);
@@ -438,12 +466,25 @@ public class EmployeeController extends BaseController {
                     return response; // Return the response as-is for caller to handle
                 }
                 
+                // Error code 101008 (imgBase64 failure) - add extra delay before retry
+                if ("101008".equals(response.getCode()) || "1500".equals(response.getCode())) {
+                    if (attempt < maxRetries) {
+                        System.out.println("❌ Face merge failed with device buffer error (Code: " + response.getCode() + ")");
+                        System.out.println("   Message: " + response.getMsg());
+                        System.out.println("   Adding extra delay before retry...");
+                        Thread.sleep(3000); // 3 second delay for device buffer issues
+                        retryDelayMs = Math.min(retryDelayMs * 2, 10000);
+                    } else {
+                        System.out.println("❌ Face merge failed on final attempt with device buffer error");
+                        return response;
+                    }
+                }
                 // Other errors - retry if not last attempt
-                if (attempt < maxRetries) {
+                else if (attempt < maxRetries) {
                     System.out.println("❌ Face merge failed on attempt " + attempt + " (Code: " + response.getCode() + 
                                      ", Message: " + response.getMsg() + "). Retrying...");
                     Thread.sleep(retryDelayMs);
-                    retryDelayMs *= 2; // Exponential backoff
+                    retryDelayMs = Math.min(retryDelayMs * 2, 10000); // Exponential backoff with cap
                 } else {
                     System.out.println("❌ Face merge failed on final attempt " + attempt);
                     return response;
@@ -459,7 +500,7 @@ public class EmployeeController extends BaseController {
                 if (attempt < maxRetries) {
                     System.out.println("❌ Exception during face merge attempt " + attempt + ": " + e.getMessage() + ". Retrying...");
                     Thread.sleep(retryDelayMs);
-                    retryDelayMs *= 2;
+                    retryDelayMs = Math.min(retryDelayMs * 2, 10000);
                 } else {
                     System.out.println("❌ Exception during final face merge attempt: " + e.getMessage());
                     throw e;
