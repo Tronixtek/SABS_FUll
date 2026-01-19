@@ -704,16 +704,16 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     // Draw and scale video frame to optimal size for XO5
     context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, targetWidth, targetHeight);
 
-    // Apply image enhancement for better face detection
+    // Apply image enhancement for better face detection in low light
     const imageData = context.getImageData(0, 0, targetWidth, targetHeight);
     const data = imageData.data;
     
-    // Enhance contrast and brightness for better XO5 recognition
+    // Enhanced brightness and contrast boost for low-light conditions
     for (let i = 0; i < data.length; i += 4) {
-      // Slight contrast and brightness boost
-      data[i] = Math.min(255, Math.max(0, data[i] * 1.05 + 5));     // Red
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.05 + 5)); // Green  
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.05 + 5)); // Blue
+      // Stronger brightness boost for low-light tolerance
+      data[i] = Math.min(255, Math.max(0, data[i] * 1.15 + 15));     // Red
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.15 + 15)); // Green  
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.15 + 15)); // Blue
     }
     context.putImageData(imageData, 0, 0);
 
