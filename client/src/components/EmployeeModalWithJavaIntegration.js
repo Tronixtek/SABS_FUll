@@ -820,24 +820,46 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         }
         ctx.putImageData(imageData, 0, 0);
         
-        // Convert to JPEG with 0.75 quality
-        const dataURL = canvas.toDataURL('image/jpeg', 0.75);
-        const imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
+        // Try different quality levels for optimal file size
+        let dataURL;
+        let imageSizeKB;
+        let quality = 0.75;
         
-        console.log(`Uploaded image optimized: ${targetWidth}x${targetHeight}, ${imageSizeKB}KB`);
+        // First attempt at 0.75 quality
+        dataURL = canvas.toDataURL('image/jpeg', quality);
+        imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
         
-        if (imageSizeKB < 30) {
-          toast.error('Image quality too low. Please use a clearer photo.');
+        // If too large, reduce quality
+        if (imageSizeKB > 200) {
+          quality = 0.65;
+          dataURL = canvas.toDataURL('image/jpeg', quality);
+          imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
+          console.log(`Reduced quality to ${quality} - Size: ${imageSizeKB}KB`);
+        }
+        
+        // If still too large, reduce more
+        if (imageSizeKB > 200) {
+          quality = 0.55;
+          dataURL = canvas.toDataURL('image/jpeg', quality);
+          imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
+          console.log(`Reduced quality to ${quality} - Size: ${imageSizeKB}KB`);
+        }
+        
+        console.log(`Uploaded image optimized: ${targetWidth}x${targetHeight}, ${imageSizeKB}KB (Quality: ${quality})`);
+        
+        // More lenient validation
+        if (imageSizeKB < 20) {
+          toast.error(`Image too small (${imageSizeKB}KB). Please use a higher quality photo.`);
           return;
         }
         
-        if (imageSizeKB > 200) {
-          toast.error('Image file too large after optimization. Please use a smaller photo.');
+        if (imageSizeKB > 250) {
+          toast.error(`Image too large (${imageSizeKB}KB). Please try a different photo.`);
           return;
         }
         
         setCapturedImage(dataURL);
-        toast.success('Photo uploaded and optimized successfully!');
+        toast.success(`Photo uploaded successfully! (${imageSizeKB}KB)`);
       };
       img.src = e.target.result;
     };
