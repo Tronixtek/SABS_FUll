@@ -749,21 +749,21 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     // Quality 0.75 provides best balance for XO5 face recognition (error code 101008 fix)
     const dataURL = canvas.toDataURL('image/jpeg', 0.75);
     
-    // Validate image size (should be 80-150KB for optimal XO5 recognition)
+    // Validate image size - relaxed threshold to match Java service (20KB minimum)
     const imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
     console.log(`Captured image: ${targetWidth}x${targetHeight}, ${imageSizeKB}KB`);
     
-    if (imageSizeKB < 30) {
-      toast.error('Image quality too low for device recognition. Please ensure good lighting.');
+    if (imageSizeKB < 20) {
+      toast.error(`Image too small (${imageSizeKB}KB). Please ensure good lighting.`);
       return;
     }
-    if (imageSizeKB > 200) {
-      toast.error('Image file too large for device. Please retake with less background detail.');
+    if (imageSizeKB > 250) {
+      toast.error(`Image too large (${imageSizeKB}KB). Please retake with less background.`);
       return;
     }
     setCapturedImage(dataURL);
     stopCamera();
-    toast.success('Face photo captured successfully!');
+    toast.success(`Face photo captured! (${imageSizeKB}KB)`);
   };
 
   const retakeImage = () => {
