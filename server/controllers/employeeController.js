@@ -265,22 +265,60 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       });
     }
 
-    // Check for existing employee with same ID or email (NO deviceId check)
-    const existingEmployee = await Employee.findOne({
-      $or: [
-        { employeeId },
-        { email }
-      ]
-    });
+    // Check for existing employee - only staffId is unique
+    const existingEmployee = await Employee.findOne({ staffId });
 
     if (existingEmployee) {
-      const conflict = existingEmployee.employeeId === employeeId ? 'Employee ID' : 'Email';
-      
-      return res.status(409).json({
-        success: false,
-        message: `${conflict} already exists`,
-        conflictField: conflict.toLowerCase().replace(' ', '')
-      });
+      // ✅ If employee was soft-deleted, restore instead of creating new
+      if (existingEmployee.isDeleted) {
+        console.log(`♻️ Found soft-deleted employee with matching Staff ID - restoring`);
+        console.log(`   Staff ID: ${existingEmployee.staffId}`);
+        console.log(`   Deleted at: ${existingEmployee.deletedAt}`);
+        
+        // Update with new data
+        existingEmployee.employeeId = employeeId;
+        existingEmployee.firstName = firstName;
+        existingEmployee.lastName = lastName;
+        existingEmployee.email = email;
+        existingEmployee.phone = phone;
+        existingEmployee.facility = facility;
+        existingEmployee.department = department;
+        existingEmployee.designation = designation;
+        existingEmployee.cadre = cadre;
+        existingEmployee.shift = shift;
+        existingEmployee.joiningDate = joiningDate;
+        existingEmployee.dateOfBirth = dateOfBirth;
+        existingEmployee.nationality = nationality;
+        existingEmployee.nationalId = nationalId;
+        existingEmployee.gender = gender;
+        existingEmployee.education = education;
+        existingEmployee.bloodGroup = bloodGroup;
+        existingEmployee.allergies = allergies;
+        existingEmployee.address = address;
+        existingEmployee.profileImage = profileImage;
+        existingEmployee.status = 'active';
+        existingEmployee.faceImageUploaded = true;
+        
+        console.log(`✅ Employee data updated, proceeding with device enrollment...`);
+        
+        // Store for later use in database save step
+        var restoringEmployee = existingEmployee;
+        
+      } else {
+        // Employee exists and is NOT deleted - this is a real conflict
+        return res.status(409).json({
+          success: false,
+          message: 'Staff ID already exists',
+          conflictField: 'staffId',
+          existingEmployee: {
+            id: existingEmployee._id,
+            employeeId: existingEmployee.employeeId,
+            staffId: existingEmployee.staffId,
+            name: `${existingEmployee.firstName} ${existingEmployee.lastName}`,
+            status: existingEmployee.status
+          }
+        });
+      }
     }
 
     // Get facility information for device integration
@@ -442,34 +480,64 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     // Set default PIN for self-service portal
     const defaultPin = '123456'; // Default PIN for all new employees
     
-    const employeeData = {
-      employeeId, staffId, firstName, lastName, email, phone, facility,
-      department, designation, cadre, shift, joiningDate,
-      dateOfBirth, nationality, nationalId, gender, education,
-      bloodGroup, allergies, address,
-      profileImage,
-      faceImageUploaded: true,
-      status: 'active',
-      deviceId: facilityDeviceId, // Facility's device ID (shared by all employees)
-      pin: defaultPin, // Default PIN (123456)
-      employeeSelfServiceEnabled: true,
-      pinMustChange: true, // Force change on first login
-      biometricData: {
-        faceId: personId, // Employee's unique person ID within device
+    let savedEmployee;
+    
+    // Check if we're restoring an exact-match soft-deleted employee or creating new
+    if (typeof restoringEmployee !== 'undefined' && restoringEmployee) {
+      console.log(`♻️ Restoring exact-match soft-deleted employee to database...`);
+      
+      // Update device-related fields
+      restoringEmployee.deviceId = facilityDeviceId;
+      restoringEmployee.pin = defaultPin;
+      restoringEmployee.employeeSelfServiceEnabled = true;
+      restoringEmployee.pinMustChange = true;
+      restoringEmployee.biometricData = {
+        faceId: personId,
         xo5PersonSn: personId,
         xo5PersonName: `${firstName} ${lastName}`,
-        xo5DeviceKey: deviceKey, // Use the lowercase device key
-        xo5DeviceId: facilityDeviceId, // Physical device identifier
+        xo5DeviceKey: deviceKey,
+        xo5DeviceId: facilityDeviceId,
         lastXO5Sync: new Date()
-      }
-    };
+      };
+      
+      // Restore the employee (undelete)
+      await restoringEmployee.restore();
+      savedEmployee = restoringEmployee;
+      
+      console.log(`✅ Employee restored from soft-delete with ID: ${savedEmployee._id}`);
+    } else {
+      console.log(`💾 Creating new employee record...`);
+      
+      const employeeData = {
+        employeeId, staffId, firstName, lastName, email, phone, facility,
+        department, designation, cadre, shift, joiningDate,
+        dateOfBirth, nationality, nationalId, gender, education,
+        bloodGroup, allergies, address,
+        profileImage,
+        faceImageUploaded: true,
+        status: 'active',
+        deviceId: facilityDeviceId,
+        pin: defaultPin,
+        employeeSelfServiceEnabled: true,
+        pinMustChange: true,
+        biometricData: {
+          faceId: personId,
+          xo5PersonSn: personId,
+          xo5PersonName: `${firstName} ${lastName}`,
+          xo5DeviceKey: deviceKey,
+          xo5DeviceId: facilityDeviceId,
+          lastXO5Sync: new Date()
+        }
+      };
 
-    const newEmployee = await Employee.create(employeeData);
-    console.log(`✅ Employee saved to database with ID: ${newEmployee._id}`);
+      savedEmployee = await Employee.create(employeeData);
+      console.log(`✅ Employee saved to database with ID: ${savedEmployee._id}`);
+    }
+    
     console.log(`🔑 Default PIN: ${defaultPin}`);
 
     // Populate related documents
-    await newEmployee.populate([
+    await savedEmployee.populate([
       { path: 'facility', select: 'name code' },
       { path: 'shift', select: 'name code startTime endTime' }
     ]);
@@ -478,17 +546,19 @@ exports.registerEmployeeWithDevice = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Employee registered successfully',
+      message: typeof restoringEmployee !== 'undefined' && restoringEmployee
+        ? 'Employee restored and re-enrolled successfully' 
+        : 'Employee registered successfully',
       data: {
-        employee: newEmployee,
+        employee: savedEmployee,
         deviceEnrollment: {
-          deviceId: facilityDeviceId, // Facility's device ID
-          personId: personId, // Employee's person ID within device
+          deviceId: facilityDeviceId,
+          personId: personId,
           status: 'enrolled',
           facilityName: facilityDoc.name
         },
         selfServiceCredentials: {
-          staffId: newEmployee.staffId || newEmployee.employeeId,
+          staffId: savedEmployee.staffId || savedEmployee.employeeId,
           pin: defaultPin,
           note: 'Default PIN is 123456. Employee must change it on first login.'
         },
@@ -496,7 +566,8 @@ exports.registerEmployeeWithDevice = async (req, res) => {
           validation: 'completed',
           deviceEnrollment: 'completed',
           databaseSave: 'completed'
-        }
+        },
+        wasRestored: !!(typeof restoringEmployee !== 'undefined' && restoringEmployee)
       }
     });
 

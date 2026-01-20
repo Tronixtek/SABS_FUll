@@ -5,7 +5,6 @@ const employeeSchema = new mongoose.Schema({
   employeeId: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   staffId: {
@@ -29,8 +28,6 @@ const employeeSchema = new mongoose.Schema({
   email: {
     type: String,
     required: false,
-    unique: true,
-    sparse: true,
     lowercase: true,
     trim: true
   },
