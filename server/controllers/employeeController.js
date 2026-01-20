@@ -736,7 +736,7 @@ exports.deleteEmployee = async (req, res) => {
 
         // Use Java service for validation and deletion
         const validationPayload = {
-          employeeId: employee.deviceId || employee.employeeId,
+          employeeId: employee.deviceId, // Use auto-generated deviceId for device operations
           deviceKey: facility.configuration.deviceKey,
           secret: facility.configuration.secret
         };
