@@ -719,23 +719,18 @@ exports.deleteEmployee = async (req, res) => {
     
     // Enhanced debugging for device deletion prerequisites
     console.log(`\n📋 Device Deletion Prerequisites Check:`);
-    console.log(`   Facility exists: ${!!facility}`);
-    console.log(`   Facility configuration exists: ${!!facility?.configuration}`);
-    console.log(`   Delete URL configured: ${!!facility?.configuration?.deleteUserApiUrl}`);
-    console.log(`   Delete URL value: ${facility?.configuration?.deleteUserApiUrl || 'NOT SET'}`);
     console.log(`   Employee deviceId exists: ${!!employee.deviceId}`);
-    console.log(`   Employee deviceId value: ${employee.deviceId || 'NOT SET'}`);
-    console.log(`   Device key exists: ${!!facility?.configuration?.deviceKey}`);
-    console.log(`   Secret exists: ${!!facility?.configuration?.secret}`);
+    console.log(`   Employee deviceId value: ${employee.deviceId || 'NOT SET - Never enrolled on device'}`);
 
-    // ✅ STEP 1: VALIDATE DEVICE CONFIGURATION & EMPLOYEE EXISTS ON DEVICE
-    if (facility?.configuration?.deleteUserApiUrl && employee.deviceId) {
-      console.log(`\n🔍 Step 1: Device validation configured`);
-      console.log(`   Delete URL: ${facility.configuration.deleteUserApiUrl}`);
+    // ✅ CRITICAL RULE: If employee has deviceId, MUST delete from device first
+    if (employee.deviceId) {
+      console.log(`\n🚨 MANDATORY DEVICE DELETION REQUIRED`);
+      console.log(`   Employee was enrolled on device (deviceId: ${employee.deviceId})`);
+      console.log(`   MUST delete from device before database deletion`);
 
       try {
-        // ✅ STEP 2: VALIDATE EMPLOYEE EXISTS ON DEVICE VIA JAVA SERVICE
-        console.log(`\n🔍 Step 2: Validating employee exists on device via Java service...`);
+        // ✅ STEP 2: DELETE FROM DEVICE VIA JAVA SERVICE
+        console.log(`\n🔍 Step 2: Deleting employee from device via Java service...`);
         
         const javaServiceClient = require('../services/javaServiceClient');
         
@@ -743,55 +738,64 @@ exports.deleteEmployee = async (req, res) => {
         console.log(`   Java service URL: ${javaServiceClient.baseURL}`);
         
         if (!javaServiceClient.isEnabled()) {
-          console.log(`⚠️ Java service integration is disabled - skipping validation`);
-          // Fall back to direct device deletion without validation
-          return await performDirectDeviceDelete(req, res, employee, facility);
+          console.log(`❌ Java service integration is DISABLED - cannot proceed`);
+          return res.status(503).json({
+            success: false,
+            message: 'Cannot delete employee: Java service integration is disabled but employee exists on device',
+            error: 'JAVA_SERVICE_DISABLED',
+            details: {
+              employeeId: employee.employeeId,
+              deviceId: employee.deviceId,
+              requiresDeviceDeletion: true
+            }
+          });
         }
 
-        // Use Java service for validation and deletion
-        const validationPayload = {
-          employeeId: employee.deviceId, // Use auto-generated deviceId for device operations
-          deviceKey: facility.configuration.deviceKey,
-          secret: facility.configuration.secret
+        // Get device secret from environment or use default
+        const deviceSecret = process.env.DEVICE_SECRET || '123456';
+
+        // Use Java service for device deletion
+        const deletePayload = {
+          employeeId: employee.employeeId, // Staff ID (e.g., PHC00001)
+          deviceKey: employee.deviceId, // Device-generated ID (e.g., 020e7096a03f178165)
+          secret: deviceSecret // Device secret from environment
         };
 
-        console.log(`   Payload being sent to Java service:`, JSON.stringify(validationPayload, null, 2));
+        console.log(`   Payload being sent to Java service:`, JSON.stringify(deletePayload, null, 2));
         console.log(`   Sending DELETE request to Java service...`);
-        const validationResponse = await javaServiceClient.client.post('/api/employee/delete', validationPayload);
+        const deleteResponse = await javaServiceClient.client.post('/api/employee/delete', deletePayload);
 
-        console.log(`   Java service response:`, validationResponse.data);
+        console.log(`   Java service response:`, deleteResponse.data);
 
-        if (!validationResponse.data.success) {
-          // Handle specific error cases
-          if (validationResponse.data.errorCode === '1003') {
-            console.log(`❌ Employee not found on device - cannot proceed with deletion`);
+        if (!deleteResponse.data.success) {
+          // Device deletion failed - CANNOT proceed with database deletion
+          console.log(`❌ Device deletion failed - BLOCKING database deletion`);
+          
+          if (deleteResponse.data.errorCode === '1003') {
             return res.status(400).json({
               success: false,
-              message: 'Employee not found on biometric device. Cannot proceed with validation-first deletion.',
+              message: 'Employee not found on biometric device',
               error: 'EMPLOYEE_NOT_ON_DEVICE',
               details: {
                 employeeId: employee.employeeId,
-                deviceChecked: true,
+                deviceId: employee.deviceId,
                 canForceDelete: true,
-                suggestion: 'Use force delete if you want to remove from database only'
-              },
-              requiresConfirmation: true
-            });
-          } else {
-            // Other validation/device error
-            console.log(`❌ Device validation failed: ${validationResponse.data.message}`);
-            return res.status(503).json({
-              success: false,
-              message: `Device operation failed: ${validationResponse.data.message}`,
-              error: 'DEVICE_OPERATION_FAILED',
-              details: validationResponse.data,
-              requiresConfirmation: true
+                suggestion: 'Employee may have been deleted from device manually. Use force delete if needed.'
+              }
             });
           }
+          
+          return res.status(503).json({
+            success: false,
+            message: `Device deletion failed: ${deleteResponse.data.message}`,
+            error: 'DEVICE_DELETION_FAILED',
+            details: deleteResponse.data
+          });
         }
 
-        // ✅ STEP 3: EMPLOYEE EXISTS AND WAS DELETED FROM DEVICE SUCCESSFULLY
-        console.log(`✅ Employee validated and deleted from device successfully`);
+        // ✅ STEP 3: DEVICE DELETION SUCCESSFUL - NOW SAFE TO DELETE FROM DATABASE
+        console.log(`✅ Employee deleted from device successfully`);
+        console.log(`✅ Proceeding with database deletion...`);
         
         // ✅ STEP 4: SOFT DELETE FROM DATABASE AFTER SUCCESSFUL DEVICE DELETION
         console.log(`\n🗑️ Step 4: Performing soft delete from database...`);
@@ -803,7 +807,7 @@ exports.deleteEmployee = async (req, res) => {
         await employee.softDelete('user_request');
         
         console.log(`✅ Employee soft deleted from database successfully`);
-        console.log(`✅ ===== VALIDATION-FIRST DELETE COMPLETED =====\n`);
+        console.log(`✅ ===== DEVICE-FIRST DELETE COMPLETED =====\n`);
 
         return res.json({ 
           success: true,
@@ -813,64 +817,60 @@ exports.deleteEmployee = async (req, res) => {
           attendanceRecordsPreserved: attendanceCount,
           employeeName: `${employee.firstName} ${employee.lastName}`,
           canBeRestored: true,
-          validationPerformed: true
+          deviceDeletionPerformed: true
         });
 
       } catch (deviceError) {
-        console.error(`❌ Device validation/deletion failed:`, deviceError.message);
+        console.error(`❌ Device deletion error - BLOCKING database deletion:`, deviceError.message);
         
-        // Handle Java service connectivity issues
+        // Handle Java service connectivity issues - BLOCK database deletion
         if (deviceError.code === 'ECONNABORTED' || deviceError.code === 'ETIMEDOUT') {
           return res.status(503).json({ 
             success: false,
-            message: 'Java service request timed out. Service may be offline.',
+            message: 'Cannot delete: Java service request timed out. Employee remains on device.',
             error: 'JAVA_SERVICE_TIMEOUT',
             employeeId: id,
-            requiresConfirmation: true,
+            deviceDeletionFailed: true
           });
         }
         
         if (deviceError.code === 'ECONNREFUSED' || deviceError.code === 'ENOTFOUND') {
           return res.status(503).json({ 
             success: false,
-            message: 'Cannot connect to Java service. Service is unreachable.',
+            message: 'Cannot delete: Java service is unreachable. Employee remains on device.',
             error: 'JAVA_SERVICE_UNREACHABLE',
             employeeId: id,
-            requiresConfirmation: true,
+            deviceDeletionFailed: true
           });
         }
 
-        // Java service error response
+        // Java service error response - BLOCK database deletion
         if (deviceError.response) {
           return res.status(500).json({ 
             success: false,
-            message: `Java service error: ${deviceError.response.data?.message || deviceError.response.statusText}`,
+            message: `Cannot delete: Java service error - ${deviceError.response.data?.message || deviceError.response.statusText}`,
             error: 'JAVA_SERVICE_ERROR',
             statusCode: deviceError.response.status,
             details: deviceError.response.data,
-            requiresConfirmation: true,
+            deviceDeletionFailed: true
           });
         }
 
-        // Network or other error
+        // Network or other error - BLOCK database deletion
         return res.status(500).json({ 
           success: false,
-          message: `Failed to communicate with Java service: ${deviceError.message}`,
+          message: `Cannot delete: Failed to communicate with Java service - ${deviceError.message}`,
           error: 'JAVA_SERVICE_ERROR',
-          requiresConfirmation: true,
+          deviceDeletionFailed: true
         });
       }
     } else {
-      // No device configuration - proceed with database-only soft delete
-      console.log(`ℹ️ No device validation configured - proceeding with database-only soft delete`);
-      if (!facility?.configuration?.deleteUserApiUrl) {
-        console.log(`   No delete API URL configured for facility ${facility?.name || 'Unknown'}`);
-      }
-      if (!employee.deviceId) {
-        console.log(`   No device ID found for employee ${employee.firstName} ${employee.lastName}`);
-      }
+      // ✅ SAFE PATH: Employee was never enrolled on device (no deviceId)
+      console.log(`\n✅ SAFE DATABASE-ONLY DELETION`);
+      console.log(`   Employee has no deviceId - was never enrolled on device`);
+      console.log(`   Safe to delete from database only`);
       
-      // ✅ SOFT DELETE FROM DATABASE (database-only path)
+      // ✅ SOFT DELETE FROM DATABASE (safe because employee was never on device)
       console.log(`\n🗑️ Performing soft delete from database...`);
       
       const Attendance = require('../models/Attendance');
@@ -884,13 +884,14 @@ exports.deleteEmployee = async (req, res) => {
 
       return res.json({ 
         success: true,
-        message: 'Employee deleted successfully (database only - no device configuration)',
+        message: 'Employee deleted successfully (database only - never enrolled on device)',
         deletedFrom: 'database-only',
         deletionType: 'soft_delete',
         attendanceRecordsPreserved: attendanceCount,
         employeeName: `${employee.firstName} ${employee.lastName}`,
         canBeRestored: true,
-        validationPerformed: false
+        deviceDeletionPerformed: false,
+        reason: 'Employee was never enrolled on biometric device'
       });
     }
 
