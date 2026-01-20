@@ -709,13 +709,24 @@ exports.deleteEmployee = async (req, res) => {
       });
     }
 
-    console.log(`\n� ===== VALIDATION-FIRST DELETE STARTED =====`);
+    console.log(`\n🗑️ ===== VALIDATION-FIRST DELETE STARTED =====`);
     console.log(`   Employee: ${employee.firstName} ${employee.lastName}`);
     console.log(`   Employee ID: ${employee.employeeId}`);
     console.log(`   Device ID: ${employee.deviceId}`);
     console.log(`   Facility: ${employee.facility?.name || 'Unknown'}`);
 
     const facility = employee.facility;
+    
+    // Enhanced debugging for device deletion prerequisites
+    console.log(`\n📋 Device Deletion Prerequisites Check:`);
+    console.log(`   Facility exists: ${!!facility}`);
+    console.log(`   Facility configuration exists: ${!!facility?.configuration}`);
+    console.log(`   Delete URL configured: ${!!facility?.configuration?.deleteUserApiUrl}`);
+    console.log(`   Delete URL value: ${facility?.configuration?.deleteUserApiUrl || 'NOT SET'}`);
+    console.log(`   Employee deviceId exists: ${!!employee.deviceId}`);
+    console.log(`   Employee deviceId value: ${employee.deviceId || 'NOT SET'}`);
+    console.log(`   Device key exists: ${!!facility?.configuration?.deviceKey}`);
+    console.log(`   Secret exists: ${!!facility?.configuration?.secret}`);
 
     // ✅ STEP 1: VALIDATE DEVICE CONFIGURATION & EMPLOYEE EXISTS ON DEVICE
     if (facility?.configuration?.deleteUserApiUrl && employee.deviceId) {
@@ -727,6 +738,9 @@ exports.deleteEmployee = async (req, res) => {
         console.log(`\n🔍 Step 2: Validating employee exists on device via Java service...`);
         
         const javaServiceClient = require('../services/javaServiceClient');
+        
+        console.log(`   Java service enabled: ${javaServiceClient.isEnabled()}`);
+        console.log(`   Java service URL: ${javaServiceClient.baseURL}`);
         
         if (!javaServiceClient.isEnabled()) {
           console.log(`⚠️ Java service integration is disabled - skipping validation`);
@@ -741,7 +755,8 @@ exports.deleteEmployee = async (req, res) => {
           secret: facility.configuration.secret
         };
 
-        console.log(`   Sending validation request to Java service...`);
+        console.log(`   Payload being sent to Java service:`, JSON.stringify(validationPayload, null, 2));
+        console.log(`   Sending DELETE request to Java service...`);
         const validationResponse = await javaServiceClient.client.post('/api/employee/delete', validationPayload);
 
         console.log(`   Java service response:`, validationResponse.data);
@@ -777,6 +792,29 @@ exports.deleteEmployee = async (req, res) => {
 
         // ✅ STEP 3: EMPLOYEE EXISTS AND WAS DELETED FROM DEVICE SUCCESSFULLY
         console.log(`✅ Employee validated and deleted from device successfully`);
+        
+        // ✅ STEP 4: SOFT DELETE FROM DATABASE AFTER SUCCESSFUL DEVICE DELETION
+        console.log(`\n🗑️ Step 4: Performing soft delete from database...`);
+        
+        const Attendance = require('../models/Attendance');
+        const attendanceCount = await Attendance.countDocuments({ employee: id });
+        console.log(`   Found ${attendanceCount} attendance records (will be preserved)`);
+        
+        await employee.softDelete('user_request');
+        
+        console.log(`✅ Employee soft deleted from database successfully`);
+        console.log(`✅ ===== VALIDATION-FIRST DELETE COMPLETED =====\n`);
+
+        return res.json({ 
+          success: true,
+          message: 'Employee deleted successfully from device and database',
+          deletedFrom: 'device-and-database',
+          deletionType: 'soft_delete',
+          attendanceRecordsPreserved: attendanceCount,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          canBeRestored: true,
+          validationPerformed: true
+        });
 
       } catch (deviceError) {
         console.error(`❌ Device validation/deletion failed:`, deviceError.message);
@@ -823,6 +861,7 @@ exports.deleteEmployee = async (req, res) => {
         });
       }
     } else {
+      // No device configuration - proceed with database-only soft delete
       console.log(`ℹ️ No device validation configured - proceeding with database-only soft delete`);
       if (!facility?.configuration?.deleteUserApiUrl) {
         console.log(`   No delete API URL configured for facility ${facility?.name || 'Unknown'}`);
@@ -830,32 +869,30 @@ exports.deleteEmployee = async (req, res) => {
       if (!employee.deviceId) {
         console.log(`   No device ID found for employee ${employee.firstName} ${employee.lastName}`);
       }
+      
+      // ✅ SOFT DELETE FROM DATABASE (database-only path)
+      console.log(`\n🗑️ Performing soft delete from database...`);
+      
+      const Attendance = require('../models/Attendance');
+      const attendanceCount = await Attendance.countDocuments({ employee: id });
+      console.log(`   Found ${attendanceCount} attendance records (will be preserved)`);
+      
+      await employee.softDelete('user_request');
+      
+      console.log(`✅ Employee soft deleted from database successfully`);
+      console.log(`✅ ===== DATABASE-ONLY DELETE COMPLETED =====\n`);
+
+      return res.json({ 
+        success: true,
+        message: 'Employee deleted successfully (database only - no device configuration)',
+        deletedFrom: 'database-only',
+        deletionType: 'soft_delete',
+        attendanceRecordsPreserved: attendanceCount,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        canBeRestored: true,
+        validationPerformed: false
+      });
     }
-
-    // ✅ STEP 4: SOFT DELETE FROM DATABASE
-    console.log(`\n🗑️ Step 4: Performing soft delete from database...`);
-    
-    // Count related attendance records
-    const Attendance = require('../models/Attendance');
-    const attendanceCount = await Attendance.countDocuments({ employee: id });
-    console.log(`   Found ${attendanceCount} attendance records (will be preserved)`);
-    
-    // Perform soft delete using the new method
-    await employee.softDelete('user_request');
-    
-    console.log(`✅ Employee soft deleted from database successfully`);
-    console.log(`✅ ===== VALIDATION-FIRST DELETE COMPLETED =====\n`);
-
-    res.json({ 
-      success: true,
-      message: 'Employee deleted successfully with validation-first approach',
-      deletedFrom: facility?.configuration?.deleteUserApiUrl && employee.deviceId ? 'device-and-database' : 'database-only',
-      deletionType: 'soft_delete',
-      attendanceRecordsPreserved: attendanceCount,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
-      canBeRestored: true,
-      validationPerformed: true
-    });
 
   } catch (error) {
     console.error('❌ Error in deleteEmployee:', error);
