@@ -734,9 +734,22 @@ exports.registerEmployeeWithDevice = async (req, res) => {
 // @access  Private
 exports.updateEmployee = async (req, res) => {
   try {
+    // Clean up empty string values for ObjectId fields to prevent cast errors
+    const updateData = { ...req.body };
+    
+    // List of fields that are ObjectId references
+    const objectIdFields = ['facility', 'department', 'shift', 'salaryGrade'];
+    
+    // Convert empty strings to undefined for ObjectId fields
+    objectIdFields.forEach(field => {
+      if (updateData[field] === '' || updateData[field] === null) {
+        updateData[field] = undefined;
+      }
+    });
+    
     const employee = await Employee.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       {
         new: true,
         runValidators: true
