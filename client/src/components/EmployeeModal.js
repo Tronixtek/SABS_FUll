@@ -507,7 +507,7 @@ const EmployeeModal = ({ employee, facilities, shifts, onClose }) => {
             </div>
 
             <div>
-              <label className="label">Joining Date *</label>
+              <label className="label">Appointment Date *</label>
               <input
                 type="date"
                 name="joiningDate"

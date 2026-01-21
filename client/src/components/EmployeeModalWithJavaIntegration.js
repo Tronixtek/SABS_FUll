@@ -1793,7 +1793,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Joining Date *</label>
+                  <label className="block text-sm font-medium text-gray-700">Appointment Date *</label>
                   <input
                     type="date"
                     name="joiningDate"
