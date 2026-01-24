@@ -134,6 +134,33 @@ app.use('/api/payroll-settings', payrollSettingsRoutes);
 app.use('/api/salary-grades', salaryGradeRoutes);
 app.use('/api/staff-id-prefix', staffIdPrefixRoutes);
 
+// Debug route to check if files exist
+app.get('/uploads/debug', (req, res) => {
+  const uploadsDir = path.join(__dirname, 'uploads');
+  const leaveDocsDir = path.join(uploadsDir, 'leave-documents');
+  
+  try {
+    const uploadsExists = fs.existsSync(uploadsDir);
+    const leaveDocsExists = fs.existsSync(leaveDocsDir);
+    
+    let files = [];
+    if (leaveDocsExists) {
+      files = fs.readdirSync(leaveDocsDir);
+    }
+    
+    res.json({
+      uploadsDir,
+      leaveDocsDir,
+      uploadsExists,
+      leaveDocsExists,
+      files: files.slice(0, 10), // First 10 files
+      totalFiles: files.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
