@@ -6,25 +6,29 @@ const User = require('./models/User');
 
 const admins = [
   {
-    name: 'Sani',
+    firstName: 'Sani',
+    lastName: 'Karaye',
     email: 'karaye@gmail.com',
     username: 'sani',
     password: 'Admin@123'
   },
   {
-    name: 'Usman',
+    firstName: 'Usman',
+    lastName: 'Wada',
     email: 'usmanwadaibrahim955@gmail.com',
     username: 'usman',
     password: 'Admin@123'
   },
   {
-    name: 'Umar',
+    firstName: 'Umar',
+    lastName: 'Ubaji',
     email: 'Umarubajibrin@gmail.com',
     username: 'umar',
     password: 'Admin@123'
   },
   {
-    name: 'Zainab',
+    firstName: 'Zainab',
+    lastName: 'Sani',
     email: 'zeesani35@gmail.com',
     username: 'zainab',
     password: 'Admin@123'
@@ -41,7 +45,7 @@ const seedAdmins = async () => {
       const existing = await User.findOne({ email: admin.email });
       
       if (existing) {
-        console.log(`⏭️  ${admin.name} (${admin.email}) already exists`);
+        console.log(`⏭️  ${admin.firstName} ${admin.lastName} (${admin.email}) already exists`);
         continue;
       }
 
@@ -51,33 +55,38 @@ const seedAdmins = async () => {
 
       // Create admin user
       const user = new User({
-        name: admin.name,
+        firstName: admin.firstName,
+        lastName: admin.lastName,
         email: admin.email,
         username: admin.username,
         password: hashedPassword,
         role: 'admin',
         permissions: [
-          'view_dashboard',
-          'manage_employees',
           'view_attendance',
-          'mark_attendance',
-          'approve_attendance',
-          'view_reports',
+          'edit_attendance',
+          'delete_attendance',
+          'manage_employees',
           'manage_facilities',
+          'edit_facilities',
           'manage_shifts',
-          'manage_breaks',
-          'view_analytics',
-          'manage_settings',
+          'view_reports',
+          'export_data',
+          'manage_users',
+          'system_settings',
+          'enroll_users',
+          'manage_devices',
+          'view_leave_requests',
+          'submit_leave',
           'approve_leave',
-          'manage_payroll'
+          'manage_leave'
         ]
       });
 
       await user.save();
-      console.log(`✅ Created admin: ${admin.name} (${admin.email})`);
+      console.log(`✅ Created admin: ${admin.firstName} ${admin.lastName} (${admin.email})`);
       console.log(`   Username: ${admin.username}`);
       console.log(`   Password: ${admin.password}`);
-    }
+    }firstName} ${admin.lastN
 
     console.log('\n✅ All admins created successfully!');
     console.log('\n📝 Login credentials:');
