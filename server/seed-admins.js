@@ -86,12 +86,12 @@ const seedAdmins = async () => {
       console.log(`✅ Created admin: ${admin.firstName} ${admin.lastName} (${admin.email})`);
       console.log(`   Username: ${admin.username}`);
       console.log(`   Password: ${admin.password}`);
-    }firstName} ${admin.lastN
+    }
 
     console.log('\n✅ All admins created successfully!');
     console.log('\n📝 Login credentials:');
     admins.forEach(admin => {
-      console.log(`\n${admin.name}:`);
+      console.log(`\n${admin.firstName} ${admin.lastName}:`);
       console.log(`  Email: ${admin.email}`);
       console.log(`  Username: ${admin.username}`);
       console.log(`  Password: ${admin.password}`);
