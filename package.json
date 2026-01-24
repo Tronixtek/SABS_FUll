@@ -11,7 +11,8 @@
     "install:all": "npm install && cd client && npm install",
     "build": "cd client && npm run build",
     "seed:admin": "node server/seeds/createAdmin.js",
-    "seed:leave-policies": "node server/seed-leave-policies.js"
+    "seed:leave-policies": "node server/seed-leave-policies.js",
+    "seed:employees-week": "node server/seed-employees-week-attendance.js"
   },
   "keywords": [
     "attendance",

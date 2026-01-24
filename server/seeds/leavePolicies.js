@@ -51,7 +51,7 @@ const seedLeavePolicies = async () => {
       {
         leaveType: 'adoptive',
         displayName: 'Adoptive Leave',
-        description: 'Leave for adoption of a child',
+        description: 'Adoptive Leave',
         isPaid: true,
         salaryPercentage: 100,
         hasBalanceLimit: true,
