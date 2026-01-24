@@ -91,6 +91,12 @@ if (process.env.NODE_ENV === 'development') {
   }));
 }
 
+// Serve uploaded files - MUST be before API routes
+const uploadsPath = path.join(__dirname, 'uploads');
+console.log('📁 Serving static files from:', uploadsPath);
+console.log('📁 Directory exists:', fs.existsSync(uploadsPath));
+app.use('/uploads', express.static(uploadsPath));
+
 // Database connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
@@ -127,9 +133,6 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll-settings', payrollSettingsRoutes);
 app.use('/api/salary-grades', salaryGradeRoutes);
 app.use('/api/staff-id-prefix', staffIdPrefixRoutes);
-
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check
 app.get('/api/health', async (req, res) => {
