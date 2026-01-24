@@ -65,6 +65,13 @@ const employeeSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  gradeLevel: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 17,
+    default: 1
+  },
   shift: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shift',
@@ -165,6 +172,13 @@ const employeeSchema = new mongoose.Schema({
     ref: 'SalaryGrade',
     required: false
   },
+  gradeLevel: {
+    type: Number,
+    required: false,
+    min: 1,
+    max: 17,
+    default: 1
+  },
   salary: {
     type: Number,
     required: false
@@ -259,18 +273,7 @@ employeeSchema.methods.softDelete = function(reason = 'user_request') {
   return this.save();
 };
 
-// Virtual field to extract grade level from cadre (e.g., "GL 6" -> 6)
-employeeSchema.virtual('gradeLevel').get(function() {
-  if (!this.cadre) return 1; // Default to GL 1
-  const match = this.cadre.match(/(\d+)/); // Extract first number from cadre
-  return match ? parseInt(match[1]) : 1;
-});
-
-// Ensure virtuals are included in JSON
-employeeSchema.set('toJSON', { virtuals: true });
-employeeSchema.set('toObject', { virtuals: true });
-
-// Add query middleware to exclude deleted employees by default
+// Add query middleware to exclude deleted employees by default// Add query middleware to exclude deleted employees by default
 employeeSchema.pre(['find', 'findOne', 'findOneAndUpdate', 'countDocuments'], function() {
   // Only add the filter if isDeleted is not already specified
   if (!this.getQuery().hasOwnProperty('isDeleted')) {

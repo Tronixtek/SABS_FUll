@@ -294,7 +294,7 @@ const RequestLeave = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Leave Type Selection */}
             <div>
-              <label htmlFor="leaveType" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="leaveType" className="block text-base font-semibold text-gray-900 mb-2">
                 Leave Type *
               </label>
               <select
@@ -303,15 +303,15 @@ const RequestLeave = () => {
                 value={formData.leaveType}
                 onChange={handleChange}
                 required
-                className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                className="block w-full px-4 py-3 text-base font-medium border-2 border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white hover:border-blue-400 transition-colors"
               >
                 {leaveTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label} - {type.description}
+                  <option key={type.value} value={type.value} className="py-2">
+                    {type.label}
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-2 text-sm text-gray-600">
                 Select the type of leave you want to request
               </p>
             </div>
@@ -327,24 +327,6 @@ const RequestLeave = () => {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {/* Payment Status */}
-                  <div className="flex items-center">
-                    <CurrencyDollarIcon className="h-4 w-4 text-green-600 mr-2" />
-                    <span className="text-gray-700">
-                      {selectedPolicy.isPaid ? (
-                        selectedPolicy.salaryPercentage === 100 ? (
-                          <span className="text-green-700 font-medium">Fully Paid (100%)</span>
-                        ) : (
-                          <span className="text-yellow-700 font-medium">
-                            Paid ({selectedPolicy.salaryPercentage}%)
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-red-700 font-medium">Unpaid</span>
-                      )}
-                    </span>
-                  </div>
-
                   {/* Balance Limit */}
                   {selectedPolicy.hasBalanceLimit && (
                     <div className="flex items-center">

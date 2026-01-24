@@ -216,6 +216,8 @@ exports.getMe = async (req, res) => {
         facility: employee.facility,
         department: employee.department,
         designation: employee.designation,
+        cadre: employee.cadre,
+        gradeLevel: employee.gradeLevel,
         shift: employee.shift,
         gender: employee.gender,
         profileImage: employee.profileImage,
