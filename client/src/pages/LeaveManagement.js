@@ -7,7 +7,8 @@ import {
   XCircleIcon,
   PlusIcon,
   FunnelIcon,
-  UserIcon
+  UserIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -24,55 +25,78 @@ const LeaveManagement = () => {
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [filters, setFilters] = useState({
     facility: '',
-    urgency: '',
     type: ''
   });
 
   const [formData, setFormData] = useState({
     employeeId: '',
-    type: 'late-arrival',
-    affectedDate: new Date().toISOString().split('T')[0],
-    startTime: '',
-    endTime: '',
-    reason: '',
-    category: 'other',
-    urgency: 'medium'
+    leaveType: 'annual',
+    startDate: '',
+    endDate: '',
+    reason: ''
   });
+  
+  const [selectedPolicy, setSelectedPolicy] = useState(null);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [fileError, setFileError] = useState('');
 
-  const leaveTypes = [
-    { value: 'late-arrival', label: 'Late Arrival', color: 'orange' },
-    { value: 'early-departure', label: 'Early Departure', color: 'blue' },
-    { value: 'partial-day', label: 'Partial Day', color: 'purple' },
-    { value: 'official-duty', label: 'Official Duty', color: 'green' },
-    { value: 'medical-leave', label: 'Medical Leave', color: 'red' },
-    { value: 'emergency-exit', label: 'Emergency Exit', color: 'red' },
-    { value: 'flexible-time', label: 'Flexible Time', color: 'indigo' }
-  ];
-
-  const categories = [
-    { value: 'medical', label: 'Medical' },
-    { value: 'family-emergency', label: 'Family Emergency' },
-    { value: 'official-meeting', label: 'Official Meeting' },
-    { value: 'training', label: 'Training' },
-    { value: 'personal', label: 'Personal' },
-    { value: 'traffic-delay', label: 'Traffic Delay' },
-    { value: 'public-transport', label: 'Public Transport' },
-    { value: 'technical-issue', label: 'Technical Issue' },
-    { value: 'other', label: 'Other' }
-  ];
-
-  const urgencyLevels = [
-    { value: 'low', label: 'Low', color: 'gray' },
-    { value: 'medium', label: 'Medium', color: 'yellow' },
-    { value: 'high', label: 'High', color: 'orange' },
-    { value: 'emergency', label: 'Emergency', color: 'red' }
-  ];
+  const [leaveTypes, setLeaveTypes] = useState([]);
 
   useEffect(() => {
     fetchLeaveRequests();
     fetchEmployees();
     fetchFacilities();
+    fetchLeaveTypes();
   }, [activeTab, filters]);
+
+  const fetchLeaveTypes = async () => {
+    try {
+      const response = await axios.get('/api/leave-policy');
+      if (response.data.success) {
+        const types = response.data.data.policies.map(policy => ({
+          value: policy.leaveType,
+          label: policy.displayName,
+          color: 'blue',
+          description: policy.description,
+          requiresUrgentApproval: policy.requiresUrgentApproval
+        }));
+        setLeaveTypes(types);
+      }
+    } catch (error) {
+      console.error('Failed to fetch leave types:', error);
+    }
+  };
+
+  // Fetch policy when leave type changes
+  const fetchPolicyDetails = async (leaveType, employee) => {
+    if (!leaveType || !employee) {
+      console.log('[FETCH POLICY - Staff] Missing data:', { leaveType, hasEmployee: !!employee });
+      return;
+    }
+    
+    try {
+      const params = new URLSearchParams();
+      if (employee.gradeLevel) {
+        params.append('gradeLevel', employee.gradeLevel);
+      }
+      if (employee.facility) {
+        params.append('facilityId', employee.facility);
+      }
+      
+      console.log('[FETCH POLICY - Staff] Fetching policy for:', leaveType, 'Employee:', employee.employeeId, 'Params:', params.toString());
+      
+      const response = await axios.get(`/api/leave-policy/${leaveType}?${params.toString()}`);
+      console.log('[FETCH POLICY - Staff] Response:', response.data);
+      
+      if (response.data.success && response.data.data.policy) {
+        setSelectedPolicy(response.data.data.policy);
+        console.log('[FETCH POLICY - Staff] Policy set:', response.data.data.policy);
+      }
+    } catch (error) {
+      console.error('[FETCH POLICY - Staff] Error:', error);
+    }
+  };
 
   const fetchLeaveRequests = async () => {
     try {
@@ -85,7 +109,6 @@ const LeaveManagement = () => {
       if (activeTab === 'rejected') params.append('status', 'rejected');
       
       if (filters.facility) params.append('facilityId', filters.facility);
-      if (filters.urgency) params.append('urgency', filters.urgency);
       if (filters.type) params.append('type', filters.type);
 
       // Use statistics endpoint which returns all requests
@@ -133,13 +156,76 @@ const LeaveManagement = () => {
   const handleSubmitLeave = async (e) => {
     e.preventDefault();
     
-    if (!formData.employeeId || !formData.reason) {
+    if (!formData.employeeId || !formData.startDate || !formData.endDate || !formData.reason) {
       toast.error('Please fill in all required fields');
       return;
     }
 
+    // Validate against policy if loaded
+    if (selectedPolicy) {
+      console.log('[SUBMIT - Staff] Validating with policy:', selectedPolicy);
+      
+      // Check minimum notice period
+      const now = new Date();
+      const requestStartDate = new Date(formData.startDate);
+      const daysNotice = Math.ceil((requestStartDate - now) / (1000 * 60 * 60 * 24));
+      
+      console.log('[SUBMIT - Staff] Notice period check:', {
+        minimumRequired: selectedPolicy.minimumNoticeDays,
+        provided: daysNotice,
+        allowRetroactive: selectedPolicy.allowRetroactive
+      });
+      
+      if (!selectedPolicy.allowRetroactive && daysNotice < selectedPolicy.minimumNoticeDays) {
+        toast.error(`This leave type requires ${selectedPolicy.minimumNoticeDays} days advance notice. You are requesting ${daysNotice} days in advance.`);
+        return;
+      }
+
+      // Check maximum days per request
+      const requestedDays = Math.ceil((new Date(formData.endDate) - new Date(formData.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+      
+      console.log('[SUBMIT - Staff] Days limit check:', {
+        maxAllowed: selectedPolicy.maxDaysPerRequest,
+        requested: requestedDays
+      });
+      
+      if (selectedPolicy.maxDaysPerRequest > 0 && requestedDays > selectedPolicy.maxDaysPerRequest) {
+        toast.error(`Maximum ${selectedPolicy.maxDaysPerRequest} days allowed per request for ${selectedPolicy.displayName}.`);
+        return;
+      }
+
+      // Check if documentation is required
+      if (selectedPolicy.requiresDocumentation && selectedPolicy.requiredDocuments.length > 0) {
+        if (selectedFiles.length === 0) {
+          toast.error(`This leave type requires documentation: ${selectedPolicy.requiredDocuments.join(', ')}. Please upload the required documents.`);
+          return;
+        }
+      }
+    } else {
+      console.warn('[SUBMIT - Staff] No policy loaded - skipping frontend validation');
+    }
+
     try {
-      await axios.post('/api/leave/submit', formData);
+      const formDataToSend = new FormData();
+      formDataToSend.append('employeeId', formData.employeeId);
+      formDataToSend.append('leaveType', formData.leaveType);
+      formDataToSend.append('startDate', formData.startDate);
+      formDataToSend.append('endDate', formData.endDate);
+      formDataToSend.append('reason', formData.reason);
+      formDataToSend.append('submittedBy', user?.id);
+      
+      // Add files if any
+      selectedFiles.forEach(file => {
+        formDataToSend.append('documents', file);
+      });
+      
+      console.log('[SUBMIT - Staff] Uploading', selectedFiles.length, 'files');
+      
+      await axios.post('/api/leave', formDataToSend, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
       toast.success('Leave request submitted successfully');
       setShowSubmitModal(false);
       resetForm();
@@ -182,15 +268,16 @@ const LeaveManagement = () => {
   const resetForm = () => {
     setFormData({
       employeeId: '',
-      type: 'late-arrival',
-      affectedDate: new Date().toISOString().split('T')[0],
-      startTime: '',
-      endTime: '',
-      reason: '',
-      category: 'other',
-      urgency: 'medium'
+      leaveType: 'annual',
+      startDate: '',
+      endDate: '',
+      reason: ''
     });
     setEmployeeSearch('');
+    setSelectedPolicy(null);
+    setSelectedEmployee(null);
+    setSelectedFiles([]);
+    setFileError('');
   };
 
   // Filter employees based on search
@@ -208,6 +295,12 @@ const LeaveManagement = () => {
     setFormData({ ...formData, employeeId: employee.employeeId });
     setEmployeeSearch(`${employee.firstName} ${employee.lastName} (${employee.staffId || employee.employeeId})`);
     setShowEmployeeDropdown(false);
+    setSelectedEmployee(employee);
+    
+    // Fetch policy for current leave type with this employee's details
+    if (formData.leaveType) {
+      fetchPolicyDetails(formData.leaveType, employee);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -220,27 +313,22 @@ const LeaveManagement = () => {
     return badges[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const getUrgencyBadge = (urgency) => {
-    const badges = {
-      'low': 'bg-gray-100 text-gray-800',
-      'medium': 'bg-yellow-100 text-yellow-800',
-      'high': 'bg-orange-100 text-orange-800',
-      'emergency': 'bg-red-100 text-red-800'
-    };
-    return badges[urgency] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getTypeBadge = (type) => {
-    const typeInfo = leaveTypes.find(t => t.value === type);
+  const getTypeBadge = (leaveType) => {
+    const typeInfo = leaveTypes.find(t => t.value === leaveType);
     if (!typeInfo) return 'bg-gray-100 text-gray-800';
     
     const colorMap = {
       'orange': 'bg-orange-100 text-orange-800',
       'blue': 'bg-blue-100 text-blue-800',
+      'pink': 'bg-pink-100 text-pink-800',
       'purple': 'bg-purple-100 text-purple-800',
       'green': 'bg-green-100 text-green-800',
       'red': 'bg-red-100 text-red-800',
-      'indigo': 'bg-indigo-100 text-indigo-800'
+      'indigo': 'bg-indigo-100 text-indigo-800',
+      'teal': 'bg-teal-100 text-teal-800',
+      'yellow': 'bg-yellow-100 text-yellow-800',
+      'gray': 'bg-gray-100 text-gray-800',
+      'amber': 'bg-amber-100 text-amber-800'
     };
     return colorMap[typeInfo.color] || 'bg-gray-100 text-gray-800';
   };
@@ -253,7 +341,7 @@ const LeaveManagement = () => {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Leave Management
           </h1>
-          <p className="text-gray-600 mt-1">Manage employee leave requests and excuses</p>
+          <p className="text-gray-600 mt-1">Manage employee leave requests - Annual, Maternity, Sabbatical & more</p>
         </div>
         {hasPermission('submit_leave') && (
           <button
@@ -307,12 +395,12 @@ const LeaveManagement = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Emergency Exits</p>
-              <p className="text-2xl font-bold text-orange-600">
-                {leaveRequests.filter(r => r.type === 'emergency-exit').length}
+              <p className="text-sm text-gray-600">Total Requests</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {leaveRequests.length}
               </p>
             </div>
-            <CalendarIcon className="h-12 w-12 text-orange-500 opacity-20" />
+            <CalendarIcon className="h-12 w-12 text-blue-500 opacity-20" />
           </div>
         </div>
       </div>
@@ -334,20 +422,6 @@ const LeaveManagement = () => {
               <option value="">All Facilities</option>
               {facilities.map(facility => (
                 <option key={facility._id} value={facility._id}>{facility.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Urgency</label>
-            <select
-              value={filters.urgency}
-              onChange={(e) => setFilters({ ...filters, urgency: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">All Urgency Levels</option>
-              {urgencyLevels.map(level => (
-                <option key={level.value} value={level.value}>{level.label}</option>
               ))}
             </select>
           </div>
@@ -405,9 +479,9 @@ const LeaveManagement = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Employee</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date & Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Dates</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Reason</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Urgency</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Documents</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
                   {hasPermission('approve_leave') && activeTab === 'pending' && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Actions</th>
@@ -431,33 +505,19 @@ const LeaveManagement = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getTypeBadge(request.type)}`}>
-                        {leaveTypes.find(t => t.value === request.type)?.label || request.type}
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getTypeBadge(request.leaveType)}`}>
+                        {leaveTypes.find(t => t.value === request.leaveType)?.label || request.leaveType}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {/* Multi-day leave */}
-                      {request.startDate && request.endDate ? (
+                      {request.startDate && request.endDate && (
                         <>
                           <div>{new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}</div>
-                          <div className="text-xs text-gray-500">Multi-day leave</div>
                         </>
-                      ) : request.startTime && request.endTime ? (
-                        /* Time-based leave */
-                        <>
-                          <div>{new Date(request.affectedDate).toLocaleDateString()}</div>
-                          <div className="text-xs text-gray-500">
-                            {request.startTime} - {request.endTime}
-                          </div>
-                        </>
-                      ) : (
-                        /* Single day leave */
-                        <div>{new Date(request.affectedDate).toLocaleDateString()}</div>
                       )}
                     </td>
                     <td className="px-6 py-4 max-w-xs">
                       <p className="text-sm text-gray-900 truncate">{request.reason}</p>
-                      <p className="text-xs text-gray-500">{request.category}</p>
                       {request.status === 'rejected' && request.managerNotes && (
                         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
                           <p className="text-xs font-medium text-red-800">Rejection Reason:</p>
@@ -465,10 +525,25 @@ const LeaveManagement = () => {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getUrgencyBadge(request.urgency)}`}>
-                        {request.urgency}
-                      </span>
+                    <td className="px-6 py-4">
+                      {request.attachments && request.attachments.length > 0 ? (
+                        <div className="space-y-1">
+                          {request.attachments.map((file, idx) => (
+                            <a
+                              key={idx}
+                              href={`http://localhost:5000${file.fileUrl}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              <DocumentTextIcon className="h-4 w-4 mr-1" />
+                              {file.fileName}
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">No documents</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(request.status)}`}>
@@ -584,8 +659,13 @@ const LeaveManagement = () => {
                     Leave Type *
                   </label>
                   <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    value={formData.leaveType}
+                    onChange={(e) => {
+                      setFormData({ ...formData, leaveType: e.target.value });
+                      if (selectedEmployee) {
+                        fetchPolicyDetails(e.target.value, selectedEmployee);
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
@@ -595,76 +675,29 @@ const LeaveManagement = () => {
                   </select>
                 </div>
 
-                {/* Category */}
+                {/* Start Date */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category *
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    {categories.map(cat => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Affected Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Affected Date *
+                    Start Date *
                   </label>
                   <input
                     type="date"
-                    value={formData.affectedDate}
-                    onChange={(e) => setFormData({ ...formData, affectedDate: e.target.value })}
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
 
-                {/* Urgency */}
+                {/* End Date */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Urgency
-                  </label>
-                  <select
-                    value={formData.urgency}
-                    onChange={(e) => setFormData({ ...formData, urgency: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {urgencyLevels.map(level => (
-                      <option key={level.value} value={level.value}>{level.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Start Time */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Time *
+                    End Date *
                   </label>
                   <input
-                    type="datetime-local"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                {/* End Time */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Time *
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
@@ -683,6 +716,102 @@ const LeaveManagement = () => {
                     placeholder="Please provide a detailed reason for the leave request..."
                     required
                   />
+                </div>
+                
+                {/* Policy Information */}
+                {selectedPolicy && (
+                  <div className="md:col-span-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-900 mb-2">Policy Information</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-blue-700">Payment Status:</span>
+                        <span className="ml-2 font-medium">
+                          {selectedPolicy.isPaid ? `${selectedPolicy.salaryPercentage}% Paid` : 'Unpaid'}
+                        </span>
+                      </div>
+                      {selectedPolicy.minimumNoticeDays > 0 && (
+                        <div>
+                          <span className="text-blue-700">Notice Required:</span>
+                          <span className="ml-2 font-medium">{selectedPolicy.minimumNoticeDays} days</span>
+                        </div>
+                      )}
+                      {selectedPolicy.maxDaysPerRequest > 0 && (
+                        <div>
+                          <span className="text-blue-700">Max Days/Request:</span>
+                          <span className="ml-2 font-medium">{selectedPolicy.maxDaysPerRequest} days</span>
+                        </div>
+                      )}
+                      {selectedPolicy.requiresDocumentation && (
+                        <div className="col-span-2">
+                          <span className="text-blue-700">Required Documents:</span>
+                          <span className="ml-2 font-medium">{selectedPolicy.requiredDocuments.join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Document Upload */}
+                <div className="md:col-span-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-start">
+                    <DocumentTextIcon className="h-5 w-5 text-gray-600 mt-0.5 mr-2" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-gray-800 mb-2">
+                        Upload Supporting Documents {selectedPolicy?.requiresDocumentation && <span className="text-red-600">*</span>}
+                      </h4>
+                      {selectedPolicy?.requiresDocumentation && (
+                        <p className="text-sm text-yellow-700 mb-3 bg-yellow-50 p-2 rounded border border-yellow-200">
+                          <strong>Required:</strong> {selectedPolicy.requiredDocuments.join(', ')}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-600 mb-3">
+                        Upload supporting documents (PDF, Word, or Images). Max 5MB per file.
+                      </p>
+                      
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files);
+                          const maxSize = 5 * 1024 * 1024; // 5MB
+                          const validFiles = files.filter(file => file.size <= maxSize);
+                          
+                          if (files.length !== validFiles.length) {
+                            setFileError('Some files were too large (max 5MB)');
+                          } else {
+                            setFileError('');
+                          }
+                          
+                          setSelectedFiles(validFiles);
+                        }}
+                        className="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-lg file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-100 file:text-blue-700
+                          hover:file:bg-blue-200 cursor-pointer"
+                      />
+                      
+                      {selectedFiles.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-600 font-medium mb-1">Selected files:</p>
+                          <ul className="text-xs text-gray-600 space-y-1">
+                            {selectedFiles.map((file, index) => (
+                              <li key={index} className="flex items-center">
+                                <CheckCircleIcon className="h-3 w-3 text-green-500 mr-1" />
+                                {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {fileError && (
+                        <p className="mt-2 text-xs text-red-600">{fileError}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

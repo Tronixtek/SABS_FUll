@@ -20,6 +20,7 @@ import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 import LeaveManagement from './pages/LeaveManagement';
+import LeavePolicyManagement from './pages/LeavePolicyManagement';
 import PayrollManagement from './pages/PayrollManagement';
 import SalaryGrades from './pages/SalaryGrades';
 
@@ -29,6 +30,7 @@ import RequestLeave from './pages/employee/RequestLeave';
 import AttendanceHistory from './pages/employee/AttendanceHistory';
 import EmployeeProfile from './pages/employee/EmployeeProfile';
 import EmployeePayslip from './pages/employee/EmployeePayslip';
+import LeaveBalance from './pages/employee/LeaveBalance';
 
 // Layout
 import Layout from './components/Layout';
@@ -51,6 +53,7 @@ function App() {
               <Route path="employees" element={<Employees />} />
               <Route path="attendance" element={<Attendance />} />
               <Route path="leave" element={<LeaveManagement />} />
+              <Route path="leave-policies" element={<LeavePolicyManagement />} />
               <Route path="payroll" element={<PayrollManagement />} />
               <Route path="salary-grades" element={<SalaryGrades />} />
               <Route path="facilities" element={<Facilities />} />
@@ -68,6 +71,7 @@ function App() {
                 <Routes>
                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<EmployeeDashboard />} />
+                  <Route path="leave-balance" element={<LeaveBalance />} />
                   <Route path="request-leave" element={<RequestLeave />} />
                   <Route path="attendance" element={<AttendanceHistory />} />
                   <Route path="payslip" element={<EmployeePayslip />} />

@@ -131,26 +131,7 @@ const attendanceSchema = new mongoose.Schema({
     type: Number, // minutes
     default: 0
   },
-  // Excuse/Leave Management fields
-  isExcused: {
-    type: Boolean,
-    default: false
-  },
-  excuseReason: {
-    type: String
-  },
-  excuseType: {
-    type: String,
-    enum: [
-      'early-departure',
-      'late-arrival', 
-      'partial-day',
-      'emergency-exit',
-      'flexible-time',
-      'medical-leave',
-      'official-duty'
-    ]
-  },
+  // Leave tracking field
   leaveRequest: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'LeaveRequest'

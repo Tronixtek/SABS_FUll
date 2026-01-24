@@ -16,6 +16,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     unit: employee?.unit || '', // Add unit field
     designation: employee?.designation || '',
     cadre: employee?.cadre || '',
+    gradeLevel: employee?.gradeLevel || '',
     shift: employee?.shift?._id || '',
     joiningDate: employee?.joiningDate ? employee.joiningDate.split('T')[0] : '',
     dateOfBirth: employee?.dateOfBirth ? employee.dateOfBirth.split('T')[0] : '',
@@ -347,137 +348,161 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     ]
   };
 
-  // Unit → Designations mapping
+  // All available designations/ranks
+  const allDesignations = [
+    'Community Health Officer (CHO)',
+    'Community Health Extension Worker (CHEW)',
+    'Junior Community Health Extension Worker (JCHEW)',
+    'Registered Nurse',
+    'Enrolled Nurse',
+    'Midwife',
+    'Nurse/Midwife Assistant',
+    'Medical Officer',
+    'Medical Officer of Health (MOH)',
+    'Laboratory Scientist',
+    'Laboratory Technician',
+    'Laboratory Assistant',
+    'Pharmacist',
+    'Pharmacy Technician',
+    'Pharmacy Assistant',
+    'Environmental Health Officer (EHO)',
+    'Health Assistant (Environmental)',
+    'Health Records Officer',
+    'Health Information Manager',
+    'Records Assistant',
+    'Health Educator',
+    'Community Health Promoter',
+    'Administrative Officer',
+    'Secretary/Clerical Officer',
+    'Accountant',
+    'Accounts Clerk',
+    'Driver',
+    'Cleaner',
+    'Security Guard',
+    'Ward Attendant/Orderly',
+    'Gateman',
+    'Gardener',
+    'Executive Secretary/Executive Director',
+    'Director',
+    'Deputy Director',
+    'Assistant Director',
+    'Principal Administrative Officer',
+    'Senior Administrative Officer',
+    'Administrative Officer I',
+    'Administrative Officer II',
+    'Assistant Administrative Officer',
+    'Executive Assistant',
+    'Director of Finance & Accounts',
+    'Principal Accountant',
+    'Senior Accountant',
+    'Accountant I',
+    'Accountant II',
+    'Accounts Assistant',
+    'Cashier',
+    'Director of Planning, Research & Statistics',
+    'Principal Planning Officer',
+    'Senior Planning Officer',
+    'Planning Officer I',
+    'Planning Officer II',
+    'Statistician',
+    'Data Analyst',
+    'M&E Officer (Monitoring & Evaluation)',
+    'Director of Medical Services',
+    'Consultant Physician',
+    'Principal Medical Officer',
+    'Senior Medical Officer',
+    'Medical Officer I',
+    'Medical Officer II',
+    'Director of Nursing Services',
+    'Assistant Director of Nursing',
+    'Principal Nursing Officer',
+    'Senior Nursing Officer',
+    'Nursing Officer I',
+    'Nursing Officer II',
+    'Director of Public Health',
+    'Principal Public Health Officer',
+    'Senior Public Health Officer',
+    'Disease Surveillance & Notification Officer (DSNO)',
+    'Epidemiologist',
+    'Health Promotion Officer',
+    'Director of Pharmaceutical Services',
+    'Principal Pharmacist',
+    'Senior Pharmacist',
+    'Pharmacist I',
+    'Pharmacist II',
+    'Director of Laboratory Services',
+    'Principal Laboratory Scientist',
+    'Senior Laboratory Scientist',
+    'Laboratory Scientist I',
+    'Laboratory Scientist II',
+    'Director of PHC Services',
+    'PHC Coordinator (LGA)',
+    'CHEW Supervisor',
+    'Director of Procurement/Supplies',
+    'Principal Procurement Officer',
+    'Senior Procurement Officer',
+    'Store Officer',
+    'Supply Chain Officer',
+    'Director of ICT/Health Information',
+    'Principal ICT Officer',
+    'Senior ICT Officer',
+    'Database Administrator',
+    'System Analyst',
+    'Director of Human Resources',
+    'Principal HR Officer',
+    'Senior HR Officer',
+    'HR Officer I',
+    'HR Officer II',
+    'Training Officer',
+    'Director of Legal Services',
+    'Principal Legal Officer',
+    'Legal Officer I',
+    'Legal Officer II',
+    'Director of Internal Audit',
+    'Principal Auditor',
+    'Senior Auditor',
+    'Internal Auditor',
+    'Director of Public Relations',
+    'Public Relations Officer',
+    'Information Officer',
+    'Director of Works/Engineering',
+    'Civil Engineer',
+    'Electrical Engineer',
+    'Mechanical Engineer',
+    'Technician',
+    'Artisan',
+    'Protocol Officer',
+    'Messenger/Dispatch Rider',
+    'ANC In-Charge',
+    'Dental In-Charge',
+    'Deputy ANC In-Charge',
+    'Deputy Dental In-Charge',
+    'Deputy In-Charge [2 i/c]',
+    'Deputy In-Charge of Health Unit',
+    'Deputy Laboratory In-Charge',
+    'Deputy Maternity In-Charge',
+    'Deputy Nutrition in-Charge',
+    'Deputy OPD In-Charge',
+    'Deputy Pharmacy In-Charge',
+    'Deputy Post Natal In-Charge',
+    'Facility In-Charge',
+    'Facility M&E',
+    'Facility Staff',
+    'Family Planning In-Charge',
+    'Health Unit In-Charge',
+    'Laboratory In-Charge',
+    'Maternity In-Charge',
+    'Nutrition In-Charge',
+    'OPD In-Charge',
+    'Pharmacy In Charge',
+    'Post-Natal In-Charge',
+    'Routine Immunization In-Charge',
+    'Other'
+  ];
+
+  // Unit → Designations mapping (for backward compatibility)
   const unitDesignations = {
-    // Administration and Human Resources
-    'Human Resources for Health': [
-      'HRH Coordinator',
-      'Deputy HRH Coordinator',
-      'HR Workforce Relation Officer',
-      'Routine Training Officer'
-    ],
-    'General Service': [
-      'Staff Officer',
-      'Security Officer',
-      'Under Secretary',
-      'Record officer',
-      'PAS',
-      'Maintainance Officer',
-      'In-service Training officer'
-    ],
-    'Floating Assembly': [
-      'Floating Manager',
-      'Refrigerator TO',
-      'Electrical TO',
-      'Biomedical TO',
-      'Technical Assistant'
-    ],
-    // Finance and Account
-    'Cashier': [
-      'Director Finance and Account',
-      'Deputy Director Finance and Account',
-      'Deputy Director Finance and Account (Auditor)',
-      'Cashier'
-    ],
-    'Payroll': [
-      'RI Accountant',
-      'Operation Accountant',
-      'BHCPF Accountant',
-      'UNICEF Accountant',
-      'PHC Accountant',
-      'HMOU Accountant',
-      'Payroll accountant'
-    ],
-    // Environmental and Public Health
-    'ACSM': [
-      'Director Environmental and Public Health',
-      'Deputy Director Environmental and Public Health',
-      'SMO'
-    ],
-    'Community Engagement': [
-      'CE FP',
-      'Assistant CE FP',
-      'SBCC FP',
-      'CBHW FP'
-    ],
-    'Environmental Health': [
-      'WDC FP',
-      'Assistant WDC FP'
-    ],
-    'WASH': [
-      'WASH FP',
-      'Climate Change FP',
-      'Waste Manager'
-    ],
-    // Medical Services
-    'Mental Health': ['Mental Health FP'],
-    'MSP': [
-      'MSPMT Coordinator',
-      'Deputy MSPMT Coordinator',
-      'MSPMT M&E'
-    ],
-    'NCD': ['NCD FP'],
-    'School Health Services': ['SHS FP'],
-    'Referral': ['RP FP'],
-    'Oral Health care': ['Oral Health Care FP'],
-    'Primary Eye Care': ['Primary Eye Care FP'],
-    'Laboratory': ['Laboratory FP'],
-    'KSCHMA': ['KSCHMA Desk Officer'],
-    // Pharmaceutical Service
-    'SHCSS': ['SHCSS FP'],
-    'Cold Chain': [
-      'SCCO',
-      'Assistant SCCO'
-    ],
-    'Logistic': [
-      'SLO',
-      'Assistant SLO'
-    ],
-    'Drugs Supply': ['Drugs Supply FP'],
-    // Disease Control and Immunization
-    'Immunization': [
-      'Director Disease Control and Immunization',
-      'SIO',
-      'Deputy SIO',
-      'PM SERICC',
-      'Deputy PM SERICC',
-      'RIO FP'
-    ],
-    'Surveillance': [
-      'DSNO',
-      'Surveillance Officer'
-    ],
-    'Malaria Control': [
-      'Malaria Program FP',
-      'Deputy Malaria Program FP'
-    ],
-    'TB/HIV': ['TBL FP'],
-    'NTD': ['NTD FP'],
-    // Family Health
-    'MCH': [
-      'Director Family Health',
-      'MNCH Coordinator'
-    ],
-    'Nutrition': ['Deputy Director Nutrition', 'Nutrition FP'],
-    'Family Planning': ['Family Planning FP', 'Reproductive Health FP'],
-    'Adolescent health': ['Adolescent Health FP'],
-    'Gender': ['Gender Health FP'],
-    // Planning, Monitoring and Evaluation
-    'HMIS': [
-      'Director Planning, Monitoring, and Evaluation',
-      'Deputy Director Planning, Monitoring and Evaluation',
-      'HMIS Officer'
-    ],
-    'ICT': [
-      'ICT Manager',
-      'Deputy ICT Manager'
-    ],
-    'QOC': ['QOC FP', 'ISS Coordinator'],
-    'RMNCAH': ['M&E'],
-    'Planning and Budget': [
-      'CPO',
-      'Assistant CPO'
-    ]
+    'All': allDesignations
   };
 
   useEffect(() => {
@@ -623,8 +648,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     unit.toLowerCase().includes(unitSearch.toLowerCase())
   );
 
-  // Show ALL designations (independent of unit)
-  const availableDesignations = allCadres;
+  // Use the comprehensive designation list
+  const availableDesignations = allDesignations;
   const filteredDesignations = availableDesignations.filter(desig =>
     desig.toLowerCase().includes(designationSearch.toLowerCase())
   );
@@ -1872,6 +1897,36 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                     required
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Grade Level (GL) *</label>
+                  <select
+                    name="gradeLevel"
+                    value={formData.gradeLevel}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Grade Level</option>
+                    {[...Array(17)].map((_, i) => {
+                      const level = i + 1;
+                      return (
+                        <option key={level} value={level}>
+                          GL {level}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {formData.gradeLevel && (
+                    <p className="mt-1 text-xs text-blue-600">
+                      Annual Leave Entitlement: {' '}
+                      <span className="font-semibold">
+                        {formData.gradeLevel >= 1 && formData.gradeLevel <= 3 ? '14 days' :
+                         formData.gradeLevel >= 4 && formData.gradeLevel <= 6 ? '21 days' : '30 days'}
+                      </span>
+                    </p>
+                  )}
                 </div>
 
                 <div>

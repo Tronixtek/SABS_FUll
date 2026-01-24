@@ -316,18 +316,17 @@ async function processXO5Attendance(xo5Record, deviceId) {
       if (actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes'))) {
         const lateMinutes = actualCheckIn.diff(scheduledCheckIn, 'minutes');
         
-        // Check if employee has a valid excuse for late arrival
-        const excuse = await LeaveRequest.hasValidExcuse(employee.employeeId, attendanceDate, 'late-arrival');
+        // Check if employee has approved leave for this date
+        const leave = await LeaveRequest.hasApprovedLeave(employee._id, attendanceDate);
         
-        if (excuse) {
-          attendance.status = 'excused';
-          attendance.lateArrival = 0; // Excused, so no late marking
-          attendance.excuseReason = excuse.reason;
-          attendance.excuseType = excuse.type;
-          attendance.isExcused = true;
+        if (leave) {
+          // Employee has approved leave, should not be marked late
+          attendance.status = 'on-leave';
+          attendance.lateArrival = 0;
+          attendance.leaveRequest = leave._id;
           
-          console.log(`✅ Late arrival excused: ${employee.firstName} ${employee.lastName} - ${excuse.type}: ${excuse.reason}`);
-          attendanceLogger.info(`Excused late arrival for ${employee.firstName} ${employee.lastName}: ${excuse.reason}`);
+          console.log(`📅 Employee on approved leave: ${employee.firstName} ${employee.lastName} - ${leave.leaveType}`);
+          attendanceLogger.info(`Employee on leave: ${employee.firstName} ${employee.lastName}: ${leave.leaveType}`);
         } else {
           attendance.lateArrival = lateMinutes;
           attendance.status = 'late';

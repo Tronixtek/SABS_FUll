@@ -1,4 +1,5 @@
 const LeaveRequest = require('../models/LeaveRequest');
+const LeavePolicy = require('../models/LeavePolicy');
 const Employee = require('../models/Employee');
 const Facility = require('../models/Facility');
 
@@ -14,25 +15,13 @@ const submitLeaveRequest = async (req, res) => {
     
     let {
       employeeId,
-      type,
       leaveType,
-      affectedDate,
-      date,
       startDate,
       endDate,
-      startTime,
-      endTime,
       reason,
-      category,
-      urgency = 'medium',
-      isEmergency = false,
       submittedBy
     } = req.body;
 
-    // Normalize field names (employee portal uses different naming)
-    if (leaveType) type = leaveType;
-    if (date && !affectedDate) affectedDate = date;
-    
     let employee;
     
     if (isEmployeePortal) {
@@ -55,48 +44,93 @@ const submitLeaveRequest = async (req, res) => {
       });
     }
 
-    // Determine if this is multi-day or time-based leave
-    const isMultiDay = startDate && endDate;
-    const isTimeBased = startTime && endTime && !isMultiDay;
-
-    // Check if request is retroactive
-    const now = new Date();
-    let affectedDateTime;
-    
-    if (isMultiDay) {
-      affectedDateTime = new Date(startDate);
-    } else if (isTimeBased || affectedDate) {
-      affectedDateTime = new Date(affectedDate || date);
+    // Validate required fields
+    if (!leaveType || !startDate || !endDate || !reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: leaveType, startDate, endDate, reason'
+      });
     }
+
+    // Get active policy for this leave type
+    const policy = await LeavePolicy.getPolicyForGradeLevel(
+      leaveType,
+      employee.gradeLevel || 1,
+      employee.facility
+    );
+
+    if (!policy || !policy.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: `Leave type ${leaveType} is not available or has been disabled`
+      });
+    }
+
+    // Validate minimum notice period
+    const now = new Date();
+    const requestStartDate = new Date(startDate);
+    const daysNotice = Math.ceil((requestStartDate - now) / (1000 * 60 * 60 * 24));
     
-    const isRetroactive = affectedDateTime < now;
+    if (!policy.allowRetroactive && daysNotice < policy.minimumNoticeDays) {
+      return res.status(400).json({
+        success: false,
+        message: `This leave type requires ${policy.minimumNoticeDays} days notice. You provided ${daysNotice} days notice.`
+      });
+    }
+
+    // Calculate requested duration
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const requestedDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Validate against max days per request
+    if (policy.maxDaysPerRequest > 0 && requestedDays > policy.maxDaysPerRequest) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum ${policy.maxDaysPerRequest} days allowed per request for ${policy.displayName}`
+      });
+    }
+
+    // Check balance if leave type has limits
+    if (policy.hasBalanceLimit && policy.maxDaysPerYear > 0) {
+      const currentYear = new Date().getFullYear();
+      const usedDays = await LeaveRequest.calculateLeaveBalance(
+        employee._id,
+        leaveType,
+        currentYear
+      );
+      
+      const available = policy.maxDaysPerYear - usedDays;
+      
+      if (requestedDays > available) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient leave balance. You have ${available} days remaining for ${policy.displayName}`
+        });
+      }
+    }
 
     // Create leave request data
     const leaveData = {
       employee: employee._id,
       employeeId: employee.employeeId,
       facility: employee.facility,
-      type: type || leaveType,
+      leaveType: leaveType,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
       reason,
-      category: category || 'personal',
-      urgency: urgency || 'medium',
-      isEmergency: isEmergency || urgency === 'emergency',
-      isRetroactive,
+      requiresUrgentApproval: policy.requiresUrgentApproval,
       submittedBy: submittedBy || req.user?.id || req.employee?.id
     };
-
-    // Add date fields based on leave type
-    if (isMultiDay) {
-      leaveData.startDate = new Date(startDate);
-      leaveData.endDate = new Date(endDate);
-      leaveData.affectedDate = new Date(startDate); // For compatibility
-    } else if (isTimeBased) {
-      leaveData.affectedDate = affectedDateTime;
-      leaveData.date = affectedDateTime;
-      leaveData.startTime = startTime;
-      leaveData.endTime = endTime;
-    } else {
-      leaveData.affectedDate = affectedDateTime;
+    
+    // Handle file uploads if present
+    if (req.files && req.files.length > 0) {
+      leaveData.attachments = req.files.map(file => ({
+        fileName: file.originalname,
+        fileUrl: `/uploads/leave-documents/${file.filename}`,
+        uploadedAt: new Date()
+      }));
+      console.log('[SUBMIT LEAVE] Uploaded files:', leaveData.attachments);
     }
 
     console.log('[SUBMIT LEAVE] Leave data to save:', JSON.stringify(leaveData, null, 2));
@@ -111,15 +145,18 @@ const submitLeaveRequest = async (req, res) => {
     // Populate for response
     await leaveRequest.populate(['employee', 'facility']);
 
-    // Send notifications (implement based on your notification system)
-    // await sendNotifications(leaveRequest);
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: `Leave request ${leaveRequest.status} successfully`,
+      message: `Leave request submitted successfully`,
       data: {
         leaveRequest,
-        autoApproved: leaveRequest.status === 'auto-approved'
+        policyInfo: {
+          isPaid: policy.isPaid,
+          salaryPercentage: policy.salaryPercentage,
+          requiresDocumentation: policy.requiresDocumentation,
+          requiredDocuments: policy.requiredDocuments,
+          requiresUrgentApproval: policy.requiresUrgentApproval
+        }
       }
     });
 
@@ -345,27 +382,26 @@ const processLeaveRequest = async (req, res) => {
   }
 };
 
-// Check if employee has valid excuse for attendance discrepancy
-const checkAttendanceExcuse = async (req, res) => {
+// Check if employee has approved leave for date (for attendance integration)
+const checkLeaveForAttendance = async (req, res) => {
   try {
-    const { employeeId, date, timeType } = req.query; // timeType: 'late-arrival' or 'early-departure'
+    const { employeeId, date } = req.query;
 
-    const excuse = await LeaveRequest.hasValidExcuse(employeeId, date, timeType);
+    const leave = await LeaveRequest.hasApprovedLeave(employeeId, date);
 
     res.json({
       success: true,
       data: {
-        hasValidExcuse: !!excuse,
-        excuse: excuse || null,
-        impact: excuse ? excuse.attendanceAdjustment : 0
+        hasApprovedLeave: !!leave,
+        leave: leave || null
       }
     });
 
   } catch (error) {
-    console.error('Error checking attendance excuse:', error);
+    console.error('Error checking leave for attendance:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to check attendance excuse',
+      message: 'Failed to check leave for attendance',
       error: error.message
     });
   }
@@ -381,9 +417,9 @@ const getLeaveStatistics = async (req, res) => {
     if (employeeId) matchQuery.employeeId = employeeId;
     
     if (startDate || endDate) {
-      matchQuery.affectedDate = {};
-      if (startDate) matchQuery.affectedDate.$gte = new Date(startDate);
-      if (endDate) matchQuery.affectedDate.$lte = new Date(endDate);
+      matchQuery.startDate = {};
+      if (startDate) matchQuery.startDate.$gte = new Date(startDate);
+      if (endDate) matchQuery.startDate.$lte = new Date(endDate);
     }
 
     const stats = await LeaveRequest.aggregate([
@@ -393,7 +429,7 @@ const getLeaveStatistics = async (req, res) => {
           _id: null,
           totalRequests: { $sum: 1 },
           approvedRequests: {
-            $sum: { $cond: [{ $in: ['$status', ['approved', 'auto-approved']] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
           },
           pendingRequests: {
             $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
@@ -401,20 +437,14 @@ const getLeaveStatistics = async (req, res) => {
           rejectedRequests: {
             $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
           },
-          emergencyExits: {
-            $sum: { $cond: [{ $eq: ['$type', 'emergency-exit'] }, 1, 0] }
+          cancelledRequests: {
+            $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] }
           },
-          lateArrivals: {
-            $sum: { $cond: [{ $eq: ['$type', 'late-arrival'] }, 1, 0] }
-          },
-          earlyDepartures: {
-            $sum: { $cond: [{ $eq: ['$type', 'early-departure'] }, 1, 0] }
-          },
-          totalExcusedHours: {
+          totalLeaveDays: {
             $sum: { 
               $cond: [
-                { $in: ['$status', ['approved', 'auto-approved']] },
-                { $divide: ['$duration', 60] },
+                { $eq: ['$status', 'approved'] },
+                '$duration',
                 0
               ]
             }
@@ -423,15 +453,24 @@ const getLeaveStatistics = async (req, res) => {
       }
     ]);
 
-    // Get breakdown by type
+    // Get breakdown by leave type
     const typeBreakdown = await LeaveRequest.aggregate([
       { $match: matchQuery },
       {
         $group: {
-          _id: '$type',
+          _id: '$leaveType',
           count: { $sum: 1 },
           approvedCount: {
-            $sum: { $cond: [{ $in: ['$status', ['approved', 'auto-approved']] }, 1, 0] }
+            $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+          },
+          totalDays: {
+            $sum: { 
+              $cond: [
+                { $eq: ['$status', 'approved'] },
+                '$duration',
+                0
+              ]
+            }
           }
         }
       }
@@ -440,7 +479,7 @@ const getLeaveStatistics = async (req, res) => {
     // Get all requests for the Leave Management page
     const allRequests = await LeaveRequest.find(matchQuery)
       .populate(['employee', 'facility', 'approvedBy'])
-      .sort({ requestDate: -1 });
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -450,10 +489,8 @@ const getLeaveStatistics = async (req, res) => {
           approvedRequests: 0,
           pendingRequests: 0,
           rejectedRequests: 0,
-          emergencyExits: 0,
-          lateArrivals: 0,
-          earlyDepartures: 0,
-          totalExcusedHours: 0
+          cancelledRequests: 0,
+          totalLeaveDays: 0
         },
         breakdown: typeBreakdown,
         allRequests: allRequests
@@ -472,10 +509,9 @@ const getLeaveStatistics = async (req, res) => {
 
 module.exports = {
   submitLeaveRequest,
-  emergencyExit,
   getEmployeeLeaveRequests,
   getPendingRequests,
   processLeaveRequest,
-  checkAttendanceExcuse,
+  checkLeaveForAttendance,
   getLeaveStatistics
 };

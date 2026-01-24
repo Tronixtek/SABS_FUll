@@ -17,13 +17,17 @@ const LeaveRequestForm = () => {
   const [message, setMessage] = useState(null);
 
   const leaveTypes = [
-    { value: 'early-departure', label: 'Early Departure' },
-    { value: 'late-arrival', label: 'Late Arrival' },
-    { value: 'partial-day', label: 'Partial Day Leave' },
-    { value: 'emergency-exit', label: 'Emergency Exit' },
-    { value: 'flexible-time', label: 'Flexible Time' },
-    { value: 'medical-leave', label: 'Medical Leave' },
-    { value: 'official-duty', label: 'Official Duty' }
+    { value: 'annual', label: 'Annual Leave', description: 'GL 1-3: 14 days, GL 4-6: 21 days, GL 7+: 30 days' },
+    { value: 'maternity', label: 'Maternity Leave', description: '12 weeks' },
+    { value: 'adoptive', label: 'Adoptive Leave', description: '16 weeks' },
+    { value: 'examination', label: 'Examination Leave', description: 'Open' },
+    { value: 'takaba', label: 'Takaba Leave', description: '16 weeks' },
+    { value: 'sabbatical', label: 'Sabbatical Leave', description: '12 months' },
+    { value: 'study', label: 'Study Leave', description: 'Educational purposes' },
+    { value: 'religious', label: 'Religious Leave', description: 'Religious observance' },
+    { value: 'casual', label: 'Casual Leave', description: 'Short-term personal matters' },
+    { value: 'absence', label: 'Leave of Absence', description: 'Extended personal leave' },
+    { value: 'official-assignment', label: 'Official Assignment', description: 'Urgent (must be approved within 24 hours)' }
   ];
 
   const categories = [

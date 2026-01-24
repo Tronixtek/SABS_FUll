@@ -1,9 +1,9 @@
 // Middleware to allow both staff and employee authentication
-const { protect } = require('./auth');
-const { protectEmployee } = require('./employeeAuth');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const Employee = require('../models/Employee');
 
 exports.protectBoth = async (req, res, next) => {
-  // Check for employee token first
   const token = req.headers.authorization?.split(' ')[1];
   
   if (!token) {
@@ -13,33 +13,35 @@ exports.protectBoth = async (req, res, next) => {
     });
   }
 
-  // Try employee authentication first
   try {
-    await protectEmployee(req, res, () => {});
-    // If successful, employee is set in req.employee
-    if (req.employee) {
-      req.user = null; // No staff user
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Try to find as employee first
+    const employee = await Employee.findById(decoded.id);
+    if (employee && employee.status === 'active') {
+      req.employee = employee;
+      req.user = null;
       return next();
     }
-  } catch (error) {
-    // Employee auth failed, try staff auth
-  }
-
-  // Try staff authentication
-  try {
-    await protect(req, res, () => {});
-    // If successful, user is set in req.user
-    if (req.user) {
-      req.employee = null; // No employee
+    
+    // Try to find as user/staff
+    const user = await User.findById(decoded.id).select('-password');
+    if (user && user.status === 'active') {
+      req.user = user;
+      req.employee = null;
       return next();
     }
+    
+    // Neither found or both inactive
+    return res.status(401).json({
+      success: false,
+      message: 'Not authorized. Account not found or inactive.'
+    });
+    
   } catch (error) {
-    // Both failed
     return res.status(401).json({
       success: false,
       message: 'Not authorized. Invalid or expired token.'
     });
   }
-
-  next();
 };

@@ -19,27 +19,21 @@ const leaveRequestSchema = new mongoose.Schema({
   },
   
   // Leave/Excuse Details
-  type: {
+  leaveType: {
     type: String,
     required: true,
     enum: [
-      // Full Leave Types
-      'annual',              // Annual leave
-      'sick',                // Sick leave
-      'emergency',           // Emergency leave
-      'maternity',           // Maternity leave
-      'paternity',           // Paternity leave
-      'bereavement',         // Bereavement leave
-      'study',               // Study leave
-      'unpaid',              // Unpaid leave
-      // Partial Day/Excuse Types
-      'early-departure',     // Need to leave early
-      'late-arrival',        // Will arrive late
-      'partial-day',         // Few hours off
-      'emergency-exit',      // Already left due to emergency
-      'flexible-time',       // Pre-approved flexible schedule
-      'medical-leave',       // Medical appointment
-      'official-duty'        // Official meeting/work
+      'annual',              // Annual leave (GL 1-3: 14 days, GL 4-6: 21 days, GL 7+: 30 days)
+      'maternity',           // Maternity leave (12 weeks)
+      'adoptive',            // Adoptive leave (16 weeks)
+      'examination',         // Examination leave (Open)
+      'takaba',              // Takaba leave (16 weeks)
+      'sabbatical',          // Sabbatical leave (12 months)
+      'study',               // Study leave (Open)
+      'religious',           // Religious leave (Open)
+      'casual',              // Casual leave (Open)
+      'absence',             // Leave of absence (Open)
+      'official-assignment'  // Official assignment - urgent, 24hr approval required
     ],
     index: true
   },
@@ -81,24 +75,11 @@ const leaveRequestSchema = new mongoose.Schema({
     required: true,
     maxlength: 500
   },
-  category: {
-    type: String,
-    enum: [
-      'medical',
-      'family-emergency',
-      'official-meeting',
-      'personal',
-      'traffic-delay',
-      'public-transport',
-      'technical-issue',
-      'other'
-    ],
-    required: true
-  },
-  urgency: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'emergency'],
-    default: 'medium'
+  
+  // Auto-approval rules for urgent leaves
+  requiresUrgentApproval: {
+    type: Boolean,
+    default: false  // True for official-assignment (must be approved within 24 hours)
   },
   
   // Approval Workflow
@@ -107,22 +88,12 @@ const leaveRequestSchema = new mongoose.Schema({
     enum: [
       'pending',           // Awaiting approval
       'approved',          // Approved by supervisor
-      'auto-approved',     // Auto-approved (emergency/flexible)
       'rejected',          // Rejected
-      'expired'            // Request expired
+      'cancelled',         // Cancelled by employee
+      'expired'            // Request expired (24hr rule for official-assignment)
     ],
     default: 'pending',
     index: true
-  },
-  
-  // Auto-approval rules
-  isEmergency: {
-    type: Boolean,
-    default: false
-  },
-  isRetroactive: {
-    type: Boolean,
-    default: false  // Request made after the fact
   },
   
   // Approval Details
@@ -144,90 +115,76 @@ const leaveRequestSchema = new mongoose.Schema({
   managerNotes: String,
   hrNotes: String,
   
-  // Integration with Attendance
-  attendanceImpact: {
-    affectsAttendance: { type: Boolean, default: true },
-    adjustmentType: {
-      type: String,
-      enum: ['excuse', 'deduction', 'neutral'],
-      default: 'excuse'
-    },
-    adjustedWorkHours: Number // How many hours to adjust
-  },
-  
-  // Notification Settings
-  notifications: {
-    employeeNotified: { type: Boolean, default: false },
-    managerNotified: { type: Boolean, default: false },
-    hrNotified: { type: Boolean, default: false }
+  // Leave Balance Tracking
+  balanceDeduction: {
+    type: Number,
+    default: 0  // Days deducted from leave balance
   }
 }, {
   timestamps: true
 });
 
 // Indexes for efficient queries
-leaveRequestSchema.index({ employee: 1, affectedDate: -1 });
-leaveRequestSchema.index({ facility: 1, status: 1, affectedDate: -1 });
-leaveRequestSchema.index({ type: 1, status: 1 });
-leaveRequestSchema.index({ affectedDate: 1, status: 1 });
+leaveRequestSchema.index({ employee: 1, startDate: -1 });
+leaveRequestSchema.index({ facility: 1, status: 1, startDate: -1 });
+leaveRequestSchema.index({ leaveType: 1, status: 1 });
+leaveRequestSchema.index({ startDate: 1, endDate: 1, status: 1 });
 
-// Virtual for calculating impact on attendance
-leaveRequestSchema.virtual('attendanceAdjustment').get(function() {
-  if (!this.attendanceImpact.affectsAttendance) return 0;
-  
-  const hours = this.duration / 60;
-  switch (this.attendanceImpact.adjustmentType) {
-    case 'excuse': return hours; // Full excuse - no deduction
-    case 'deduction': return -hours; // Deduct from work hours
-    case 'neutral': return 0; // No impact
-    default: return 0;
-  }
-});
-
-// Pre-save middleware to calculate duration and set auto-approval
+// Pre-save middleware to set flags and calculate duration
 leaveRequestSchema.pre('save', function(next) {
-  // Calculate duration if not set
-  if (this.startTime && this.endTime && !this.duration) {
-    this.duration = Math.abs(new Date(this.endTime) - new Date(this.startTime)) / (1000 * 60);
+  // Calculate duration in days if not set
+  if (this.startDate && this.endDate && !this.duration) {
+    const start = new Date(this.startDate);
+    const end = new Date(this.endDate);
+    const diffTime = Math.abs(end - start);
+    this.duration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
   }
   
-  // Auto-approve emergency requests
-  if (this.isEmergency || this.urgency === 'emergency') {
-    this.status = 'auto-approved';
-    this.approvedAt = new Date();
+  // Set urgent approval flag for official assignments
+  if (this.leaveType === 'official-assignment') {
+    this.requiresUrgentApproval = true;
   }
   
-  // Auto-approve retrospective emergency exits
-  if (this.type === 'emergency-exit' && this.isRetroactive) {
-    this.status = 'auto-approved';
-    this.approvedAt = new Date();
+  // Calculate balance deduction for leave types with limits
+  if (this.status === 'approved' && this.duration) {
+    const leaveTypesWithLimits = ['annual', 'maternity', 'adoptive', 'takaba', 'sabbatical'];
+    if (leaveTypesWithLimits.includes(this.leaveType)) {
+      this.balanceDeduction = this.duration;
+    }
   }
   
   next();
 });
 
-// Static method to check if employee has valid excuse for time period
-leaveRequestSchema.statics.hasValidExcuse = async function(employeeId, date, timeType = null) {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+// Static method to check if employee has approved leave for a date
+leaveRequestSchema.statics.hasApprovedLeave = async function(employeeId, date) {
+  const checkDate = new Date(date);
+  checkDate.setHours(0, 0, 0, 0);
   
   const query = {
-    employeeId: employeeId,
-    affectedDate: { $gte: startOfDay, $lte: endOfDay },
-    status: { $in: ['approved', 'auto-approved'] }
+    employee: employeeId,
+    startDate: { $lte: checkDate },
+    endDate: { $gte: checkDate },
+    status: 'approved'
   };
   
-  // Filter by time type if specified
-  if (timeType === 'late-arrival') {
-    query.type = { $in: ['late-arrival', 'partial-day', 'flexible-time'] };
-  } else if (timeType === 'early-departure') {
-    query.type = { $in: ['early-departure', 'partial-day', 'emergency-exit', 'flexible-time'] };
-  }
-  
   return await this.findOne(query);
+};
+
+// Static method to calculate leave balance for employee
+leaveRequestSchema.statics.calculateLeaveBalance = async function(employeeId, leaveType, year = new Date().getFullYear()) {
+  const startOfYear = new Date(year, 0, 1);
+  const endOfYear = new Date(year, 11, 31, 23, 59, 59);
+  
+  const approvedLeaves = await this.find({
+    employee: employeeId,
+    leaveType: leaveType,
+    status: 'approved',
+    startDate: { $gte: startOfYear, $lte: endOfYear }
+  });
+  
+  const totalUsed = approvedLeaves.reduce((sum, leave) => sum + (leave.duration || 0), 0);
+  return totalUsed;
 };
 
 module.exports = mongoose.model('LeaveRequest', leaveRequestSchema);

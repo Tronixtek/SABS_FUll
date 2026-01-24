@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
 
 // Import routes
@@ -21,6 +22,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const xo5Routes = require('./routes/xo5Routes');
 const integrationRoutes = require('./routes/integrationRoutes');
 const leaveRoutes = require('./routes/leave');
+const leavePolicyRoutes = require('./routes/leavePolicy');
 const payrollRoutes = require('./routes/payrollRoutes');
 const payrollSettingsRoutes = require('./routes/payrollSettingsRoutes');
 const salaryGradeRoutes = require('./routes/salaryGradeRoutes');
@@ -106,9 +108,13 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/xo5', xo5Routes);
 app.use('/api/integration', integrationRoutes);
 app.use('/api/leave', leaveRoutes);
+app.use('/api/leave-policy', leavePolicyRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll-settings', payrollSettingsRoutes);
 app.use('/api/salary-grades', salaryGradeRoutes);
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check
 app.get('/api/health', async (req, res) => {

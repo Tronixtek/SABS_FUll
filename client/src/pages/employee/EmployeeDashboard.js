@@ -22,6 +22,18 @@ const EmployeeDashboard = () => {
   const [showChangePinModal, setShowChangePinModal] = useState(employee?.pinMustChange || false);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loadingLeave, setLoadingLeave] = useState(true);
+  const [leaveBalance, setLeaveBalance] = useState({
+    annual: { total: 0, used: 0, remaining: 0 },
+    maternity: { total: 84, used: 0, remaining: 84 },
+    adoptive: { total: 112, used: 0, remaining: 112 },
+    takaba: { total: 112, used: 0, remaining: 112 },
+    sabbatical: { total: 365, used: 0, remaining: 365 }
+  });
+  
+  // Attendance State
+  const [todayAttendance, setTodayAttendance] = useState(null);
+  const [monthAttendance, setMonthAttendance] = useState({ present: 0, total: 0 });
+  const [loadingAttendance, setLoadingAttendance] = useState(true);
   
   // PIN Change State
   const [pinForm, setPinForm] = useState({
@@ -36,8 +48,129 @@ const EmployeeDashboard = () => {
   useEffect(() => {
     if (employee?.id) {
       fetchLeaveRequests();
+      calculateLeaveBalance();
+      fetchAttendanceData();
     }
   }, [employee]);
+
+  const fetchAttendanceData = async () => {
+    try {
+      setLoadingAttendance(true);
+      
+      // Fetch today's attendance
+      const today = new Date().toISOString().split('T')[0];
+      const todayResponse = await axios.get(
+        `${API_URL}/api/attendance/employee/${employee.employeeId}?date=${today}`
+      );
+      
+      if (todayResponse.data.success && todayResponse.data.data.attendance.length > 0) {
+        setTodayAttendance(todayResponse.data.data.attendance[0]);
+      }
+      
+      // Fetch this month's attendance count
+      const currentDate = new Date();
+      const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      
+      const monthResponse = await axios.get(
+        `${API_URL}/api/attendance/employee/${employee.employeeId}?startDate=${firstDay.toISOString().split('T')[0]}&endDate=${lastDay.toISOString().split('T')[0]}`
+      );
+      
+      if (monthResponse.data.success) {
+        const attendance = monthResponse.data.data.attendance || [];
+        const presentDays = attendance.filter(a => a.status === 'present' || a.status === 'on-leave').length;
+        const totalWorkingDays = new Date().getDate(); // Days elapsed in current month
+        setMonthAttendance({ present: presentDays, total: totalWorkingDays });
+      }
+    } catch (error) {
+      console.error('Failed to fetch attendance:', error);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  };
+
+  const calculateLeaveBalance = () => {
+    // Calculate annual leave based on grade level
+    let annualTotal = 14; // Default GL 1-3
+    if (employee?.gradeLevel) {
+      const gl = parseInt(employee.gradeLevel);
+      if (gl >= 1 && gl <= 3) annualTotal = 14;
+      else if (gl >= 4 && gl <= 6) annualTotal = 21;
+      else annualTotal = 30;
+    }
+
+    // Calculate used leave for current year
+    const currentYear = new Date().getFullYear();
+    const approvedLeaves = leaveRequests.filter(req => 
+      req.status === 'approved' && 
+      new Date(req.startDate).getFullYear() === currentYear
+    );
+
+    const usedLeave = {
+      annual: 0,
+      maternity: 0,
+      adoptive: 0,
+      takaba: 0,
+      sabbatical: 0
+    };
+
+    approvedLeaves.forEach(leave => {
+      const days = calculateLeaveDays(leave.startDate, leave.endDate);
+      switch(leave.leaveType) {
+        case 'annual':
+          usedLeave.annual += days;
+          break;
+        case 'maternity':
+          usedLeave.maternity += days;
+          break;
+        case 'adoptive':
+          usedLeave.adoptive += days;
+          break;
+        case 'takaba':
+          usedLeave.takaba += days;
+          break;
+        case 'sabbatical':
+          usedLeave.sabbatical += days;
+          break;
+      }
+    });
+
+    setLeaveBalance({
+      annual: { 
+        total: annualTotal, 
+        used: usedLeave.annual, 
+        remaining: Math.max(0, annualTotal - usedLeave.annual) 
+      },
+      maternity: { 
+        total: 84, 
+        used: usedLeave.maternity, 
+        remaining: Math.max(0, 84 - usedLeave.maternity) 
+      },
+      adoptive: { 
+        total: 112, 
+        used: usedLeave.adoptive, 
+        remaining: Math.max(0, 112 - usedLeave.adoptive) 
+      },
+      takaba: { 
+        total: 112, 
+        used: usedLeave.takaba, 
+        remaining: Math.max(0, 112 - usedLeave.takaba) 
+      },
+      sabbatical: { 
+        total: 365, 
+        used: usedLeave.sabbatical, 
+        remaining: Math.max(0, 365 - usedLeave.sabbatical) 
+      }
+    });
+  };
+
+  const calculateLeaveDays = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+    return diffDays;
+  };
 
   const fetchLeaveRequests = async () => {
     try {
@@ -52,6 +185,13 @@ const EmployeeDashboard = () => {
       setLoadingLeave(false);
     }
   };
+
+  // Recalculate leave balance when leave requests change
+  useEffect(() => {
+    if (employee?.id && leaveRequests.length >= 0) {
+      calculateLeaveBalance();
+    }
+  }, [leaveRequests, employee]);
 
   const handleLogout = () => {
     employeeLogout();
@@ -119,25 +259,42 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // Quick stats (placeholder data - will be connected to real APIs in next phase)
+  // Quick stats
+  const getTodayStatus = () => {
+    if (loadingAttendance) return { value: 'Loading...', color: 'text-gray-600', bgColor: 'bg-gray-100' };
+    if (!todayAttendance) return { value: 'Not Clocked In', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
+    if (todayAttendance.status === 'present') return { value: 'Present', color: 'text-green-600', bgColor: 'bg-green-100' };
+    if (todayAttendance.status === 'absent') return { value: 'Absent', color: 'text-red-600', bgColor: 'bg-red-100' };
+    if (todayAttendance.status === 'on-leave') return { value: 'On Leave', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+    if (todayAttendance.status === 'late') return { value: 'Late Arrival', color: 'text-orange-600', bgColor: 'bg-orange-100' };
+    return { value: todayAttendance.status, color: 'text-gray-600', bgColor: 'bg-gray-100' };
+  };
+  
+  const todayStatus = getTodayStatus();
+  
   const stats = [
     {
       name: 'Today\'s Attendance',
-      value: 'Not Clocked In',
+      value: todayStatus.value,
+      subtitle: todayAttendance?.checkIn ? `In: ${new Date(todayAttendance.checkIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '',
       icon: ClockIcon,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100'
+      color: todayStatus.color,
+      bgColor: todayStatus.bgColor,
+      onClick: () => navigate('/employee-app/attendance')
     },
     {
       name: 'This Month',
-      value: '20 Days',
+      value: loadingAttendance ? 'Loading...' : `${monthAttendance.present} Days`,
+      subtitle: loadingAttendance ? '' : `of ${monthAttendance.total} days`,
       icon: CalendarIcon,
       color: 'text-green-600',
-      bgColor: 'bg-green-100'
+      bgColor: 'bg-green-100',
+      onClick: () => navigate('/employee-app/attendance')
     },
     {
       name: 'Leave Balance',
-      value: '12 Days',
+      value: loadingLeave ? 'Loading...' : 'View Details',
+      subtitle: loadingLeave ? '' : `${leaveBalance.annual.used} days used`,
       icon: UserIcon,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100'
@@ -198,7 +355,8 @@ const EmployeeDashboard = () => {
           {stats.map((stat) => (
             <div
               key={stat.name}
-              className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
+              onClick={stat.onClick || (() => stat.name === 'Leave Balance' && navigate('/employee-app/leave-balance'))}
+              className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md hover:scale-105 transition-all"
             >
               <div className="p-5">
                 <div className="flex items-center">
@@ -213,8 +371,20 @@ const EmployeeDashboard = () => {
                       <dd className="text-lg font-semibold text-gray-900">
                         {stat.value}
                       </dd>
+                      {stat.subtitle && (
+                        <dd className="text-xs text-gray-500 mt-1">
+                          {stat.subtitle}
+                        </dd>
+                      )}
                     </dl>
                   </div>
+                  {stat.name === 'Leave Balance' && (
+                    <div className="ml-2">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

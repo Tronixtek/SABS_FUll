@@ -10,7 +10,8 @@
     "dev:full": "concurrently \"npm run dev\" \"npm run client\"",
     "install:all": "npm install && cd client && npm install",
     "build": "cd client && npm run build",
-    "seed:admin": "node server/seeds/createAdmin.js"
+    "seed:admin": "node server/seeds/createAdmin.js",
+    "seed:leave-policies": "node server/seed-leave-policies.js"
   },
   "keywords": [
     "attendance",
@@ -35,6 +36,7 @@
     "moment-timezone": "^0.5.43",
     "mongoose": "^7.5.0",
     "morgan": "^1.10.0",
+    "multer": "^2.0.2",
     "node-cron": "^3.0.2",
     "nodemailer": "^7.0.9",
     "pdfkit": "^0.17.2",
