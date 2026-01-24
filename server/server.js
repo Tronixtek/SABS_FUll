@@ -26,6 +26,7 @@ const leavePolicyRoutes = require('./routes/leavePolicy');
 const payrollRoutes = require('./routes/payrollRoutes');
 const payrollSettingsRoutes = require('./routes/payrollSettingsRoutes');
 const salaryGradeRoutes = require('./routes/salaryGradeRoutes');
+const staffIdPrefixRoutes = require('./routes/staffIdPrefix');
 
 // Models
 const Employee = require('./models/Employee');
@@ -112,6 +113,7 @@ app.use('/api/leave-policy', leavePolicyRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll-settings', payrollSettingsRoutes);
 app.use('/api/salary-grades', salaryGradeRoutes);
+app.use('/api/staff-id-prefix', staffIdPrefixRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

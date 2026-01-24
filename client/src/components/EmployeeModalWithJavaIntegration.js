@@ -66,6 +66,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     databaseSave: null,  // null, 'loading', 'success', 'error'
     message: ''
   });
+  const [availablePrefixes, setAvailablePrefixes] = useState([]);
+  const [selectedPrefixType, setSelectedPrefixType] = useState(''); // 'predefined' or 'other'
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -525,6 +527,32 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     };
     fetchSalaryGrades();
   }, []);
+
+  // Fetch staff ID prefixes
+  useEffect(() => {
+    const fetchPrefixes = async () => {
+      try {
+        const response = await axios.get('/api/staff-id-prefix');
+        if (response.data.success) {
+          setAvailablePrefixes(response.data.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch prefixes:', error);
+      }
+    };
+    fetchPrefixes();
+  }, []);
+
+  // Handle prefix type change
+  useEffect(() => {
+    if (selectedPrefixType && selectedPrefixType !== 'other') {
+      // When a predefined prefix is selected, clear the staffId to start fresh
+      setFormData(prev => ({ ...prev, staffId: selectedPrefixType }));
+    } else if (selectedPrefixType === 'other') {
+      // When "Other" is selected, clear staffId for manual entry
+      setFormData(prev => ({ ...prev, staffId: '' }));
+    }
+  }, [selectedPrefixType]);
 
   useEffect(() => {
     if (showCamera && stream && videoRef.current) {
@@ -1271,23 +1299,65 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                   <label className="block text-sm font-medium text-gray-700">
                     Staff ID / Card Number *
                   </label>
-                  <div className="mt-1 flex">
-                    <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md">
-                      KNLG
-                    </span>
+                  
+                  {/* Prefix Dropdown */}
+                  <select
+                    value={selectedPrefixType}
+                    onChange={(e) => setSelectedPrefixType(e.target.value)}
+                    required
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                  >
+                    <option value="">Select Prefix</option>
+                    {availablePrefixes.map((prefix) => (
+                      <option key={prefix._id} value={prefix.prefix}>
+                        {prefix.prefix} {prefix.description ? `- ${prefix.description}` : ''}
+                      </option>
+                    ))}
+                    <option value="other">Other (Enter Full ID)</option>
+                  </select>
+
+                  {/* Staff ID Input */}
+                  {selectedPrefixType && selectedPrefixType !== 'other' ? (
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 text-sm font-semibold text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md min-w-[100px] justify-center">
+                        {selectedPrefixType}
+                      </span>
+                      <input
+                        type="text"
+                        value={formData.staffId.replace(new RegExp(`^${selectedPrefixType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`), '')}
+                        onChange={(e) => {
+                          const value = e.target.value.trim();
+                          setFormData({ ...formData, staffId: `${selectedPrefixType}${value}` });
+                        }}
+                        required
+                        className="flex-1 block w-full border border-gray-300 rounded-r-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="001"
+                      />
+                    </div>
+                  ) : selectedPrefixType === 'other' ? (
                     <input
                       type="text"
-                      name="staffId"
-                      value={formData.staffId.replace(/^KNLG/, '')}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, ''); // Only allow numbers
-                        setFormData({ ...formData, staffId: `KNLG${value}` });
-                      }}
+                      value={formData.staffId}
+                      onChange={(e) => setFormData({ ...formData, staffId: e.target.value.trim() })}
                       required
-                      className="flex-1 block w-full border border-gray-300 rounded-r-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="001"
+                      className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter full staff ID (e.g., XYZ123)"
                     />
-                  </div>
+                  ) : (
+                    <input
+                      type="text"
+                      disabled
+                      className="block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 cursor-not-allowed"
+                      placeholder="Select a prefix first"
+                    />
+                  )}
+                  
+                  {selectedPrefixType && selectedPrefixType !== 'other' && (
+                    <p className="mt-1 text-xs text-gray-500">Enter the numeric/alphanumeric part - prefix is auto-added</p>
+                  )}
+                  {selectedPrefixType === 'other' && (
+                    <p className="mt-1 text-xs text-gray-500">Enter the complete staff ID in any format</p>
+                  )}
                 </div>
                 
                 <div>

@@ -13,6 +13,13 @@ const facilitySchema = new mongoose.Schema({
     uppercase: true,
     trim: true
   },
+  staffIdPrefix: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    // Staff ID prefix for employee card numbers (e.g., 'KNLG', 'KANO SG')
+    // If not set, defaults to the facility code
+  },
   address: {
     street: String,
     city: String,

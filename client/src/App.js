@@ -23,6 +23,7 @@ import LeaveManagement from './pages/LeaveManagement';
 import LeavePolicyManagement from './pages/LeavePolicyManagement';
 import PayrollManagement from './pages/PayrollManagement';
 import SalaryGrades from './pages/SalaryGrades';
+import StaffIdPrefixSettings from './pages/StaffIdPrefixSettings';
 
 // Employee Portal Pages
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';

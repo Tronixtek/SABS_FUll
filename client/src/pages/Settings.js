@@ -11,8 +11,10 @@ import {
   RefreshCw,
   Mail,
   Send,
-  DollarSign
+  DollarSign,
+  CreditCard
 } from 'lucide-react';
+import StaffIdPrefixSettings from './StaffIdPrefixSettings';
 
 const Settings = () => {
   const [loading, setLoading] = useState(true);
@@ -237,6 +239,7 @@ const Settings = () => {
     { id: 'general', label: 'General', icon: SettingsIcon },
     { id: 'attendance', label: 'Attendance', icon: Clock },
     { id: 'payroll', label: 'Payroll', icon: DollarSign },
+    { id: 'staff-prefix', label: 'Staff ID Prefix', icon: CreditCard },
     { id: 'notification', label: 'Notifications', icon: Bell },
     { id: 'reporting', label: 'Reporting', icon: FileText },
     { id: 'system', label: 'System', icon: Database }
@@ -478,6 +481,10 @@ const Settings = () => {
           )}
 
           {/* Payroll Settings */}
+          {activeTab === 'staff-prefix' && (
+            <StaffIdPrefixSettings />
+          )}
+
           {activeTab === 'payroll' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
