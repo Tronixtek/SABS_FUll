@@ -6,7 +6,20 @@ const morgan = require('morgan');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+// Ensure uploads directories exist
+const uploadsDir = path.join(__dirname, 'uploads');
+const leaveDocsDir = path.join(uploadsDir, 'leave-documents');
+const profilesDir = path.join(uploadsDir, 'profiles');
+
+[uploadsDir, leaveDocsDir, profilesDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`📁 Created directory: ${dir}`);
+  }
+});
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');

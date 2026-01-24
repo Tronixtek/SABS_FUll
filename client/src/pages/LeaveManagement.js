@@ -13,6 +13,8 @@ import {
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const LeaveManagement = () => {
   const { hasPermission, user } = useAuth();
   const [activeTab, setActiveTab] = useState('pending');
@@ -531,7 +533,7 @@ const LeaveManagement = () => {
                           {request.attachments.map((file, idx) => (
                             <a
                               key={idx}
-                              href={`http://localhost:5000${file.fileUrl}`}
+                              href={file.fileUrl.startsWith('data:') ? file.fileUrl : `${API_URL}${file.fileUrl}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center text-xs text-blue-600 hover:text-blue-800 hover:underline"
