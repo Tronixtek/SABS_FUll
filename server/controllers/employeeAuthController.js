@@ -218,7 +218,7 @@ exports.getMe = async (req, res) => {
         designation: employee.designation,
         shift: employee.shift,
         gender: employee.gender,
-        profilePhoto: employee.profilePhoto,
+        profileImage: employee.profileImage,
         pinMustChange: employee.pinMustChange,
         lastEmployeeLogin: employee.lastEmployeeLogin
       }

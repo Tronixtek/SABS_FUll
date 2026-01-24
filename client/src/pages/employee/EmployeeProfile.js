@@ -13,9 +13,17 @@ import {
   CalendarIcon
 } from '@heroicons/react/24/outline';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const EmployeeProfile = () => {
   const navigate = useNavigate();
   const { employee } = useEmployeeAuth();
+
+  // Debug: Log employee data
+  React.useEffect(() => {
+    console.log('Employee data:', employee);
+    console.log('Profile image:', employee?.profileImage);
+  }, [employee]);
 
   const profileSections = [
     {
@@ -89,8 +97,22 @@ const EmployeeProfile = () => {
         {/* Profile Header Card */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <div className="flex items-center space-x-4">
-            <div className="bg-blue-100 rounded-full p-4">
-              <UserIcon className="h-16 w-16 text-blue-600" />
+            <div className="relative">
+              {employee?.profileImage ? (
+                <img
+                  src={employee.profileImage.startsWith('data:') ? employee.profileImage : `${API_URL}${employee.profileImage}`}
+                  alt={`${employee?.firstName} ${employee?.lastName}`}
+                  className="h-24 w-24 rounded-full object-cover border-4 border-blue-100"
+                  onError={(e) => {
+                    console.error('Image failed to load:', e.target.src);
+                    e.target.style.display = 'none';
+                    e.target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <div className={`bg-blue-100 rounded-full p-4 ${employee?.profileImage ? 'hidden' : ''}`}>
+                <UserIcon className="h-16 w-16 text-blue-600" />
+              </div>
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
