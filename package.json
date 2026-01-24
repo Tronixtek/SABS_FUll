@@ -12,7 +12,8 @@
     "build": "cd client && npm run build",
     "seed:admin": "node server/seeds/createAdmin.js",
     "seed:leave-policies": "node server/seed-leave-policies.js",
-    "seed:employees-week": "node server/seed-employees-week-attendance.js"
+    "seed:employees-week": "node server/seed-employees-week-attendance.js",
+    "seed:admins": "node server/seed-admins.js"
   },
   "keywords": [
     "attendance",
