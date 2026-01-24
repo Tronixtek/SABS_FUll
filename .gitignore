@@ -38,3 +38,9 @@ coverage/
 .cache/
 temp/
 tmp/
+
+# Uploads - ignore files but keep directory structure
+server/uploads/**/*
+!server/uploads/.gitkeep
+!server/uploads/leave-documents/.gitkeep
+!server/uploads/profiles/.gitkeep
