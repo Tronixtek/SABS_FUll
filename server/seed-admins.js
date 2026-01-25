@@ -32,6 +32,20 @@ const admins = [
     email: 'zeesani35@gmail.com',
     username: 'zainab',
     password: 'Admin@123'
+  },
+  {
+    firstName: 'Adamu',
+    lastName: 'Jigaware',
+    email: 'adfate4@gmail.com',
+    username: 'adamu',
+    password: 'Admin@123'
+  },
+  {
+    firstName: 'Masud',
+    lastName: 'Abbas',
+    email: 'mr.masoudstat@gmail.com',
+    username: 'masud',
+    password: 'Admin@123'
   }
 ];
 
