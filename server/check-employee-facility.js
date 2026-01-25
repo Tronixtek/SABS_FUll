@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const Employee = require('./models/Employee');
+const Facility = require('./models/Facility');
+const Shift = require('./models/Shift');
 
 const checkEmployee = async () => {
   try {
