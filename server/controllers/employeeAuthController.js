@@ -199,8 +199,8 @@ exports.changePin = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const employee = await Employee.findById(req.employee.id)
-      .populate('facility', 'facilityName facilityCode timezone')
-      .populate('shift', 'shiftName startTime endTime');
+      .populate('facility', 'name code timezone')
+      .populate('shift', 'name code startTime endTime');
 
     res.status(200).json({
       success: true,

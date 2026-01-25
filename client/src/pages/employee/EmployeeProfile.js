@@ -40,10 +40,10 @@ const EmployeeProfile = () => {
     {
       title: 'Work Information',
       fields: [
-        { label: 'Facility', value: employee?.facility?.facilityName || 'Not assigned', icon: BuildingOfficeIcon },
+        { label: 'Facility', value: employee?.facility?.name || 'Not assigned', icon: BuildingOfficeIcon },
         { label: 'Department', value: employee?.department || 'Not assigned', icon: BriefcaseIcon },
         { label: 'Designation', value: employee?.designation || 'Not assigned', icon: BriefcaseIcon },
-        { label: 'Shift', value: employee?.shift?.shiftName || 'Not assigned', icon: ClockIcon },
+        { label: 'Shift', value: employee?.shift?.name || 'Not assigned', icon: ClockIcon },
         { 
           label: 'Shift Hours', 
           value: employee?.shift?.startTime && employee?.shift?.endTime 
