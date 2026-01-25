@@ -646,45 +646,39 @@ exports.generatePDFReport = async (req, res) => {
     
     // Validate report data was generated
     if (!reportData || !reportData.statistics) {
+      console.error('❌ No report data generated');
       return res.status(500).json({
         success: false,
         message: 'Failed to generate report data'
       });
     }
     
-    // Create PDF document
-    const doc = new PDFDocument({ margin: 50 });
+    console.log('📄 Creating PDF document...');
+    console.log('Report type:', type);
+    console.log('Records count:', reportData.records?.length || 0);
     
-    // Handle PDF stream errors
-    let pdfError = false;
-    doc.on('error', (err) => {
-      console.error('PDF document error:', err);
-      pdfError = true;
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          message: 'PDF generation failed',
-          error: err.message
-        });
-      }
+    // Create PDF document
+    const doc = new PDFDocument({ 
+      margin: 50,
+      size: 'A4',
+      bufferPages: true
     });
     
-    res.on('error', (err) => {
-      console.error('Response stream error:', err);
-      pdfError = true;
+    // Handle errors
+    doc.on('error', (err) => {
+      console.error('❌ PDF document error:', err);
     });
     
     // Set response headers for PDF
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="report_${type}_${moment().format('YYYY-MM-DD')}.pdf"`);
     
+    console.log('📤 Piping PDF to response...');
+    
     // Pipe the PDF to response
     doc.pipe(res);
     
-    // Stop processing if there was an error
-    if (pdfError) {
-      return;
-    }
+    console.log('✏️ Writing PDF content...');
     
     // Add header
     doc.fontSize(20).text('SABS Attendance System', 50, 50);

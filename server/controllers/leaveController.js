@@ -2,6 +2,107 @@ const LeaveRequest = require('../models/LeaveRequest');
 const LeavePolicy = require('../models/LeavePolicy');
 const Employee = require('../models/Employee');
 const Facility = require('../models/Facility');
+const Attendance = require('../models/Attendance');
+const Shift = require('../models/Shift');
+const moment = require('moment-timezone');
+
+// Helper function to create attendance records for approved leave
+const createAttendanceRecordsForLeave = async (leaveRequest) => {
+  try {
+    console.log('[CREATE ATTENDANCE] Creating attendance records for leave:', leaveRequest._id);
+    
+    // Get employee details
+    const employee = await Employee.findById(leaveRequest.employee).populate('shift facility');
+    if (!employee) {
+      console.error('[CREATE ATTENDANCE] Employee not found');
+      return;
+    }
+
+    // Get facility timezone
+    const timezone = employee.facility?.timezone || 'Africa/Lagos';
+    
+    // Determine the date range for the leave
+    let startDate, endDate;
+    
+    if (leaveRequest.startDate && leaveRequest.endDate) {
+      // Multi-day leave
+      startDate = moment(leaveRequest.startDate).tz(timezone).startOf('day');
+      endDate = moment(leaveRequest.endDate).tz(timezone).endOf('day');
+    } else if (leaveRequest.date || leaveRequest.affectedDate) {
+      // Single day leave
+      const leaveDate = leaveRequest.date || leaveRequest.affectedDate;
+      startDate = moment(leaveDate).tz(timezone).startOf('day');
+      endDate = moment(leaveDate).tz(timezone).endOf('day');
+    } else {
+      console.error('[CREATE ATTENDANCE] No date information in leave request');
+      return;
+    }
+
+    console.log(`[CREATE ATTENDANCE] Date range: ${startDate.format('YYYY-MM-DD')} to ${endDate.format('YYYY-MM-DD')}`);
+
+    // Loop through each day in the leave period
+    let currentDate = startDate.clone();
+    let recordsCreated = 0;
+    
+    while (currentDate.isSameOrBefore(endDate, 'day')) {
+      const dateStr = currentDate.format('YYYY-MM-DD');
+      const dayStart = currentDate.clone().startOf('day').toDate();
+      const dayEnd = currentDate.clone().endOf('day').toDate();
+      
+      // Check if attendance record already exists for this date
+      const existing = await Attendance.findOne({
+        employeeId: employee.employeeId,
+        date: { $gte: dayStart, $lte: dayEnd }
+      });
+
+      if (!existing) {
+        // Create attendance record with 'on-leave' status
+        const attendanceData = {
+          employee: employee._id,
+          employeeId: employee.employeeId,
+          facility: employee.facility._id,
+          date: currentDate.toDate(),
+          type: 'check-in',
+          timestamp: currentDate.toDate(),
+          shift: employee.shift._id,
+          scheduledCheckIn: currentDate.clone().set({
+            hour: parseInt(employee.shift.startTime.split(':')[0]),
+            minute: parseInt(employee.shift.startTime.split(':')[1])
+          }).toDate(),
+          scheduledCheckOut: currentDate.clone().set({
+            hour: parseInt(employee.shift.endTime.split(':')[0]),
+            minute: parseInt(employee.shift.endTime.split(':')[1])
+          }).toDate(),
+          status: 'on-leave',
+          leaveRequest: leaveRequest._id,
+          source: 'MANUAL',
+          verified: true,
+          workHours: 0,
+          overtime: 0,
+          undertime: 0,
+          lateArrival: 0,
+          earlyDeparture: 0
+        };
+
+        await Attendance.create(attendanceData);
+        recordsCreated++;
+        console.log(`[CREATE ATTENDANCE] Created record for ${dateStr}`);
+      } else {
+        // Update existing record to on-leave status
+        existing.status = 'on-leave';
+        existing.leaveRequest = leaveRequest._id;
+        await existing.save();
+        console.log(`[CREATE ATTENDANCE] Updated existing record for ${dateStr} to on-leave`);
+      }
+
+      currentDate.add(1, 'day');
+    }
+
+    console.log(`[CREATE ATTENDANCE] Created/updated ${recordsCreated} attendance records`);
+  } catch (error) {
+    console.error('[CREATE ATTENDANCE] Error creating attendance records:', error);
+  }
+};
 
 // Submit Leave/Excuse Request
 const submitLeaveRequest = async (req, res) => {
@@ -350,6 +451,9 @@ const processLeaveRequest = async (req, res) => {
       leaveRequest.approvedBy = approvedBy || req.user?.id; // Use provided ID or fallback to current user
       leaveRequest.approvedAt = new Date();
       console.log('[LEAVE PROCESS] Approving with user:', leaveRequest.approvedBy);
+      
+      // Create attendance records for the leave period
+      await createAttendanceRecordsForLeave(leaveRequest);
     } else if (action === 'reject') {
       leaveRequest.status = 'rejected';
       leaveRequest.rejectionReason = managerNotes;

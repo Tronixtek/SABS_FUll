@@ -371,10 +371,21 @@ exports.getDashboardAnalytics = async (req, res) => {
       
       const dayAggregated = aggregateAttendanceRecords(dayAttendance);
       
+      // Get total active employees for this day to calculate absent count
+      const employeesWithRecords = new Set(dayAggregated.map(a => a.employee.employeeId));
+      const allEmployees = await Employee.find({
+        ...facilityFilter,
+        status: 'active',
+        isDeleted: false
+      }).select('employeeId');
+      
+      // Calculate absent count: employees without records
+      const absentCount = allEmployees.length - employeesWithRecords.size;
+      
       // Format for Dashboard charts: {_id: {date, status}, count}
       const presentCount = dayAggregated.filter(a => a.status === 'present').length;
       const lateCount = dayAggregated.filter(a => a.status === 'late').length;
-      const absentCount = dayAggregated.filter(a => a.status === 'absent').length;
+      const onLeaveCount = dayAggregated.filter(a => a.status === 'on-leave').length;
       
       if (presentCount > 0) {
         attendanceTrend.push({ _id: { date, status: 'present' }, count: presentCount });
@@ -384,6 +395,9 @@ exports.getDashboardAnalytics = async (req, res) => {
       }
       if (absentCount > 0) {
         attendanceTrend.push({ _id: { date, status: 'absent' }, count: absentCount });
+      }
+      if (onLeaveCount > 0) {
+        attendanceTrend.push({ _id: { date, status: 'on-leave' }, count: onLeaveCount });
       }
     }
     
