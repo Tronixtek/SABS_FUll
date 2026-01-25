@@ -49,17 +49,13 @@ const seedAdmins = async () => {
         continue;
       }
 
-      // Hash password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(admin.password, salt);
-
-      // Create admin user
+      // Create admin user (password will be hashed by the User model's pre-save hook)
       const user = new User({
         firstName: admin.firstName,
         lastName: admin.lastName,
         email: admin.email,
         username: admin.username,
-        password: hashedPassword,
+        password: admin.password, // Don't hash here - let the model do it
         role: 'admin',
         permissions: [
           'view_attendance',
