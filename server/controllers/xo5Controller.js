@@ -313,26 +313,24 @@ async function processXO5Attendance(xo5Record, deviceId) {
       console.log('Minutes Difference:', actualCheckIn.diff(scheduledCheckIn, 'minutes'));
       console.log('===========================\n');
       
-      if (actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes'))) {
+      // Check if employee has approved leave for this date (check regardless of late/on-time)
+      const leave = await LeaveRequest.hasApprovedLeave(employee._id, attendanceDate);
+      
+      if (leave) {
+        // Employee has approved leave - mark as on-leave regardless of time
+        attendance.status = 'on-leave';
+        attendance.lateArrival = 0;
+        attendance.leaveRequest = leave._id;
+        
+        console.log(`📅 Employee on approved leave: ${employee.firstName} ${employee.lastName} - ${leave.leaveType}`);
+        attendanceLogger.info(`Employee on leave: ${employee.firstName} ${employee.lastName}: ${leave.leaveType}`);
+      } else if (actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes'))) {
+        // No leave - check if late
         const lateMinutes = actualCheckIn.diff(scheduledCheckIn, 'minutes');
+        attendance.lateArrival = lateMinutes;
+        attendance.status = 'late';
         
-        // Check if employee has approved leave for this date
-        const leave = await LeaveRequest.hasApprovedLeave(employee._id, attendanceDate);
-        
-        if (leave) {
-          // Employee has approved leave, should not be marked late
-          attendance.status = 'on-leave';
-          attendance.lateArrival = 0;
-          attendance.leaveRequest = leave._id;
-          
-          console.log(`📅 Employee on approved leave: ${employee.firstName} ${employee.lastName} - ${leave.leaveType}`);
-          attendanceLogger.info(`Employee on leave: ${employee.firstName} ${employee.lastName}: ${leave.leaveType}`);
-        } else {
-          attendance.lateArrival = lateMinutes;
-          attendance.status = 'late';
-          
-          console.log(`⏰ Late arrival: ${employee.firstName} ${employee.lastName} - ${attendance.lateArrival} minutes late`);
-        }
+        console.log(`⏰ Late arrival: ${employee.firstName} ${employee.lastName} - ${attendance.lateArrival} minutes late`);
       } else {
         console.log(`✅ On-time arrival: ${employee.firstName} ${employee.lastName}`);
       }
@@ -367,31 +365,69 @@ async function processXO5Attendance(xo5Record, deviceId) {
           // Employee has approved leave but still checked in/out
           if (approvedLeave.leaveType === 'half-day') {
             attendance.status = 'half-day';
-            todayCheckIn.status = 'half-day';
-            await todayCheckIn.save();
+            // Preserve 'late' and 'on-leave' status from check-in
+            if (todayCheckIn.status !== 'late' && todayCheckIn.status !== 'on-leave') {
+              todayCheckIn.status = 'half-day';
+              await todayCheckIn.save();
+            }
           } else {
             attendance.status = 'on-leave';
-            todayCheckIn.status = 'on-leave';
-            await todayCheckIn.save();
+            // If check-in was already on-leave, keep it. If it was late, employee was late but has leave (on-leave takes priority)
+            if (todayCheckIn.status !== 'on-leave') {
+              todayCheckIn.status = 'on-leave';
+              await todayCheckIn.save();
+            }
           }
         } else if (workMinutes >= halfDayThreshold && workMinutes < expectedMinutes - 30) {
           // Worked between 4-7.5 hours (for 8-hour shift) = half-day
           attendance.status = 'half-day';
-          todayCheckIn.status = 'half-day';
-          await todayCheckIn.save();
+          // Preserve 'late' and 'on-leave' status from check-in
+          if (todayCheckIn.status !== 'late' && todayCheckIn.status !== 'on-leave') {
+            todayCheckIn.status = 'half-day';
+            await todayCheckIn.save();
+          }
           attendance.undertimeMinutes = expectedMinutes - workMinutes;
         } else if (workMinutes < halfDayThreshold) {
           // Worked less than half day
           attendance.status = 'half-day';
-          todayCheckIn.status = 'half-day';
-          await todayCheckIn.save();
+          // Preserve 'late' and 'on-leave' status from check-in
+          if (todayCheckIn.status !== 'late' && todayCheckIn.status !== 'on-leave') {
+            todayCheckIn.status = 'half-day';
+            await todayCheckIn.save();
+          }
           attendance.undertimeMinutes = expectedMinutes - workMinutes;
         } else if (workMinutes > expectedMinutes + 30) {
           // Overtime (30 min grace)
           attendance.overtimeMinutes = workMinutes - expectedMinutes;
+          // Don't modify check-in status - preserve 'late' or 'on-leave' if set
         } else if (workMinutes < expectedMinutes - 30) {
           // Undertime (30 min grace)
           attendance.undertimeMinutes = expectedMinutes - workMinutes;
+          // Don't modify check-in status - preserve 'late' or 'on-leave' if set
+        }
+      } else {
+        // No check-in found - employee is only checking out
+        // This happens when: 1) Employee on official assignment/examination returns to check out
+        //                    2) Employee forgot to check in but remembers to check out
+        //                    3) Time-based leave where only checkout is required
+        
+        // Check if employee has approved leave for today
+        const approvedLeave = await LeaveRequest.findOne({
+          employeeId: employee.employeeId,
+          status: 'approved',
+          startDate: { $lte: attendanceDate },
+          endDate: { $gte: attendanceDate }
+        });
+        
+        if (approvedLeave) {
+          // Employee has approved leave and is checking out (e.g., returning from official assignment)
+          attendance.status = 'on-leave';
+          attendance.leaveRequest = approvedLeave._id;
+          console.log(`📅 Check-out with approved leave (no check-in): ${employee.firstName} ${employee.lastName} - ${approvedLeave.leaveType}`);
+        } else {
+          // No check-in and no leave - mark as incomplete/half-day
+          attendance.status = 'half-day';
+          console.log(`⚠️ Check-out without check-in: ${employee.firstName} ${employee.lastName}`);
         }
       }
       
