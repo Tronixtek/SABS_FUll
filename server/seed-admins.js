@@ -53,6 +53,13 @@ const admins = [
     email: 'Aliyukabo2000@gmail.com',
     username: 'ali',
     password: 'Admin@123'
+  },
+  {
+    firstName: 'Aliyu',
+    lastName: 'Ismail',
+    email: 'aliyuismail616@gmail.com',
+    username: 'aliyu',
+    password: 'Admin@123'
   }
 ];
 
