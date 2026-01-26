@@ -136,7 +136,7 @@ async function seedAttendanceForExisting() {
           scheduledCheckOut: scheduledCheckOut,
           status: status,
           lateArrival: lateArrival,
-          source: 'SEED_SCRIPT',
+          source: 'MANUAL',
           verified: true
         });
         
@@ -152,7 +152,7 @@ async function seedAttendanceForExisting() {
           scheduledCheckIn: scheduledCheckIn,
           scheduledCheckOut: scheduledCheckOut,
           status: 'present',
-          source: 'SEED_SCRIPT',
+          source: 'MANUAL',
           verified: true
         });
       }
@@ -161,8 +161,8 @@ async function seedAttendanceForExisting() {
     console.log(`\n📊 Generated ${attendanceRecords.length} attendance records`);
     console.log('💾 Saving to database...');
     
-    // Clear existing attendance (optional - comment out if you want to keep existing data)
-    // await Attendance.deleteMany({ source: 'SEED_SCRIPT' });
+    // Clear existing seeded attendance (optional - comment out if you want to keep existing data)
+    // await Attendance.deleteMany({ source: 'MANUAL' });
     
     // Insert all records
     await Attendance.insertMany(attendanceRecords);
