@@ -198,19 +198,73 @@ exports.getDashboardAnalytics = async (req, res) => {
     
     console.log('📊 Month aggregated records:', monthAggregated.length);
     
+    // Generate absent records for employees who didn't check in during the month
+    // Get all active employees
+    const allActiveEmployees = await Employee.find({
+      ...facilityFilter,
+      status: 'active'
+    }).populate('facility', 'name code');
+    
+    // Create a set of employee-date combinations that have attendance
+    const attendedSet = new Set();
+    monthAggregated.forEach(att => {
+      if (att.employee && att.date) {
+        const key = `${att.employee._id.toString()}-${att.date}`;
+        attendedSet.add(key);
+      }
+    });
+    
+    // Generate dates array for the month
+    const datesInRange = [];
+    for (let d = moment(start); d <= moment(end); d.add(1, 'days')) {
+      datesInRange.push(d.format('YYYY-MM-DD'));
+    }
+    
+    // Generate absent records
+    const absentRecords = [];
+    for (const emp of allActiveEmployees) {
+      for (const date of datesInRange) {
+        const key = `${emp._id.toString()}-${date}`;
+        if (!attendedSet.has(key)) {
+          absentRecords.push({
+            employee: {
+              _id: emp._id,
+              employeeId: emp.employeeId,
+              firstName: emp.firstName,
+              lastName: emp.lastName
+            },
+            facility: emp.facility,
+            date: date,
+            status: 'absent',
+            checkIn: { time: null },
+            checkOut: { time: null },
+            workHours: 0,
+            overtime: 0,
+            undertime: 0,
+            lateArrival: 0
+          });
+        }
+      }
+    }
+    
+    // Add absent records to monthAggregated
+    const monthAggregatedWithAbsent = [...monthAggregated, ...absentRecords];
+    
+    console.log(`📊 Month aggregated with absent: ${monthAggregatedWithAbsent.length} (${monthAggregated.length} attended + ${absentRecords.length} absent)`);
+    
     // Calculate month statistics
     const monthStats = {
-      presentDays: monthAggregated.filter(a => ['present', 'late'].includes(a.status)).length,
-      lateDays: monthAggregated.filter(a => a.status === 'late').length,
-      absentDays: monthAggregated.filter(a => a.status === 'absent').length,
-      totalWorkHours: Math.round(monthAggregated.reduce((sum, a) => sum + (a.workHours || 0), 0) * 100) / 100,
-      totalOvertime: Math.round(monthAggregated.reduce((sum, a) => sum + (a.overtime || 0), 0) * 100) / 100
+      presentDays: monthAggregatedWithAbsent.filter(a => ['present', 'late'].includes(a.status)).length,
+      lateDays: monthAggregatedWithAbsent.filter(a => a.status === 'late').length,
+      absentDays: monthAggregatedWithAbsent.filter(a => a.status === 'absent').length,
+      totalWorkHours: Math.round(monthAggregatedWithAbsent.reduce((sum, a) => sum + (a.workHours || 0), 0) * 100) / 100,
+      totalOvertime: Math.round(monthAggregatedWithAbsent.reduce((sum, a) => sum + (a.overtime || 0), 0) * 100) / 100
     };
     
     console.log('📈 Month stats:', monthStats);
     
     // Top performers (employees with highest attendance rate)
-    const topPerformers = monthAggregated.reduce((acc, record) => {
+    const topPerformers = monthAggregatedWithAbsent.reduce((acc, record) => {
       const empId = record.employee._id.toString();
       if (!acc[empId]) {
         acc[empId] = {
@@ -251,7 +305,7 @@ exports.getDashboardAnalytics = async (req, res) => {
     console.log('🏆 Top performers:', topPerformersList.length);
     
     // Frequent late arrivals
-    const frequentLateArrivals = monthAggregated
+    const frequentLateArrivals = monthAggregatedWithAbsent
       .filter(record => record.status === 'late')
       .reduce((acc, record) => {
         const empId = record.employee._id.toString();
@@ -278,7 +332,7 @@ exports.getDashboardAnalytics = async (req, res) => {
     console.log('⏰ Frequent late arrivals:', frequentLateArrivalsList.length);
     
     // Facility-grouped late arrivals
-    const facilityGroupedLateArrivals = monthAggregated
+    const facilityGroupedLateArrivals = monthAggregatedWithAbsent
       .filter(record => record.status === 'late' && record.facility)
       .reduce((acc, record) => {
         const facId = record.facility._id.toString();
@@ -322,7 +376,7 @@ exports.getDashboardAnalytics = async (req, res) => {
     console.log('🏢 Facility-grouped late arrivals:', facilityGroupedLateArrivalsList.length);
     
     // Facility-wise performance
-    const facilityWise = monthAggregated.reduce((acc, record) => {
+    const facilityWise = monthAggregatedWithAbsent.reduce((acc, record) => {
       if (!record.facility) return acc;
       
       const facId = record.facility._id.toString();
