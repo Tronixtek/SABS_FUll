@@ -350,7 +350,9 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     
     // Employee gets unique person ID within the device (not device ID)
     // XO5 device has max 32 character limit for person IDs
-    let personId = employeeId;
+    // Add random alphanumeric suffix to prevent race condition duplicates (XO5 doesn't accept underscore)
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase(); // 6 random alphanumeric chars
+    let personId = `${employeeId}${randomSuffix}`;
     
     // Validate person ID length for XO5 device compatibility
     if (personId.length > 32) {
@@ -360,6 +362,7 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     
     console.log(`📱 Facility Device ID: ${facilityDeviceId}`);
     console.log(`👤 Employee Person ID: ${personId} (${personId.length} chars)`);
+    console.log(`   Random suffix: ${randomSuffix} (prevents concurrent enrollment conflicts)`);
 
     // ✅ STEP 3: ENROLL TO BIOMETRIC DEVICE FIRST (NO DATABASE SAVE YET)
     console.log(`🔄 Starting biometric device enrollment...`);
