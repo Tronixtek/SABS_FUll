@@ -4,6 +4,8 @@ require('dotenv').config();
 
 const Employee = require('./server/models/Employee');
 const Attendance = require('./server/models/Attendance');
+const Facility = require('./server/models/Facility');
+const Shift = require('./server/models/Shift');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/attendance-system', {
