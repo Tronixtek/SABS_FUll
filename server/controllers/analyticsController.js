@@ -199,8 +199,8 @@ exports.getDashboardAnalytics = async (req, res) => {
     console.log('📊 Month aggregated records:', monthAggregated.length);
     
     // Generate absent records for employees who didn't check in during the month
-    // Get all active employees
-    const allActiveEmployees = await Employee.find({
+    // Reuse allActiveEmployees but populate facility
+    const allEmployeesWithFacility = await Employee.find({
       ...facilityFilter,
       status: 'active'
     }).populate('facility', 'name code');
@@ -222,7 +222,7 @@ exports.getDashboardAnalytics = async (req, res) => {
     
     // Generate absent records
     const absentRecords = [];
-    for (const emp of allActiveEmployees) {
+    for (const emp of allEmployeesWithFacility) {
       for (const date of datesInRange) {
         const key = `${emp._id.toString()}-${date}`;
         if (!attendedSet.has(key)) {
