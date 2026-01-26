@@ -161,13 +161,38 @@ async function seedAttendanceForExisting() {
     console.log(`\n📊 Generated ${attendanceRecords.length} attendance records`);
     console.log('💾 Saving to database...');
     
-    // Clear existing seeded attendance (optional - comment out if you want to keep existing data)
-    // await Attendance.deleteMany({ source: 'MANUAL' });
+    // Check for existing attendance and skip duplicates
+    let inserted = 0;
+    let skipped = 0;
     
-    // Insert all records
-    await Attendance.insertMany(attendanceRecords);
+    for (const record of attendanceRecords) {
+      try {
+        // Check if record already exists
+        const existing = await Attendance.findOne({
+          employee: record.employee,
+          date: record.date,
+          type: record.type
+        });
+        
+        if (existing) {
+          skipped++;
+        } else {
+          await Attendance.create(record);
+          inserted++;
+        }
+      } catch (error) {
+        if (error.code === 11000) {
+          // Duplicate key - skip
+          skipped++;
+        } else {
+          throw error;
+        }
+      }
+    }
     
-    console.log('✅ Attendance records seeded successfully!');
+    console.log(`✅ Attendance records seeded successfully!`);
+    console.log(`   Inserted: ${inserted}`);
+    console.log(`   Skipped (already exist): ${skipped}`);
     console.log('\n📈 Summary:');
     console.log(`   Employees: ${employees.length}`);
     console.log(`   Days: ${DAYS_TO_GENERATE}`);
