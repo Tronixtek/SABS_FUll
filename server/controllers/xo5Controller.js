@@ -260,6 +260,66 @@ async function processXO5Attendance(xo5Record, deviceId) {
       .second(0)
       .toDate();
     
+    // Determine initial status based on check-in/check-out type
+    let initialStatus = 'present';
+    let lateArrivalMinutes = 0;
+    let leaveRequestId = null;
+    
+    // For check-in, determine status BEFORE creating the record
+    if (isCheckIn) {
+      // Get the facility timezone (default to UTC if not set)
+      const facilityTimezone = employee.facility?.timezone || 'UTC';
+      
+      // Calculate scheduled time for late arrival check IN THE FACILITY'S TIMEZONE
+      const [startHour, startMinute] = employee.shift.startTime.split(':');
+      const scheduledCheckInTime = moment.tz(attendanceDate, facilityTimezone)
+        .hour(parseInt(startHour))
+        .minute(parseInt(startMinute))
+        .second(0);
+        
+      const actualCheckIn = moment.tz(attendanceTime, facilityTimezone);
+      const graceMinutes = employee.shift.graceTime?.checkIn || 15;
+      
+      // DEBUG: Log all time calculations
+      console.log('\n=== LATE DETECTION DEBUG ===');
+      console.log('Facility Timezone:', facilityTimezone);
+      console.log('Employee:', employee.firstName, employee.lastName);
+      console.log('Shift Start Time:', employee.shift.startTime);
+      console.log('Scheduled Check-in:', scheduledCheckInTime.format('YYYY-MM-DD HH:mm:ss Z'));
+      console.log('Actual Check-in:', actualCheckIn.format('YYYY-MM-DD HH:mm:ss Z'));
+      console.log('Grace Minutes:', graceMinutes);
+      console.log('Grace Period Ends:', scheduledCheckInTime.clone().add(graceMinutes, 'minutes').format('YYYY-MM-DD HH:mm:ss Z'));
+      console.log('Is After Grace?:', actualCheckIn.isAfter(scheduledCheckInTime.clone().add(graceMinutes, 'minutes')));
+      console.log('Minutes Difference:', actualCheckIn.diff(scheduledCheckInTime, 'minutes'));
+      console.log('===========================\n');
+      
+      // Check if employee has approved leave for this date (check regardless of late/on-time)
+      const leave = await LeaveRequest.hasApprovedLeave(employee._id, attendanceDate);
+      
+      if (leave) {
+        // Employee has approved leave - mark as on-leave regardless of time
+        initialStatus = 'on-leave';
+        lateArrivalMinutes = 0;
+        leaveRequestId = leave._id;
+        
+        console.log(`📅 Employee on approved leave: ${employee.firstName} ${employee.lastName} - ${leave.leaveType}`);
+        attendanceLogger.info(`Employee on leave: ${employee.firstName} ${employee.lastName}: ${leave.leaveType}`);
+      } else if (actualCheckIn.isAfter(scheduledCheckInTime.clone().add(graceMinutes, 'minutes'))) {
+        // No leave - employee is late
+        lateArrivalMinutes = actualCheckIn.diff(scheduledCheckInTime, 'minutes');
+        initialStatus = 'late';
+        
+        console.log(`⏰ Late arrival: ${employee.firstName} ${employee.lastName} - ${lateArrivalMinutes} minutes late`);
+      } else {
+        // Employee is on time - this is the only time they get 'present' status
+        initialStatus = 'present';
+        console.log(`✅ On-time arrival: ${employee.firstName} ${employee.lastName}`);
+      }
+      
+      attendanceLogger.info(`✅ Check-in: ${employee.firstName} ${employee.lastName} at ${moment(attendanceTime).format('HH:mm:ss')} - Status: ${initialStatus}`);
+    }
+    
+    // Create attendance record with the correct status
     const attendance = new Attendance({
       employee: employee._id,
       employeeId: employee.employeeId, // Required field
@@ -270,7 +330,9 @@ async function processXO5Attendance(xo5Record, deviceId) {
       shift: employee.shift._id,
       scheduledCheckIn: scheduledCheckIn, // Required field
       scheduledCheckOut: scheduledCheckOut, // Required field
-      status: 'present',
+      status: initialStatus, // Set correct status from the start
+      lateArrival: lateArrivalMinutes,
+      leaveRequest: leaveRequestId,
       source: 'XO5_DEVICE',
       deviceIP: xo5Record.deviceKey,
       verified: true,
@@ -285,59 +347,8 @@ async function processXO5Attendance(xo5Record, deviceId) {
       }
     });
     
-    // Add specific details based on check-in or check-out
-    if (isCheckIn) {
-      // Get the facility timezone (default to UTC if not set)
-      const facilityTimezone = employee.facility?.timezone || 'UTC';
-      
-      // Calculate scheduled time for late arrival check IN THE FACILITY'S TIMEZONE
-      const [startHour, startMinute] = employee.shift.startTime.split(':');
-      const scheduledCheckIn = moment.tz(attendanceDate, facilityTimezone)
-        .hour(parseInt(startHour))
-        .minute(parseInt(startMinute))
-        .second(0);
-        
-      const actualCheckIn = moment.tz(attendanceTime, facilityTimezone);
-      const graceMinutes = employee.shift.graceTime?.checkIn || 15;
-      
-      // DEBUG: Log all time calculations
-      console.log('\n=== LATE DETECTION DEBUG ===');
-      console.log('Facility Timezone:', facilityTimezone);
-      console.log('Employee:', employee.firstName, employee.lastName);
-      console.log('Shift Start Time:', employee.shift.startTime);
-      console.log('Scheduled Check-in:', scheduledCheckIn.format('YYYY-MM-DD HH:mm:ss Z'));
-      console.log('Actual Check-in:', actualCheckIn.format('YYYY-MM-DD HH:mm:ss Z'));
-      console.log('Grace Minutes:', graceMinutes);
-      console.log('Grace Period Ends:', scheduledCheckIn.clone().add(graceMinutes, 'minutes').format('YYYY-MM-DD HH:mm:ss Z'));
-      console.log('Is After Grace?:', actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes')));
-      console.log('Minutes Difference:', actualCheckIn.diff(scheduledCheckIn, 'minutes'));
-      console.log('===========================\n');
-      
-      // Check if employee has approved leave for this date (check regardless of late/on-time)
-      const leave = await LeaveRequest.hasApprovedLeave(employee._id, attendanceDate);
-      
-      if (leave) {
-        // Employee has approved leave - mark as on-leave regardless of time
-        attendance.status = 'on-leave';
-        attendance.lateArrival = 0;
-        attendance.leaveRequest = leave._id;
-        
-        console.log(`📅 Employee on approved leave: ${employee.firstName} ${employee.lastName} - ${leave.leaveType}`);
-        attendanceLogger.info(`Employee on leave: ${employee.firstName} ${employee.lastName}: ${leave.leaveType}`);
-      } else if (actualCheckIn.isAfter(scheduledCheckIn.clone().add(graceMinutes, 'minutes'))) {
-        // No leave - check if late
-        const lateMinutes = actualCheckIn.diff(scheduledCheckIn, 'minutes');
-        attendance.lateArrival = lateMinutes;
-        attendance.status = 'late';
-        
-        console.log(`⏰ Late arrival: ${employee.firstName} ${employee.lastName} - ${attendance.lateArrival} minutes late`);
-      } else {
-        console.log(`✅ On-time arrival: ${employee.firstName} ${employee.lastName}`);
-      }
-      
-      attendanceLogger.info(`✅ Check-in: ${employee.firstName} ${employee.lastName} at ${moment(attendanceTime).format('HH:mm:ss')}`);
-    } 
-    else if (isCheckOut) {
+    // Add specific details for check-out
+    if (isCheckOut) {
       // For check-out, we could calculate work duration if we find the corresponding check-in
       const todayCheckIn = await Attendance.findOne({
         employee: employee._id,

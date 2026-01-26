@@ -77,11 +77,18 @@ const aggregateAttendanceRecords = (rawRecords) => {
         attendanceItem.undertime = expectedHours - attendanceItem.workHours;
       }
     } else if (!attendanceItem.checkOut.time && attendanceItem.checkIn.time) {
-      // Only checked in, no checkout - mark as incomplete ONLY if not already late/excused
-      if (attendanceItem.status === 'present') {
+      // Only checked in, no checkout - check if there's an approved leave that excuses this
+      const hasLeave = attendanceItem.leaveRequest || attendanceItem.status === 'on-leave';
+      
+      if (hasLeave) {
+        // Employee has approved leave (e.g., official assignment) - preserve current status
+        // If status is 'late', keep it (they were late before the official duty)
+        // If status is 'on-leave', keep it (they were on leave all day)
+      } else if (attendanceItem.status === 'present') {
+        // No leave and no checkout - mark as incomplete only if status is 'present'
         attendanceItem.status = 'incomplete';
       }
-      // If status is already 'late' or 'excused', preserve it
+      // If status is 'late' without leave, preserve it (they were late and didn't checkout)
     }
   }
 
@@ -332,15 +339,16 @@ exports.getDashboardAnalytics = async (req, res) => {
       }
       
       acc[facId].totalRecords++;
-      if (['present', 'late'].includes(record.status)) {
+      
+      // Count each status separately (no overlapping)
+      if (record.status === 'present') {
         acc[facId].present++;
-      }
-      if (record.status === 'late') {
+      } else if (record.status === 'late') {
         acc[facId].late++;
-      }
-      if (record.status === 'absent') {
+      } else if (record.status === 'absent') {
         acc[facId].absent++;
       }
+      
       acc[facId].totalWorkHours += record.workHours || 0;
       
       return acc;
@@ -349,8 +357,9 @@ exports.getDashboardAnalytics = async (req, res) => {
     const facilityWiseList = Object.values(facilityWise)
       .map(fac => ({
         ...fac,
+        // Attendance rate based on present + late (those who showed up)
         attendanceRate: fac.totalRecords > 0 
-          ? Math.round((fac.present / fac.totalRecords) * 100) 
+          ? Math.round(((fac.present + fac.late) / fac.totalRecords) * 100) 
           : 0,
         totalWorkHours: Math.round(fac.totalWorkHours * 100) / 100
       }));

@@ -366,11 +366,19 @@ exports.getAttendance = async (req, res) => {
         
         console.log(`📊 Calculated work hours for ${attendanceItem.employee.firstName}: ${attendanceItem.workHours.toFixed(2)}h (${workMinutes} minutes)`);
       } else if (!attendanceItem.checkOut.time && attendanceItem.checkIn.time) {
-        // Only checked in, no checkout - mark as incomplete ONLY if not already late/excused
-        if (attendanceItem.status === 'present') {
+        // Only checked in, no checkout - check if there's an approved leave that excuses this
+        const hasLeave = attendanceItem.leaveRequest || attendanceItem.status === 'on-leave';
+        
+        if (hasLeave) {
+          // Employee has approved leave (e.g., official assignment) - preserve current status
+          // If status is 'late', keep it (they were late before the official duty)
+          // If status is 'on-leave', keep it (they were on leave all day)
+          console.log(`📅 Missing checkout excused by approved leave: ${attendanceItem.employee.firstName} - Status: ${attendanceItem.status}`);
+        } else if (attendanceItem.status === 'present') {
+          // No leave and no checkout - mark as incomplete only if status is 'present'
           attendanceItem.status = 'incomplete';
         }
-        // If status is already 'late' or 'excused', preserve it
+        // If status is 'late' without leave, preserve it (they were late and didn't checkout)
       }
     }
     
