@@ -1,0 +1,11 @@
+﻿# Commands to run on VPS to diagnose and rebuild
+
+# 1. Check if JAR exists
+ls -lh /root/SABS_FUll/java-attendance-service/target/*.jar
+
+# 2. Check build logs
+cd /root/SABS_FUll/java-attendance-service
+mvn clean package -DskipTests 2>&1 | tail -100
+
+# 3. If build fails, check OpenCV dependency
+mvn dependency:tree | grep opencv
