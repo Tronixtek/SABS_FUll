@@ -386,6 +386,10 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       optimizedFaceImage = faceImage.split(',')[1];
     }
     
+    // ✅ SANITIZE BASE64 STRING - Remove all whitespace, newlines, carriage returns
+    // XO5 device may be strict about base64 format
+    optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
+    
     // Validate Base64 format
     if (!optimizedFaceImage || optimizedFaceImage.length < 1000) {
       return res.status(400).json({
@@ -395,11 +399,36 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       });
     }
     
-    // Log image details for debugging
-    console.log(`   Original image length: ${faceImage.length}`);
-    console.log(`   Optimized image length: ${optimizedFaceImage.length}`);
-    console.log(`   Image starts with: ${optimizedFaceImage.substring(0, 20)}...`);
-    console.log(`   Image ends with: ...${optimizedFaceImage.substring(optimizedFaceImage.length - 10)}`);
+    // Validate base64 format (should only contain valid base64 characters)
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(optimizedFaceImage)) {
+      console.error(`   ❌ Invalid base64 format detected`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image encoding format',
+        hint: 'Image data is corrupted. Please recapture the photo.'
+      });
+    }
+    
+    // Calculate estimated image size from base64
+    const estimatedSizeKB = Math.round((optimizedFaceImage.length * 3/4) / 1024);
+    
+    // Log detailed image metrics for debugging
+    console.log(`   📊 IMAGE METRICS:`);
+    console.log(`   - Original length: ${faceImage.length} chars`);
+    console.log(`   - Optimized length: ${optimizedFaceImage.length} chars`);
+    console.log(`   - Estimated size: ${estimatedSizeKB}KB`);
+    console.log(`   - Format: ${faceImage.includes('data:image/jpeg') ? 'JPEG' : faceImage.includes('data:image/png') ? 'PNG' : 'Unknown'}`);
+    console.log(`   - Base64 preview: ${optimizedFaceImage.substring(0, 30)}...`);
+    console.log(`   - Base64 suffix: ...${optimizedFaceImage.substring(optimizedFaceImage.length - 10)}`);
+    
+    // Warn if image is outside optimal range for XO5
+    if (estimatedSizeKB < 30) {
+      console.warn(`   ⚠️ Image may be too small (${estimatedSizeKB}KB) - Face detection may fail`);
+    } else if (estimatedSizeKB > 200) {
+      console.warn(`   ⚠️ Image may be too large (${estimatedSizeKB}KB) - May exceed device limits`);
+    } else {
+      console.log(`   ✅ Image size within optimal range (${estimatedSizeKB}KB)`);
+    }
     
     const javaServicePayload = {
       employeeId: personId,

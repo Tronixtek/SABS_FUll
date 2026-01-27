@@ -732,11 +732,12 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     const data = imageData.data;
     
     // Enhanced brightness and contrast boost for low-light conditions
+    // Reduced from 1.15+15 to 1.08+8 to preserve facial features for XO5 recognition
     for (let i = 0; i < data.length; i += 4) {
-      // Stronger brightness boost for low-light tolerance
-      data[i] = Math.min(255, Math.max(0, data[i] * 1.15 + 15));     // Red
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.15 + 15)); // Green  
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.15 + 15)); // Blue
+      // Moderate brightness boost for low-light tolerance
+      data[i] = Math.min(255, Math.max(0, data[i] * 1.08 + 8));     // Red
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.08 + 8)); // Green  
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.08 + 8)); // Blue
     }
     context.putImageData(imageData, 0, 0);
 
@@ -808,36 +809,38 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
         const data = imageData.data;
         
+        // Moderate enhancement to preserve facial features (1.08+8)
         for (let i = 0; i < data.length; i += 4) {
-          data[i] = Math.min(255, Math.max(0, data[i] * 1.15 + 15));
-          data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.15 + 15));
-          data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.15 + 15));
+          data[i] = Math.min(255, Math.max(0, data[i] * 1.08 + 8));
+          data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * 1.08 + 8));
+          data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * 1.08 + 8));
         }
         ctx.putImageData(imageData, 0, 0);
         
         // Try different quality levels for optimal file size
+        // Never go below 0.65 to preserve facial features for XO5 recognition
         let dataURL;
         let imageSizeKB;
-        let quality = 0.75;
+        let quality = 0.80; // Start higher for better face recognition
         
-        // First attempt at 0.75 quality
+        // First attempt at 0.80 quality (optimal for face recognition)
         dataURL = canvas.toDataURL('image/jpeg', quality);
         imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
         
-        // If too large, reduce quality
+        // If too large, reduce to 0.75
+        if (imageSizeKB > 180) {
+          quality = 0.75;
+          dataURL = canvas.toDataURL('image/jpeg', quality);
+          imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
+          console.log(`Adjusted quality to ${quality} - Size: ${imageSizeKB}KB`);
+        }
+        
+        // If still too large, reduce to 0.65 (minimum acceptable)
         if (imageSizeKB > 200) {
           quality = 0.65;
           dataURL = canvas.toDataURL('image/jpeg', quality);
           imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
-          console.log(`Reduced quality to ${quality} - Size: ${imageSizeKB}KB`);
-        }
-        
-        // If still too large, reduce more
-        if (imageSizeKB > 200) {
-          quality = 0.55;
-          dataURL = canvas.toDataURL('image/jpeg', quality);
-          imageSizeKB = Math.round((dataURL.length * 3/4) / 1024);
-          console.log(`Reduced quality to ${quality} - Size: ${imageSizeKB}KB`);
+          console.log(`Final quality reduction to ${quality} - Size: ${imageSizeKB}KB`);
         }
         
         console.log(`Uploaded image optimized: ${targetWidth}x${targetHeight}, ${imageSizeKB}KB (Quality: ${quality})`);
@@ -977,7 +980,23 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         const deviceErrorCode = errorData.deviceErrorCode;
         const recommendations = errorData.recommendations || [];
         
-        if (deviceErrorCode === '1500') {
+        // Check if this is a face detection error
+        if (message.includes('FACE_NOT_DETECTED') || message.includes('No face detected')) {
+          // Face detection failed - this is expected and user-friendly
+          let errorMsg = 'Face Detection Failed\n\n';
+          if (message.includes(':')) {
+            errorMsg += message.split(':')[1].trim();
+          } else {
+            errorMsg += 'The captured image does not contain a detectable face.\n\n';
+            errorMsg += 'Please ensure:\n';
+            errorMsg += '• Face is clearly visible and centered\n';
+            errorMsg += '• Good lighting without shadows\n';
+            errorMsg += '• Front-facing (not at an angle)\n';
+            errorMsg += '• No sunglasses, hats, or masks\n';
+            errorMsg += '• Face occupies at least 30% of the image';
+          }
+          toast.error(errorMsg, { duration: 10000 });
+        } else if (deviceErrorCode === '1500') {
           // Face image quality/detection error
           let errorMsg = message;
           if (recommendations.length > 0) {

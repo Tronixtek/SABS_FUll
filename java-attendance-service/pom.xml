@@ -79,6 +79,13 @@
             <!--<version>1.18.26</version>-->
             <scope>provided</scope>
         </dependency>
+
+        <!-- OpenCV for face detection -->
+        <dependency>
+            <groupId>org.openpnp</groupId>
+            <artifactId>opencv</artifactId>
+            <version>4.7.0-0</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -11,6 +11,33 @@ import org.springframework.web.bind.annotation.*;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.PreDestroy;
+
+// OpenCV imports for face detection
+import org.opencv.core.*;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.Objdetect;
+import javax.annotation.PostConstruct;
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+
+// OpenCV imports for face detection
+import org.opencv.core.*;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.Objdetect;
+import javax.annotation.PostConstruct;
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 @RestController
 @RequestMapping("/api/employee")
@@ -19,6 +46,221 @@ public class EmployeeController extends BaseController {
 
     @Autowired
     private RequestBuilderService requestBuilderService;
+    
+    // ==================== FACE DETECTION SETUP ====================
+    private CascadeClassifier faceDetector;
+    private static final String HAAR_CASCADE_FRONTALFACE = "haarcascade_frontalface_default.xml";
+    
+    @PostConstruct
+    public void initializeFaceDetection() {
+        try {
+            System.out.println("=== INITIALIZING FACE DETECTION ===");
+            
+            // Load OpenCV native library
+            nu.pattern.OpenCV.loadLocally();
+            System.out.println("✅ OpenCV library loaded successfully");
+            
+            // Load Haar Cascade classifier from resources
+            InputStream cascadeStream = getClass().getClassLoader().getResourceAsStream("haarcascades/" + HAAR_CASCADE_FRONTALFACE);
+            
+            if (cascadeStream == null) {
+                // Try alternative path
+                cascadeStream = getClass().getClassLoader().getResourceAsStream(HAAR_CASCADE_FRONTALFACE);
+            }
+            
+            if (cascadeStream != null) {
+                // Create temporary file for cascade classifier
+                File cascadeFile = File.createTempFile("haarcascade", ".xml");
+                cascadeFile.deleteOnExit();
+                Files.copy(cascadeStream, cascadeFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                
+                faceDetector = new CascadeClassifier(cascadeFile.getAbsolutePath());
+                
+                if (!faceDetector.empty()) {
+                    System.out.println("✅ Face detection classifier loaded successfully");
+                } else {
+                    System.err.println("⚠️ WARNING: Face detector is empty, face detection will be skipped");
+                    faceDetector = null;
+                }
+            } else {
+                System.err.println("⚠️ WARNING: Haar Cascade file not found, face detection will be skipped");
+                System.err.println("   Face validation will rely on device-side detection only");
+                faceDetector = null;
+            }
+            
+        } catch (Exception e) {
+            System.err.println("⚠️ WARNING: Face detection initialization failed: " + e.getMessage());
+            System.err.println("   Face validation will rely on device-side detection only");
+            faceDetector = null;
+        }
+    }
+    
+    /**
+     * Validates that the image contains at least one face
+     * This prevents non-face images from being sent to the device
+     */
+    private FaceDetectionResult detectFaceInImage(byte[] imageBytes) {
+        System.out.println("=== FACE DETECTION VALIDATION ===");
+        
+        // If face detector is not initialized, skip validation
+        if (faceDetector == null) {
+            System.out.println("⚠️ Face detector not available, skipping face detection");
+            return FaceDetectionResult.skipped("Face detector not initialized");
+        }
+        
+        try {
+            // Decode image from bytes
+            Mat image = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.IMREAD_COLOR);
+            
+            if (image.empty()) {
+                System.err.println("❌ Failed to decode image for face detection");
+                return FaceDetectionResult.failed("Unable to decode image");
+            }
+            
+            System.out.println("Image loaded: " + image.width() + "x" + image.height());
+            
+            // Convert to grayscale for better face detection
+            Mat grayImage = new Mat();
+            Imgproc.cvtColor(image, grayImage, Imgproc.COLOR_BGR2GRAY);
+            
+            // Enhance contrast for better detection
+            Imgproc.equalizeHist(grayImage, grayImage);
+            
+            // Detect faces
+            MatOfRect faceDetections = new MatOfRect();
+            faceDetector.detectMultiScale(
+                grayImage,
+                faceDetections,
+                1.1,        // scaleFactor: 1.1 for better accuracy
+                3,          // minNeighbors: 3 for balance between false positives and sensitivity
+                Objdetect.CASCADE_SCALE_IMAGE,
+                new Size(30, 30),  // minimum face size
+                new Size()         // maximum face size (no limit)
+            );
+            
+            Rect[] faces = faceDetections.toArray();
+            int faceCount = faces.length;
+            
+            System.out.println("Face detection complete: " + faceCount + " face(s) detected");
+            
+            if (faceCount > 0) {
+                // Log face details
+                for (int i = 0; i < faceCount; i++) {
+                    Rect face = faces[i];
+                    System.out.println("  Face " + (i + 1) + ": x=" + face.x + ", y=" + face.y + ", width=" + face.width + ", height=" + face.height);
+                }
+                
+                // Calculate confidence based on face size relative to image
+                Rect largestFace = faces[0];
+                for (Rect face : faces) {
+                    if (face.width * face.height > largestFace.width * largestFace.height) {
+                        largestFace = face;
+                    }
+                }
+                
+                double faceArea = largestFace.width * largestFace.height;
+                double imageArea = image.width() * image.height();
+                double faceRatio = faceArea / imageArea;
+                
+                System.out.println("Largest face occupies " + String.format("%.1f", faceRatio * 100) + "% of image");
+                
+                // Check if face is too small (less than 5% of image)
+                if (faceRatio < 0.05) {
+                    System.out.println("⚠️ Face detected but very small, may affect recognition quality");
+                    return FaceDetectionResult.success(faceCount, "Face detected but small");
+                }
+                
+                System.out.println("✅ Face validation passed");
+                return FaceDetectionResult.success(faceCount, "Face detected successfully");
+                
+            } else {
+                System.err.println("❌ No face detected in image");
+                return FaceDetectionResult.failed("No face detected in the image. Please ensure:\n" +
+                    "  - Face is clearly visible and centered\n" +
+                    "  - Good lighting without shadows\n" +
+                    "  - Front-facing (not at an angle)\n" +
+                    "  - No glasses, hats, or face coverings\n" +
+                    "  - Face occupies at least 30% of the image");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ Face detection failed: " + e.getMessage());
+            e.printStackTrace();
+            return FaceDetectionResult.failed("Face detection error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Result class for face detection operations
+     */
+    private static class FaceDetectionResult {
+        private final boolean success;
+        private final boolean skipped;
+        private final int faceCount;
+        private final String message;
+        
+        private FaceDetectionResult(boolean success, boolean skipped, int faceCount, String message) {
+            this.success = success;
+            this.skipped = skipped;
+            this.faceCount = faceCount;
+            this.message = message;
+        }
+        
+        public static FaceDetectionResult success(int faceCount, String message) {
+            return new FaceDetectionResult(true, false, faceCount, message);
+        }
+        
+        public static FaceDetectionResult failed(String message) {
+            return new FaceDetectionResult(false, false, 0, message);
+        }
+        
+        public static FaceDetectionResult skipped(String message) {
+            return new FaceDetectionResult(true, true, 0, message);
+        }
+        
+        public boolean isSuccess() { return success; }
+        public boolean isSkipped() { return skipped; }
+        public int getFaceCount() { return faceCount; }
+        public String getMessage() { return message; }
+    }
+    
+    // ==================== XO5 DEVICE QUEUE PROTECTION ====================
+    // Single-threaded executor to ensure sequential processing to XO5 device
+    // This prevents device buffer overload when multiple admins enroll simultaneously
+    private final ExecutorService deviceExecutor = Executors.newSingleThreadExecutor(
+        new ThreadFactory() {
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "XO5-Device-Queue");
+                t.setDaemon(true);
+                return t;
+            }
+        }
+    );
+    
+    // Track queue statistics
+    private final AtomicInteger queuedRequests = new AtomicInteger(0);
+    private final AtomicInteger processedRequests = new AtomicInteger(0);
+    private final AtomicInteger failedRequests = new AtomicInteger(0);
+    
+    // Maximum wait time for device operation (60 seconds)
+    private static final long DEVICE_OPERATION_TIMEOUT = 60000;
+    
+    @PreDestroy
+    public void shutdown() {
+        System.out.println("Shutting down XO5 device queue...");
+        deviceExecutor.shutdown();
+        try {
+            if (!deviceExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+                deviceExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            deviceExecutor.shutdownNow();
+        }
+        System.out.println("XO5 device queue shutdown complete");
+        System.out.println("Total queued: " + queuedRequests.get());
+        System.out.println("Total processed: " + processedRequests.get());
+        System.out.println("Total failed: " + failedRequests.get());
+    }
 
     /**
      * Register Employee and Upload Face Image
@@ -29,7 +271,68 @@ public class EmployeeController extends BaseController {
         System.out.println("Employee ID: " + request.getEmployeeId());
         System.out.println("Full Name: " + request.getFullName());
         System.out.println("Device Key: " + request.getDeviceKey());
+        
+        // Increment queue counter
+        int queuePosition = queuedRequests.incrementAndGet();
+        System.out.println("📊 Queue Statistics - Position: " + queuePosition + ", Processed: " + processedRequests.get() + ", Failed: " + failedRequests.get());
 
+        try {
+            // Submit to single-threaded queue for sequential device access
+            Future<BaseResult> future = deviceExecutor.submit(() -> processEnrollmentToDevice(request));
+            
+            // Wait for result with timeout
+            System.out.println("⏳ Waiting for device operation to complete (timeout: " + DEVICE_OPERATION_TIMEOUT + "ms)...");
+            BaseResult result = future.get(DEVICE_OPERATION_TIMEOUT, TimeUnit.MILLISECONDS);
+            
+            processedRequests.incrementAndGet();
+            System.out.println("✅ Enrollment completed successfully");
+            return result;
+            
+        } catch (TimeoutException e) {
+            failedRequests.incrementAndGet();
+            System.err.println("❌ Device operation timed out after " + DEVICE_OPERATION_TIMEOUT + "ms");
+            return ResultWrapper.wrapFailure("TIMEOUT", "Device enrollment timed out. The device may be busy processing other requests. Please try again.");
+            
+        } catch (ExecutionException e) {
+            failedRequests.incrementAndGet();
+            Throwable cause = e.getCause();
+            System.err.println("❌ Device operation failed: " + cause.getMessage());
+            
+            if (cause instanceof RuntimeException) {
+                RuntimeException re = (RuntimeException) cause;
+                String errorMessage = re.getMessage();
+                
+                if (errorMessage != null && (errorMessage.startsWith("EMPLOYEE_ALREADY_ENROLLED") || errorMessage.startsWith("DUPLICATE_EMPLOYEE_DETECTED"))) {
+                    return ResultWrapper.wrapFailure("DUPLICATE_EMPLOYEE", errorMessage);
+                }
+                return ResultWrapper.wrapFailure("1000", "Employee registration failed: " + errorMessage);
+            }
+            
+            return ResultWrapper.wrapFailure("1000", "Employee registration failed: " + cause.getMessage());
+            
+        } catch (InterruptedException e) {
+            failedRequests.incrementAndGet();
+            Thread.currentThread().interrupt();
+            System.err.println("❌ Device operation interrupted");
+            return ResultWrapper.wrapFailure("INTERRUPTED", "Device enrollment was interrupted. Please try again.");
+            
+        } catch (Exception e) {
+            failedRequests.incrementAndGet();
+            e.printStackTrace();
+            return ResultWrapper.wrapFailure("1000", "Unexpected error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Process enrollment to device - executed sequentially in queue
+     * This ensures only one enrollment happens at a time, preventing XO5 device buffer overload
+     */
+    private BaseResult processEnrollmentToDevice(EmployeeRegistrationRequest request) {
+        System.out.println("\n🔄 === PROCESSING ENROLLMENT FROM QUEUE ===");
+        System.out.println("Employee ID: " + request.getEmployeeId());
+        System.out.println("Full Name: " + request.getFullName());
+        System.out.println("Thread: " + Thread.currentThread().getName());
+        
         try {
             // 🔹 1. Validate input
             if (request.getEmployeeId() == null || request.getEmployeeId().trim().isEmpty()) {
@@ -158,14 +461,14 @@ public class EmployeeController extends BaseController {
             String errorMessage = e.getMessage();
             
             // Check if it's a duplicate employee error
-            if (errorMessage.startsWith("EMPLOYEE_ALREADY_ENROLLED") || errorMessage.startsWith("DUPLICATE_EMPLOYEE_DETECTED")) {
-                return ResultWrapper.wrapFailure("DUPLICATE_EMPLOYEE", errorMessage);
+            if (errorMessage != null && (errorMessage.startsWith("EMPLOYEE_ALREADY_ENROLLED") || errorMessage.startsWith("DUPLICATE_EMPLOYEE_DETECTED"))) {
+                throw e; // Re-throw to be caught by caller
             }
             
-            return ResultWrapper.wrapFailure("1000", "Employee registration failed: " + errorMessage);
+            throw new RuntimeException("Employee registration failed: " + errorMessage, e);
         } catch (Exception e) {
             e.printStackTrace();
-            return ResultWrapper.wrapFailure("1000", "Employee registration failed: " + e.getMessage());
+            throw new RuntimeException("Employee registration failed: " + e.getMessage(), e);
         }
     }
 
@@ -893,6 +1196,30 @@ public class EmployeeController extends BaseController {
                 System.out.println("⚠️ WARNING: Image may not be JPEG format");
                 System.out.println("   XO5 devices work best with JPEG images");
                 System.out.println("   Base64 starts with: " + processedImage.substring(0, Math.min(10, processedImage.length())));
+            }
+            
+            // ==================== FACE DETECTION VALIDATION ====================
+            // CRITICAL: Validate that image contains a face before sending to device
+            // This is the ONLY reason to reject an image that passes frontend capture
+            System.out.println("\n=== VALIDATING IMAGE CONTAINS FACE ===");
+            FaceDetectionResult faceResult = detectFaceInImage(imageBytes);
+            
+            if (!faceResult.isSkipped()) {
+                // Face detection was performed
+                if (!faceResult.isSuccess()) {
+                    // No face detected - this is the ONLY reason to reject the image
+                    System.err.println("❌ FACE DETECTION FAILED");
+                    System.err.println("   " + faceResult.getMessage());
+                    throw new RuntimeException("FACE_NOT_DETECTED: " + faceResult.getMessage());
+                } else {
+                    System.out.println("✅ Face detection passed: " + faceResult.getFaceCount() + " face(s) detected");
+                    if (faceResult.getMessage() != null && faceResult.getMessage().contains("small")) {
+                        System.out.println("⚠️ " + faceResult.getMessage());
+                    }
+                }
+            } else {
+                System.out.println("⚠️ Face detection skipped: " + faceResult.getMessage());
+                System.out.println("   Image will be validated by device only");
             }
             
             System.out.println("✅ Enhanced image validation completed successfully");
