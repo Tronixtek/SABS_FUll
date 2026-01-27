@@ -841,9 +841,17 @@ exports.deleteEmployee = async (req, res) => {
         // Get device secret from environment or use default
         const deviceSecret = process.env.DEVICE_SECRET || '123456';
 
+        // ✅ CRITICAL: Use the EXACT personId that was used during enrollment (includes random suffix)
+        // This is stored in biometricData.xo5PersonSn during enrollment
+        const personIdToDelete = employee.biometricData?.xo5PersonSn || employee.employeeId;
+        
+        console.log(`   Person ID on device: ${personIdToDelete}`);
+        console.log(`   Base employee ID: ${employee.employeeId}`);
+        console.log(`   ${personIdToDelete !== employee.employeeId ? '⚠️ Using personId with suffix (from enrollment)' : 'ℹ️ No suffix found, using base ID'}`);
+
         // Use Java service for device deletion
         const deletePayload = {
-          employeeId: employee.employeeId, // Staff ID (e.g., PHC00001)
+          employeeId: personIdToDelete, // MUST use the exact personId from enrollment (with random suffix)
           deviceKey: employee.deviceId, // Device-generated ID (e.g., 020e7096a03f178165)
           secret: deviceSecret // Device secret from environment
         };
