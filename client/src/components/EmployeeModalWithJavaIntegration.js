@@ -973,8 +973,49 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
           message: `Device enrollment failed: ${message}` 
         }));
         
-        if (errorData.error === 'SERVICE_UNAVAILABLE') {
-          toast.error('Device service is unavailable. Please check the service status.');
+        // Check for specific error codes and display appropriate messages
+        const deviceErrorCode = errorData.deviceErrorCode;
+        const recommendations = errorData.recommendations || [];
+        
+        if (deviceErrorCode === '1500') {
+          // Face merge failure - show detailed guidance
+          let errorMsg = message;
+          if (recommendations.length > 0) {
+            errorMsg += '\n\n' + recommendations.join('\n');
+          }
+          toast.error(errorMsg, { 
+            duration: 12000,
+            style: {
+              maxWidth: '600px',
+              fontSize: '14px'
+            }
+          });
+        } else if (deviceErrorCode === '1002') {
+          // Device not on gateway
+          let errorMsg = message;
+          if (recommendations.length > 0) {
+            errorMsg += '\n\n' + recommendations.join('\n');
+          }
+          toast.error(errorMsg, { 
+            duration: 10000,
+            style: {
+              maxWidth: '600px',
+              fontSize: '14px'
+            }
+          });
+        } else if (errorData.error === 'SERVICE_UNAVAILABLE' || deviceErrorCode === 'CONNECTION_REFUSED') {
+          // Java service not reachable
+          let errorMsg = message;
+          if (recommendations.length > 0) {
+            errorMsg += '\n\n' + recommendations.join('\n');
+          }
+          toast.error(errorMsg, { 
+            duration: 10000,
+            style: {
+              maxWidth: '600px',
+              fontSize: '14px'
+            }
+          });
         } else if (errorData.error === 'TIMEOUT') {
           if (errorData.possibleSuccess) {
             toast.error(
@@ -987,8 +1028,27 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
           } else {
             toast.error('Device enrollment timed out. Please check device connectivity.');
           }
+        } else if (deviceErrorCode === 'UNKNOWN' || !deviceErrorCode) {
+          // Unknown device error - show detailed troubleshooting steps
+          let errorMsg = 'Unknown Device Error: An unexpected error occurred during device enrollment.';
+          if (recommendations.length > 0) {
+            errorMsg += '\n\nTroubleshooting Steps:\n' + recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n');
+          } else {
+            // Fallback recommendations if backend doesn't provide any
+            errorMsg += '\n\nTroubleshooting Steps:\n';
+            errorMsg += '1. Check if the biometric device is powered on\n';
+            errorMsg += '2. Verify device network connectivity\n';
+            errorMsg += '3. Try recapturing the face image\n';
+            errorMsg += '4. Contact your system administrator if the issue persists';
+          }
+          toast.error(errorMsg, { duration: 10000 });
         } else {
-          toast.error(`Device enrollment error: ${errorData.deviceError || message}`);
+          // Generic device error with recommendations if available
+          let errorMsg = `Device enrollment error: ${errorData.deviceError || message}`;
+          if (recommendations.length > 0) {
+            errorMsg += '\n\nRecommendations:\n' + recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n');
+          }
+          toast.error(errorMsg, { duration: 8000 });
         }
         
       } else if (step === 'database_save') {

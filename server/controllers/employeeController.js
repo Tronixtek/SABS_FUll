@@ -454,19 +454,66 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       console.error(`❌ Device enrollment failed [Code: ${errorCode}]: ${errorMsg}`);
       console.error(`   Full error response:`, javaResponse.data);
       
-      // Provide more user-friendly error messages
+      // Provide more user-friendly error messages based on error codes
       let userMessage = errorMsg;
-      if (errorCode === '1002') {
-        userMessage = `Device connection failed: ${errorMsg}. Please ensure the attendance device is powered on and connected to the network.`;
+      let userRecommendations = [];
+      
+      if (errorCode === '1500') {
+        // Face merge failure (error 101008) - biometric device could not process the face
+        userMessage = '❌ Face Merge Failed: The biometric device could not detect or process the face image.';
+        userRecommendations = [
+          '📸 Recapture the photo - ensure the face is clearly visible and centered',
+          '💡 Use good lighting - avoid shadows, backlighting, or harsh overhead lights',
+          '👓 Remove sunglasses, hats, masks, or anything covering the face',
+          '📐 Use recommended resolution: 640x480 or higher (up to 1920x1080)',
+          '💾 Keep image size between 100-400KB (current size may be too large/small)',
+          '🎯 Ensure the face is front-facing and the person is looking at the camera',
+          '✨ Check image quality - avoid blurry, pixelated, or overly compressed images',
+          '🔄 If problem persists, try a different camera or lighting setup'
+        ];
+      } else if (errorCode === '1002') {
+        // Device not on gateway or connection failed
+        userMessage = '🔌 Device Connection Failed: Cannot communicate with the biometric device.';
+        userRecommendations = [
+          '⚡ Check if the biometric device is powered on',
+          '🌐 Verify the device is connected to the network (check network cable or WiFi)',
+          '🔄 Check if the device appears on the gateway/network',
+          '📡 Ensure the Java device service is running and accessible',
+          '🔧 Try restarting the biometric device',
+          '💻 Verify device IP address and gateway settings',
+          '📞 Contact your system administrator if the problem persists'
+        ];
       } else if (errorCode === '1001') {
-        userMessage = `Invalid data: ${errorMsg}`;
+        userMessage = `Invalid data sent to device: ${errorMsg}`;
+        userRecommendations = [
+          'Ensure all required fields are filled correctly',
+          'Check that the employee ID is valid',
+          'Verify the facility configuration is correct'
+        ];
       } else if (errorCode === 'DUPLICATE_EMPLOYEE') {
-        userMessage = `Employee is already enrolled on the device.`;
+        userMessage = 'Employee is already enrolled on the device.';
+        userRecommendations = [
+          'This employee may have been enrolled previously',
+          'Check the employee list to see if they already exist',
+          'If this is an error, contact your administrator'
+        ];
+      } else if (errorCode === 'UNKNOWN' || !errorCode) {
+        // Unknown device error - provide general troubleshooting steps
+        userMessage = 'An unexpected device error occurred during enrollment.';
+        userRecommendations = [
+          'Check if the biometric device is powered on and connected',
+          'Verify the device has stable network connectivity',
+          'Ensure the Java device service is running',
+          'Try recapturing the face image with better lighting',
+          'If the problem persists, restart the biometric device',
+          'Contact your system administrator for assistance'
+        ];
       }
       
       return res.status(502).json({
         success: false,
         message: userMessage,
+        recommendations: userRecommendations,
         deviceError: errorMsg,
         deviceErrorCode: errorCode,
         deviceResponse: javaResponse.data,
@@ -694,11 +741,20 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       });
     }
     
-    if (error.code === 'ECONNREFUSED') {
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
       return res.status(503).json({
         success: false,
-        message: 'Device service is unavailable',
+        message: '🔌 Cannot Connect to Device Service: The Java device service is not reachable.',
         error: 'SERVICE_UNAVAILABLE',
+        deviceErrorCode: 'CONNECTION_REFUSED',
+        recommendations: [
+          'Check if the Java device service is running',
+          'Verify the device service URL is correct in configuration',
+          'Ensure there are no firewall rules blocking the connection',
+          'Check network connectivity between server and device service',
+          'Restart the Java device service if necessary',
+          'Contact your system administrator for assistance'
+        ],
         step: 'device_enrollment'
       });
     }
