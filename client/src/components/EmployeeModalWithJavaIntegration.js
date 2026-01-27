@@ -978,44 +978,14 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         const recommendations = errorData.recommendations || [];
         
         if (deviceErrorCode === '1500') {
-          // Face merge failure - show detailed guidance
+          // Face image quality/detection error
           let errorMsg = message;
           if (recommendations.length > 0) {
-            errorMsg += '\n\n' + recommendations.join('\n');
+            errorMsg += '\n\nRecommendations:\n' + recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n');
           }
-          toast.error(errorMsg, { 
-            duration: 12000,
-            style: {
-              maxWidth: '600px',
-              fontSize: '14px'
-            }
-          });
-        } else if (deviceErrorCode === '1002') {
-          // Device not on gateway
-          let errorMsg = message;
-          if (recommendations.length > 0) {
-            errorMsg += '\n\n' + recommendations.join('\n');
-          }
-          toast.error(errorMsg, { 
-            duration: 10000,
-            style: {
-              maxWidth: '600px',
-              fontSize: '14px'
-            }
-          });
-        } else if (errorData.error === 'SERVICE_UNAVAILABLE' || deviceErrorCode === 'CONNECTION_REFUSED') {
-          // Java service not reachable
-          let errorMsg = message;
-          if (recommendations.length > 0) {
-            errorMsg += '\n\n' + recommendations.join('\n');
-          }
-          toast.error(errorMsg, { 
-            duration: 10000,
-            style: {
-              maxWidth: '600px',
-              fontSize: '14px'
-            }
-          });
+          toast.error(errorMsg, { duration: 10000 });
+        } else if (errorData.error === 'SERVICE_UNAVAILABLE') {
+          toast.error('Device service is unavailable. Please check the service status.');
         } else if (errorData.error === 'TIMEOUT') {
           if (errorData.possibleSuccess) {
             toast.error(

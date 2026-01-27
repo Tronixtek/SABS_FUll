@@ -459,29 +459,23 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       let userRecommendations = [];
       
       if (errorCode === '1500') {
-        // Face merge failure (error 101008) - biometric device could not process the face
-        userMessage = '❌ Face Merge Failed: The biometric device could not detect or process the face image.';
+        // Face image quality/detection error (error 101008)
+        userMessage = 'Failed to enroll face: The biometric device could not detect or process the face image.';
         userRecommendations = [
-          '📸 Recapture the photo - ensure the face is clearly visible and centered',
-          '💡 Use good lighting - avoid shadows, backlighting, or harsh overhead lights',
-          '👓 Remove sunglasses, hats, masks, or anything covering the face',
-          '📐 Use recommended resolution: 640x480 or higher (up to 1920x1080)',
-          '💾 Keep image size between 100-400KB (current size may be too large/small)',
-          '🎯 Ensure the face is front-facing and the person is looking at the camera',
-          '✨ Check image quality - avoid blurry, pixelated, or overly compressed images',
-          '🔄 If problem persists, try a different camera or lighting setup'
+          'Ensure the photo shows a clear, front-facing view of the face',
+          'Use good lighting - avoid shadows or backlighting',
+          'Remove sunglasses, hats, or anything covering the face',
+          'Use a high-quality image (recommended: 640x480 or higher resolution)',
+          'Keep image size between 100-400KB',
+          'Ensure the face is clearly visible and unobstructed',
+          'Try recapturing the photo if the current one is blurry or low quality'
         ];
       } else if (errorCode === '1002') {
-        // Device not on gateway or connection failed
-        userMessage = '🔌 Device Connection Failed: Cannot communicate with the biometric device.';
+        userMessage = 'Device connection failed. Please ensure the attendance device is powered on and connected to the network.';
         userRecommendations = [
-          '⚡ Check if the biometric device is powered on',
-          '🌐 Verify the device is connected to the network (check network cable or WiFi)',
-          '🔄 Check if the device appears on the gateway/network',
-          '📡 Ensure the Java device service is running and accessible',
-          '🔧 Try restarting the biometric device',
-          '💻 Verify device IP address and gateway settings',
-          '📞 Contact your system administrator if the problem persists'
+          'Check if the device is powered on',
+          'Verify network connectivity',
+          'Contact your system administrator if the problem persists'
         ];
       } else if (errorCode === '1001') {
         userMessage = `Invalid data sent to device: ${errorMsg}`;
@@ -741,20 +735,11 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       });
     }
     
-    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+    if (error.code === 'ECONNREFUSED') {
       return res.status(503).json({
         success: false,
-        message: '🔌 Cannot Connect to Device Service: The Java device service is not reachable.',
+        message: 'Device service is unavailable',
         error: 'SERVICE_UNAVAILABLE',
-        deviceErrorCode: 'CONNECTION_REFUSED',
-        recommendations: [
-          'Check if the Java device service is running',
-          'Verify the device service URL is correct in configuration',
-          'Ensure there are no firewall rules blocking the connection',
-          'Check network connectivity between server and device service',
-          'Restart the Java device service if necessary',
-          'Contact your system administrator for assistance'
-        ],
         step: 'device_enrollment'
       });
     }
