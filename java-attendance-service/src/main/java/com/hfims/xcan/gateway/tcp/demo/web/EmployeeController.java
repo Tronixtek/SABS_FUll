@@ -397,6 +397,47 @@ public class EmployeeController extends BaseController {
     }
 
     /**
+     * Delete Face from Device
+     * Removes face image associated with an employee from the device
+     */
+    @PostMapping("/delete-face")
+    public BaseResult deleteFaceFromDevice(@RequestBody DeleteFaceRequest request) {
+        System.out.println("=== DELETE FACE REQUEST ===");
+        System.out.println("Employee ID: " + request.getEmployeeId());
+        System.out.println("Device Key: " + request.getDeviceKey());
+        
+        try {
+            if (request.getEmployeeId() == null || request.getEmployeeId().trim().isEmpty()) {
+                return ResultWrapper.wrapFailure("1001", "Employee ID is required");
+            }
+            if (request.getDeviceKey() == null || request.getSecret() == null) {
+                return ResultWrapper.wrapFailure("1001", "Device credentials are required");
+            }
+            
+            HfDeviceResp response = deleteFaceFromDevice(
+                request.getEmployeeId(), 
+                request.getDeviceKey(), 
+                request.getSecret()
+            );
+            
+            if ("000".equals(response.getCode())) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("employeeId", request.getEmployeeId());
+                data.put("deleted", true);
+                data.put("message", "Face image deleted successfully from device");
+                return ResultWrapper.wrapSuccess(data);
+            } else {
+                return ResultWrapper.wrapFailure(response.getCode(), 
+                    "Failed to delete face: " + response.getMsg());
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultWrapper.wrapFailure("1000", "Delete face operation failed: " + e.getMessage());
+        }
+    }
+
+    /**
      * Register Employee and Upload Face Image
      */
     @PostMapping("/register")
@@ -1960,24 +2001,48 @@ public class EmployeeController extends BaseController {
 
             System.out.println("✅ Employee confirmed to exist on device");
 
-            // STEP 3: Attempt device deletion since employee exists
-            System.out.println("🗑️ Step 3: Deleting employee from device...");
+            // STEP 3: Delete face data first (if exists)
+            System.out.println("🗑️ Step 3: Deleting face data from device...");
+            boolean faceDeleted = false;
+            String faceDeleteMessage = "No face data to delete";
+            
+            try {
+                HfDeviceResp faceDeleteResponse = deleteFaceFromDevice(request.getEmployeeId(), request.getDeviceKey(), request.getSecret());
+                if ("000".equals(faceDeleteResponse.getCode())) {
+                    System.out.println("✅ Face data deleted successfully");
+                    faceDeleted = true;
+                    faceDeleteMessage = "Face deleted successfully";
+                } else {
+                    System.out.println("⚠️ Face deletion response: " + faceDeleteResponse.getCode() + " - " + faceDeleteResponse.getMsg());
+                    faceDeleteMessage = "Face deletion: " + faceDeleteResponse.getMsg();
+                    // Continue with person deletion even if face deletion fails
+                }
+            } catch (Exception e) {
+                System.out.println("⚠️ Face deletion error (non-critical): " + e.getMessage());
+                faceDeleteMessage = "Face deletion error: " + e.getMessage();
+                // Continue with person deletion
+            }
+
+            // STEP 4: Delete person record from device
+            System.out.println("🗑️ Step 4: Deleting person record from device...");
             HfDeviceResp deleteResponse = deletePersonFromDevice(request.getEmployeeId(), request.getDeviceKey(), request.getSecret());
             
             responseData.put("deviceResponse", deleteResponse.getMsg());
+            responseData.put("faceDeleted", faceDeleted);
+            responseData.put("faceDeleteMessage", faceDeleteMessage);
             
             if ("000".equals(deleteResponse.getCode())) {
-                System.out.println("✅ Employee deleted successfully from device: " + request.getEmployeeId());
+                System.out.println("✅ Person record deleted successfully from device: " + request.getEmployeeId());
                 responseData.put("deleted", true);
-                responseData.put("message", "Employee validated and deleted successfully from device");
+                responseData.put("message", "Employee and face data deleted successfully from device");
                 responseData.put("canProceedWithSoftDelete", true);
                 return ResultWrapper.wrapSuccess(responseData);
             } else {
-                System.out.println("❌ Device deletion failed despite validation: " + deleteResponse.getCode() + " - " + deleteResponse.getMsg());
+                System.out.println("❌ Person deletion failed despite validation: " + deleteResponse.getCode() + " - " + deleteResponse.getMsg());
                 responseData.put("deleted", false);
-                responseData.put("message", "Device deletion failed: " + deleteResponse.getMsg());
+                responseData.put("message", "Person deletion failed: " + deleteResponse.getMsg());
                 responseData.put("canProceedWithSoftDelete", false);
-                return ResultWrapper.wrapFailure("1004", "Device deletion failed despite validation: " + deleteResponse.getMsg());
+                return ResultWrapper.wrapFailure("1004", "Person deletion failed despite validation: " + deleteResponse.getMsg());
             }
 
         } catch (Exception e) {
@@ -2378,6 +2443,75 @@ public class EmployeeController extends BaseController {
             // Call the personDelete method
             HfDeviceResp response = (HfDeviceResp) personDeleteMethod.invoke(null, hostInfo, deviceKey, secret, personDeleteReq);
             
+            return response;
+        } catch (ClassNotFoundException e) {
+            System.err.println("❌ PersonDeleteReq class not found in SDK");
+            throw new RuntimeException("SDK PersonDeleteReq class not available");
+        } catch (NoSuchMethodException e) {
+            System.err.println("❌ personDelete method not found in HfDeviceClient");
+            throw new RuntimeException("SDK personDelete method not available");
+        } catch (Exception e) {
+            System.err.println("❌ Error during person deletion: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+    
+    /**
+     * Delete face from device using the correct SDK method
+     */
+    private HfDeviceResp deleteFaceFromDevice(String employeeId, String deviceKey, String secret) throws Exception {
+        try {
+            System.out.println("=== ATTEMPTING FACE DELETION ===");
+            System.out.println("Employee ID: " + employeeId);
+            System.out.println("Device Key: " + deviceKey);
+            
+            // Build FaceDeleteReq
+            Class<?> faceDeleteReqClass = Class.forName("com.hfims.xcan.gateway.netty.client.req.FaceDeleteReq");
+            Object faceDeleteReq = faceDeleteReqClass.getDeclaredConstructor().newInstance();
+            
+            // Set personSn
+            try {
+                faceDeleteReqClass.getMethod("setPersonSn", String.class).invoke(faceDeleteReq, employeeId);
+                System.out.println("✅ PersonSn set successfully");
+            } catch (NoSuchMethodException e) {
+                System.err.println("❌ setPersonSn method not found, trying setEmployeeId");
+                faceDeleteReqClass.getMethod("setEmployeeId", String.class).invoke(faceDeleteReq, employeeId);
+            }
+            
+            System.out.println("✅ FaceDeleteReq object created successfully");
+            
+            // Get the method signature for faceDelete
+            Class<?> hostInfoClass = Class.forName("com.hfims.xcan.gateway.netty.client.dto.HostInfoDto");
+            
+            Method faceDeleteMethod = HfDeviceClient.class.getMethod("faceDelete",
+                hostInfoClass, String.class, String.class, faceDeleteReqClass);
+            
+            System.out.println("✅ Found faceDelete method in HfDeviceClient");
+            
+            // Call the faceDelete method
+            HfDeviceResp response = (HfDeviceResp) faceDeleteMethod.invoke(null, hostInfo, deviceKey, secret, faceDeleteReq);
+            
+            if (response != null) {
+                System.out.println("Face delete response - Code: " + response.getCode() + ", Message: " + response.getMsg());
+            } else {
+                System.err.println("⚠️ Face delete returned null response");
+            }
+            
+            return response;
+        } catch (ClassNotFoundException e) {
+            System.err.println("❌ FaceDeleteReq class not found in SDK");
+            throw new RuntimeException("SDK FaceDeleteReq class not available");
+        } catch (NoSuchMethodException e) {
+            System.err.println("❌ faceDelete method not found in HfDeviceClient");
+            throw new RuntimeException("SDK faceDelete method not available");
+        } catch (Exception e) {
+            System.err.println("❌ Error during face deletion: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+            
             System.out.println("PersonDelete response - Code: " + response.getCode() + ", Message: " + response.getMsg());
             return response;
             
@@ -2506,6 +2640,24 @@ class FaceUploadRequest {
  * Request class for deleting person from device
  */
 class DeletePersonRequest {
+    private String employeeId;
+    private String deviceKey;
+    private String secret;
+
+    public String getEmployeeId() { return employeeId; }
+    public void setEmployeeId(String employeeId) { this.employeeId = employeeId; }
+    
+    public String getDeviceKey() { return deviceKey; }
+    public void setDeviceKey(String deviceKey) { this.deviceKey = deviceKey; }
+    
+    public String getSecret() { return secret; }
+    public void setSecret(String secret) { this.secret = secret; }
+}
+
+/**
+ * Request class for deleting face from device
+ */
+class DeleteFaceRequest {
     private String employeeId;
     private String deviceKey;
     private String secret;
