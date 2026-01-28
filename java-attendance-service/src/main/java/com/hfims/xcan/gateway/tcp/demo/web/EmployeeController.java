@@ -1386,18 +1386,19 @@ public class EmployeeController extends BaseController {
             }
             
             // ==================== FACE DETECTION VALIDATION ====================
-            // CRITICAL: Validate that image contains a face before sending to device
-            // This is the ONLY reason to reject an image that passes frontend capture
-            System.out.println("\n=== VALIDATING IMAGE CONTAINS FACE ===");
+            // Optional validation - warns if no face detected but doesn't block enrollment
+            // The XO5 device will perform its own face validation
+            System.out.println("\n=== VALIDATING IMAGE CONTAINS FACE (Optional) ===");
             FaceDetectionResult faceResult = detectFaceInImage(imageBytes);
             
             if (!faceResult.isSkipped()) {
                 // Face detection was performed
                 if (!faceResult.isSuccess()) {
-                    // No face detected - this is the ONLY reason to reject the image
-                    System.err.println("❌ FACE DETECTION FAILED");
-                    System.err.println("   " + faceResult.getMessage());
-                    throw new RuntimeException("FACE_NOT_DETECTED: " + faceResult.getMessage());
+                    // No face detected by OpenCV - log warning but continue
+                    // XO5 device has its own face detection which may still succeed
+                    System.out.println("⚠️ OPENCV FACE DETECTION WARNING");
+                    System.out.println("   " + faceResult.getMessage());
+                    System.out.println("   Continuing with enrollment - XO5 device will validate");
                 } else {
                     System.out.println("✅ Face detection passed: " + faceResult.getFaceCount() + " face(s) detected");
                     if (faceResult.getMessage() != null && faceResult.getMessage().contains("small")) {
