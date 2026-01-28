@@ -52,6 +52,8 @@ fi
 
 echo ""
 echo "=== Step 5: Compile Source Code ==="
+# Set Maven memory options to prevent OOM
+export MAVEN_OPTS="-Xmx512m -Xms256m"
 mvn compile
 if [ $? -ne 0 ]; then
     echo "❌ Compilation failed!"
@@ -67,9 +69,17 @@ fi
 
 echo ""
 echo "=== Step 6: Package JAR File ==="
-mvn package -DskipTests
+echo "Using memory-optimized Maven settings..."
+export MAVEN_OPTS="-Xmx512m -Xms256m -XX:MaxMetaspaceSize=256m"
+mvn package -DskipTests -Dmaven.compiler.fork=false
 if [ $? -ne 0 ]; then
     echo "❌ Packaging failed!"
+    echo ""
+    echo "If you see 'Killed' message, your VPS may be out of memory."
+    echo "Solutions:"
+    echo "1. Add swap space: sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile"
+    echo "2. Stop other services temporarily: sudo systemctl stop nginx mongodb"
+    echo "3. Try building with even less memory: MAVEN_OPTS='-Xmx256m' mvn package -DskipTests"
     exit 1
 fi
 
