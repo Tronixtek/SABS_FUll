@@ -832,14 +832,52 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Target size for XO5 device
-        const targetWidth = 640;
-        const targetHeight = 480;
+        // Get original dimensions
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        const aspectRatio = originalWidth / originalHeight;
         
+        // Target max dimensions for XO5 device
+        const MAX_WIDTH = 640;
+        const MAX_HEIGHT = 640;
+        
+        let targetWidth, targetHeight;
+        
+        // Calculate scaled dimensions while preserving aspect ratio
+        if (originalWidth > originalHeight) {
+          // Landscape orientation
+          targetWidth = Math.min(MAX_WIDTH, originalWidth);
+          targetHeight = Math.round(targetWidth / aspectRatio);
+          
+          // If height exceeds max, recalculate based on height
+          if (targetHeight > MAX_HEIGHT) {
+            targetHeight = MAX_HEIGHT;
+            targetWidth = Math.round(targetHeight * aspectRatio);
+          }
+        } else {
+          // Portrait or square orientation
+          targetHeight = Math.min(MAX_HEIGHT, originalHeight);
+          targetWidth = Math.round(targetHeight * aspectRatio);
+          
+          // If width exceeds max, recalculate based on width
+          if (targetWidth > MAX_WIDTH) {
+            targetWidth = MAX_WIDTH;
+            targetHeight = Math.round(targetWidth / aspectRatio);
+          }
+        }
+        
+        console.log('📤 Upload image processing:', {
+          original: { width: originalWidth, height: originalHeight },
+          target: { width: targetWidth, height: targetHeight },
+          aspectRatio: aspectRatio.toFixed(2)
+        });
+        
+        // Set canvas to exact target dimensions (no stretching)
         canvas.width = targetWidth;
         canvas.height = targetHeight;
         
-        // Draw image scaled to fit
+        // Clear canvas and draw image with correct aspect ratio
+        ctx.clearRect(0, 0, targetWidth, targetHeight);
         ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
         
         // Apply same brightness enhancement as camera

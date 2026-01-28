@@ -11,7 +11,8 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Use the actual Attendance model from the project
+// Import required models
+const Employee = require('./server/models/Employee');
 const Attendance = require('./server/models/Attendance');
 
 async function cleanupInvalidRecords() {
