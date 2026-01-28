@@ -2511,22 +2511,6 @@ public class EmployeeController extends BaseController {
             throw e;
         }
     }
-            
-            System.out.println("PersonDelete response - Code: " + response.getCode() + ", Message: " + response.getMsg());
-            return response;
-            
-        } catch (ClassNotFoundException e) {
-            System.err.println("PersonDeleteReq class not found: " + e.getMessage());
-            throw new Exception("PersonDeleteReq class not available in SDK: " + e.getMessage());
-        } catch (NoSuchMethodException e) {
-            System.err.println("personDelete method not found: " + e.getMessage());
-            throw new Exception("personDelete method not available in SDK: " + e.getMessage());
-        } catch (Exception e) {
-            System.err.println("Failed to delete person: " + e.getMessage());
-            e.printStackTrace();
-            throw new Exception("Person deletion failed: " + e.getMessage());
-        }
-    }
     
     /**
      * Get person info from device
