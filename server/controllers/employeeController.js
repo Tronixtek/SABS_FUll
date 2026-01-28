@@ -441,20 +441,39 @@ exports.registerEmployeeWithDevice = async (req, res) => {
 
       } catch (deviceError) {
         console.error(`❌ Device enrollment error:`, deviceError.message);
+        console.error('Full error:', deviceError.response?.data || deviceError);
+        
+        // Extract detailed error from Java service response
+        let errorMessage = 'Unknown device error';
+        let errorCode = 'ERROR';
+        
+        if (deviceError.response?.data) {
+          // Java service returned an error response
+          const javaErrorData = deviceError.response.data;
+          errorCode = javaErrorData.code || 'ERROR';
+          errorMessage = javaErrorData.msg || javaErrorData.message || 'Unknown device error';
+        } else if (deviceError.code === 'ECONNREFUSED') {
+          errorMessage = 'Device service is not running or unavailable';
+          errorCode = 'CONNECTION_REFUSED';
+        } else if (deviceError.code === 'ETIMEDOUT') {
+          errorMessage = 'Device service request timed out';
+          errorCode = 'TIMEOUT';
+        } else {
+          errorMessage = deviceError.message || 'Failed to connect to device service';
+          errorCode = deviceError.code || 'ERROR';
+        }
         
         // Update employee with sync error (but keep employee record)
         savedEmployee.deviceSynced = false;
         savedEmployee.biometricData.syncStatus = 'failed';
-        savedEmployee.biometricData.syncError = deviceError.message;
+        savedEmployee.biometricData.syncError = `[${errorCode}] ${errorMessage}`;
         savedEmployee.biometricData.lastSyncAttempt = new Date();
         await savedEmployee.save();
 
         deviceEnrollmentResult = {
           status: 'error',
-          message: deviceError.code === 'ECONNREFUSED' 
-            ? 'Device service unavailable' 
-            : deviceError.message,
-          errorCode: deviceError.code || 'ERROR',
+          message: errorMessage,
+          errorCode: errorCode,
           deviceSynced: false,
           canRetry: true
         };
@@ -720,20 +739,39 @@ exports.retryDeviceSync = async (req, res) => {
 
     } catch (deviceError) {
       console.error(`❌ Device sync error:`, deviceError.message);
+      console.error('Full error:', deviceError.response?.data || deviceError);
+      
+      // Extract detailed error from Java service response
+      let errorMessage = 'Unknown device error';
+      let errorCode = 'ERROR';
+      
+      if (deviceError.response?.data) {
+        // Java service returned an error response
+        const javaErrorData = deviceError.response.data;
+        errorCode = javaErrorData.code || 'ERROR';
+        errorMessage = javaErrorData.msg || javaErrorData.message || 'Unknown device error';
+      } else if (deviceError.code === 'ECONNREFUSED') {
+        errorMessage = 'Device service is not running or unavailable';
+        errorCode = 'CONNECTION_REFUSED';
+      } else if (deviceError.code === 'ETIMEDOUT') {
+        errorMessage = 'Device service request timed out';
+        errorCode = 'TIMEOUT';
+      } else {
+        errorMessage = deviceError.message || 'Failed to connect to device service';
+        errorCode = deviceError.code || 'ERROR';
+      }
       
       // Update with error
       employee.deviceSynced = false;
       employee.biometricData.syncStatus = 'failed';
-      employee.biometricData.syncError = deviceError.message;
+      employee.biometricData.syncError = `[${errorCode}] ${errorMessage}`;
       employee.biometricData.lastSyncAttempt = new Date();
       await employee.save();
 
       return res.status(503).json({
         success: false,
-        message: deviceError.code === 'ECONNREFUSED' 
-          ? 'Device service unavailable' 
-          : 'Failed to connect to device service',
-        error: deviceError.message,
+        message: errorMessage,
+        deviceErrorCode: errorCode,
         canRetry: true
       });
     }
