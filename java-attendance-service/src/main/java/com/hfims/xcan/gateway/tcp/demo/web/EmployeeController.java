@@ -727,6 +727,18 @@ public class EmployeeController extends BaseController {
             }
         }
 
+        // Set easy parameter for photo quality detection (0=strict, 1=loose)
+        // According to XO5 SDK documentation: 0 = Strict detection, 1 = Loose detection
+        // Using 1 (loose) for better success rate with face recognition
+        boolean easySet = false;
+        try {
+            faceMergeReqClass.getMethod("setEasy", Integer.class).invoke(faceMergeReq, 1);
+            easySet = true;
+            System.out.println("✅ Quality detection set to LOOSE (easy=1) for better face recognition success");
+        } catch (NoSuchMethodException e) {
+            System.out.println("⚠️ Could not set 'easy' parameter - using default strict detection");
+        }
+
         if (!personSnSet || !faceImageSet) {
             throw new RuntimeException("Failed to configure FaceMergeReq - PersonSn: " + personSnSet + ", FaceImage: " + faceImageSet);
         }
