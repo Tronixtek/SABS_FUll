@@ -356,6 +356,7 @@ const Employees = () => {
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Employee ID</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Staff ID</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Name</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Email</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Facility</th>
@@ -370,6 +371,7 @@ const Employees = () => {
                 employees.map((employee) => (
                   <tr key={employee._id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6 text-sm font-medium text-gray-900">{employee.employeeId}</td>
+                    <td className="py-4 px-6 text-sm font-semibold text-blue-700">{employee.staffId || 'N/A'}</td>
                     <td className="py-4 px-6 text-sm text-gray-900 font-medium">
                       {employee.firstName} {employee.lastName}
                     </td>
@@ -408,7 +410,7 @@ const Employees = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-gray-500">
+                  <td colSpan="9" className="py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center">
                       <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />

@@ -718,30 +718,51 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    // Calculate dimensions maintaining aspect ratio
-    const videoAspectRatio = video.videoWidth / video.videoHeight;
+    // Get actual video dimensions
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+    const videoAspectRatio = videoWidth / videoHeight;
+    
+    // Target dimensions for XO5 device (640x480 is ideal)
+    const maxWidth = 640;
+    const maxHeight = 640;
+    
     let targetWidth, targetHeight;
     
-    // Target 640x480 as base, but maintain aspect ratio
-    if (videoAspectRatio > 1.33) {
-      // Wider than 4:3 (e.g., 16:9) - fit by width
-      targetWidth = 640;
-      targetHeight = Math.round(640 / videoAspectRatio);
+    // Calculate scaled dimensions while preserving aspect ratio
+    if (videoWidth > videoHeight) {
+      // Landscape orientation
+      targetWidth = Math.min(maxWidth, videoWidth);
+      targetHeight = Math.round(targetWidth / videoAspectRatio);
+      
+      // If height exceeds max, recalculate based on height
+      if (targetHeight > maxHeight) {
+        targetHeight = maxHeight;
+        targetWidth = Math.round(targetHeight * videoAspectRatio);
+      }
     } else {
-      // Taller or 4:3 - fit by height  
-      targetHeight = 480;
-      targetWidth = Math.round(480 * videoAspectRatio);
+      // Portrait or square orientation
+      targetHeight = Math.min(maxHeight, videoHeight);
+      targetWidth = Math.round(targetHeight * videoAspectRatio);
+      
+      // If width exceeds max, recalculate based on width
+      if (targetWidth > maxWidth) {
+        targetWidth = maxWidth;
+        targetHeight = Math.round(targetWidth / videoAspectRatio);
+      }
     }
     
-    // Ensure minimum dimensions for face detection
-    if (targetWidth < 480) targetWidth = 480;
-    if (targetHeight < 480) targetHeight = 480;
+    console.log(`Video: ${videoWidth}x${videoHeight}, Target: ${targetWidth}x${targetHeight}, Ratio: ${videoAspectRatio.toFixed(2)}`);
     
+    // Set canvas to exact target dimensions (no stretching)
     canvas.width = targetWidth;
     canvas.height = targetHeight;
 
-    // Draw video frame maintaining aspect ratio (no stretching)
-    context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, targetWidth, targetHeight);
+    // Clear canvas before drawing
+    context.clearRect(0, 0, targetWidth, targetHeight);
+
+    // Draw video frame at exact aspect ratio (no distortion)
+    context.drawImage(video, 0, 0, targetWidth, targetHeight);
 
     // Apply image enhancement for better face detection in low light
     const imageData = context.getImageData(0, 0, targetWidth, targetHeight);
