@@ -11,8 +11,8 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-const attendanceSchema = new mongoose.Schema({}, { strict: false, collection: 'attendances' });
-const Attendance = mongoose.model('Attendance', attendanceSchema);
+// Use the actual Attendance model from the project
+const Attendance = require('./server/models/Attendance');
 
 async function cleanupInvalidRecords() {
   try {
