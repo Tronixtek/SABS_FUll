@@ -2,6 +2,7 @@ const Employee = require('../models/Employee');
 const Facility = require('../models/Facility');
 const axios = require('axios');
 const javaServiceClient = require('../services/javaServiceClient');
+const syncToDevice = require('./syncToDeviceHelper');
 
 // Helper function to generate unique employee ID
 const generateEmployeeId = async (facilityId) => {
@@ -231,14 +232,312 @@ exports.createEmployee = async (req, res) => {
   }
 };
 
-// @desc    Register new employee with Java XO5 integration
+// @desc    Register new employee with Java XO5 integration (DATABASE-FIRST APPROACH)
 // @route   POST /api/employees/register
 // @access  Private
 exports.registerEmployeeWithDevice = async (req, res) => {
-  let deviceEnrollmentSuccess = false;
+  let savedEmployee = null;
+  let deviceEnrollmentAttempted = false;
   
   try {
-    console.log(`\n🚀 ===== EMPLOYEE REGISTRATION STARTED (Device-First) =====`);
+    console.log(`\n🚀 ===== EMPLOYEE REGISTRATION STARTED (Database-First) =====`);
+    
+    const {
+      employeeId, staffId, firstName, lastName, email, phone, facility,
+      department, designation, cadre, shift, joiningDate,
+      dateOfBirth, nationality, nationalId, gender, education,
+      bloodGroup, allergies, address, profileImage, faceImage
+    } = req.body;
+
+    // ✅ STEP 1: VALIDATE INPUT DATA
+    console.log(`📋 Validating registration data...`);
+    
+    if (!employeeId || !staffId || !firstName || !lastName || !email || !facility || !department || !designation || !shift) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields',
+        required: ['employeeId', 'staffId', 'firstName', 'lastName', 'email', 'facility', 'department', 'designation', 'shift']
+      });
+    }
+
+    // Check for existing employee - only staffId is unique
+    const existingEmployee = await Employee.findOne({ staffId });
+
+    if (existingEmployee && !existingEmployee.isDeleted) {
+      return res.status(409).json({
+        success: false,
+        message: 'Staff ID already exists',
+        conflictField: 'staffId',
+        existingEmployee: {
+          id: existingEmployee._id,
+          employeeId: existingEmployee.employeeId,
+          staffId: existingEmployee.staffId,
+          name: `${existingEmployee.firstName} ${existingEmployee.lastName}`,
+          status: existingEmployee.status
+        }
+      });
+    }
+
+    // Get facility information
+    const Facility = require('../models/Facility');
+    const facilityDoc = await Facility.findById(facility);
+    
+    if (!facilityDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Facility not found'
+      });
+    }
+
+    console.log(`✅ Validation passed for employee: ${firstName} ${lastName} (${employeeId})`);
+
+    // ✅ STEP 2: SAVE TO DATABASE FIRST (SOURCE OF TRUTH)
+    console.log(`💾 Saving employee to database (source of truth)...`);
+    
+    // Set default PIN for self-service portal
+    const defaultPin = '123456';
+    
+    // Prepare facility device info
+    const facilityDeviceId = (facilityDoc.deviceInfo?.deviceId || facilityDoc.code || facility).toLowerCase();
+    const deviceKey = facilityDoc.configuration?.deviceKey?.toLowerCase() || facilityDeviceId;
+    
+    // Generate unique person ID for device
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+    let personId = `${employeeId}${randomSuffix}`;
+    if (personId.length > 32) {
+      personId = personId.substring(0, 32);
+    }
+    
+    const employeeData = {
+      employeeId, staffId, firstName, lastName, email, phone, facility,
+      department, designation, cadre, shift, joiningDate,
+      dateOfBirth, nationality, nationalId, gender, education,
+      bloodGroup, allergies, address,
+      profileImage,
+      faceImageUploaded: !!faceImage,
+      status: 'active',
+      deviceId: facilityDeviceId,
+      pin: defaultPin,
+      employeeSelfServiceEnabled: true,
+      pinMustChange: true,
+      deviceSynced: false, // Will be updated after successful device enrollment
+      biometricData: {
+        faceId: personId,
+        xo5PersonSn: personId,
+        xo5PersonName: `${firstName} ${lastName}`,
+        xo5DeviceKey: deviceKey,
+        xo5DeviceId: facilityDeviceId,
+        syncStatus: 'pending', // pending, synced, failed
+        lastSyncAttempt: null,
+        syncError: null
+      }
+    };
+
+    // Handle soft-deleted employee restoration
+    if (existingEmployee && existingEmployee.isDeleted) {
+      console.log(`♻️ Restoring soft-deleted employee...`);
+      Object.assign(existingEmployee, employeeData);
+      await existingEmployee.restore();
+      savedEmployee = existingEmployee;
+    } else {
+      savedEmployee = await Employee.create(employeeData);
+    }
+    
+    console.log(`✅ Employee saved to database with ID: ${savedEmployee._id}`);
+    console.log(`   Device sync status: pending`);
+
+    // Populate related documents
+    await savedEmployee.populate([
+      { path: 'facility', select: 'name code' },
+      { path: 'shift', select: 'name code startTime endTime' }
+    ]);
+
+    // ✅ STEP 3: ATTEMPT DEVICE ENROLLMENT (NON-BLOCKING)
+    let deviceEnrollmentResult = {
+      status: 'skipped',
+      message: 'No face image provided',
+      deviceSynced: false
+    };
+
+    // Check if facility supports smart device integration
+    const supportsDeviceIntegration = facilityDoc.configuration?.integrationType === 'java-xo5';
+
+    if (faceImage && supportsDeviceIntegration) {
+      deviceEnrollmentAttempted = true;
+      console.log(`🔄 Attempting device enrollment...`);
+      console.log(`   Employee DB ID: ${savedEmployee._id}`);
+      console.log(`   Person ID: ${personId}`);
+      console.log(`   Facility Device: ${facilityDeviceId}`);
+
+      try {
+        // Optimize face image
+        let optimizedFaceImage = faceImage;
+        if (faceImage.includes('data:image')) {
+          optimizedFaceImage = faceImage.split(',')[1];
+        }
+        optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
+
+        const estimatedSizeKB = Math.round((optimizedFaceImage.length * 3/4) / 1024);
+        console.log(`   Image size: ${estimatedSizeKB}KB`);
+
+        const javaServicePayload = {
+          employeeId: personId,
+          fullName: `${firstName} ${lastName}`,
+          faceImage: optimizedFaceImage,
+          deviceKey: deviceKey,
+          secret: facilityDoc.configuration?.deviceSecret || '123456',
+          verificationStyle: 0
+        };
+
+        // Call Java device service with timeout
+        const javaResponse = await axios.post(
+          `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/register`,
+          javaServicePayload,
+          {
+            timeout: 60000,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+
+        const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
+
+        if (isSuccess) {
+          console.log(`✅ Device enrollment successful!`);
+          
+          // Update employee record with sync success
+          savedEmployee.deviceSynced = true;
+          savedEmployee.biometricData.syncStatus = 'synced';
+          savedEmployee.biometricData.lastXO5Sync = new Date();
+          savedEmployee.biometricData.lastSyncAttempt = new Date();
+          await savedEmployee.save();
+
+          deviceEnrollmentResult = {
+            status: 'success',
+            message: 'Face enrolled to biometric device successfully',
+            deviceSynced: true,
+            personId: personId
+          };
+        } else {
+          const errorCode = javaResponse.data.code || 'UNKNOWN';
+          const errorMsg = javaResponse.data.msg || javaResponse.data.message || 'Unknown device error';
+          
+          console.warn(`⚠️ Device enrollment failed: [${errorCode}] ${errorMsg}`);
+          
+          // Update employee with sync failure (but keep employee record)
+          savedEmployee.deviceSynced = false;
+          savedEmployee.biometricData.syncStatus = 'failed';
+          savedEmployee.biometricData.syncError = `[${errorCode}] ${errorMsg}`;
+          savedEmployee.biometricData.lastSyncAttempt = new Date();
+          await savedEmployee.save();
+
+          deviceEnrollmentResult = {
+            status: 'failed',
+            message: errorMsg,
+            errorCode: errorCode,
+            deviceSynced: false,
+            canRetry: true
+          };
+        }
+
+      } catch (deviceError) {
+        console.error(`❌ Device enrollment error:`, deviceError.message);
+        
+        // Update employee with sync error (but keep employee record)
+        savedEmployee.deviceSynced = false;
+        savedEmployee.biometricData.syncStatus = 'failed';
+        savedEmployee.biometricData.syncError = deviceError.message;
+        savedEmployee.biometricData.lastSyncAttempt = new Date();
+        await savedEmployee.save();
+
+        deviceEnrollmentResult = {
+          status: 'error',
+          message: deviceError.code === 'ECONNREFUSED' 
+            ? 'Device service unavailable' 
+            : deviceError.message,
+          errorCode: deviceError.code || 'ERROR',
+          deviceSynced: false,
+          canRetry: true
+        };
+      }
+    } else if (!supportsDeviceIntegration) {
+      console.log(`ℹ️ Facility does not support biometric device integration`);
+      deviceEnrollmentResult.message = 'Facility does not support biometric integration';
+    }
+
+    console.log(`✅ ===== REGISTRATION COMPLETED =====`);
+    console.log(`   Employee ID: ${savedEmployee._id}`);
+    console.log(`   Device Synced: ${deviceEnrollmentResult.deviceSynced}`);
+    console.log(`   Sync Status: ${savedEmployee.biometricData.syncStatus}\n`);
+
+    // Return success response (even if device enrollment failed)
+    res.status(201).json({
+      success: true,
+      message: 'Employee registered successfully',
+      data: {
+        employee: savedEmployee,
+        deviceEnrollment: deviceEnrollmentResult,
+        selfServiceCredentials: {
+          staffId: savedEmployee.staffId || savedEmployee.employeeId,
+          pin: defaultPin,
+          note: 'Default PIN is 123456. Employee must change it on first login.'
+        },
+        steps: {
+          validation: 'completed',
+          databaseSave: 'completed',
+          deviceEnrollment: deviceEnrollmentResult.status
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error(`❌ ===== REGISTRATION ERROR =====`);
+    console.error(`Error: ${error.message}`);
+    console.error(`Stack:`, error.stack);
+
+    // If employee was saved but device enrollment failed, still return success
+    if (savedEmployee && deviceEnrollmentAttempted) {
+      return res.status(201).json({
+        success: true,
+        message: 'Employee created but device enrollment failed. You can retry sync later.',
+        data: {
+          employee: savedEmployee,
+          deviceEnrollment: {
+            status: 'failed',
+            message: error.message,
+            canRetry: true
+          },
+          selfServiceCredentials: {
+            staffId: savedEmployee.staffId || savedEmployee.employeeId,
+            pin: '123456',
+            note: 'Default PIN is 123456. Employee must change it on first login.'
+          },
+          steps: {
+            validation: 'completed',
+            databaseSave: 'completed',
+            deviceEnrollment: 'failed'
+          }
+        }
+      });
+    }
+
+    // Database error - complete failure
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Employee already exists',
+        error: 'DUPLICATE_ENTRY',
+        step: 'database_save'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Employee registration failed',
+      error: error.message,
+      step: savedEmployee ? 'device_enrollment' : 'database_save'
+    });
+  }
+};
     
     const {
       employeeId, staffId, firstName, lastName, email, phone, facility,
@@ -842,6 +1141,168 @@ exports.updateEmployee = async (req, res) => {
       message: 'Employee updated successfully'
     });
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Retry device sync for employee with failed enrollment
+// @route   POST /api/employees/:id/retry-device-sync
+// @access  Private
+exports.retryDeviceSync = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { faceImage } = req.body;
+
+    // Find employee
+    const employee = await Employee.findById(id).populate('facility');
+    
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+
+    // Check if already synced
+    if (employee.deviceSynced && employee.biometricData?.syncStatus === 'synced') {
+      return res.status(400).json({
+        success: false,
+        message: 'Employee is already synced to device',
+        syncStatus: employee.biometricData.syncStatus,
+        lastSync: employee.biometricData.lastXO5Sync
+      });
+    }
+
+    // Check facility supports device integration
+    if (employee.facility.configuration?.integrationType !== 'java-xo5') {
+      return res.status(400).json({
+        success: false,
+        message: 'Facility does not support biometric device integration'
+      });
+    }
+
+    if (!faceImage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Face image is required for device enrollment'
+      });
+    }
+
+    console.log(`\n🔄 ===== RETRY DEVICE SYNC =====`);
+    console.log(`   Employee: ${employee.firstName} ${employee.lastName}`);
+    console.log(`   DB ID: ${employee._id}`);
+    console.log(`   Current Sync Status: ${employee.biometricData?.syncStatus || 'unknown'}`);
+
+    // Prepare device enrollment
+    const facilityDeviceId = (employee.facility.deviceInfo?.deviceId || employee.facility.code).toLowerCase();
+    const deviceKey = employee.facility.configuration?.deviceKey?.toLowerCase() || facilityDeviceId;
+    const personId = employee.biometricData?.xo5PersonSn || employee.biometricData?.faceId;
+
+    // Optimize face image
+    let optimizedFaceImage = faceImage;
+    if (faceImage.includes('data:image')) {
+      optimizedFaceImage = faceImage.split(',')[1];
+    }
+    optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
+
+    const estimatedSizeKB = Math.round((optimizedFaceImage.length * 3/4) / 1024);
+    console.log(`   Image size: ${estimatedSizeKB}KB`);
+    console.log(`   Person ID: ${personId}`);
+
+    const javaServicePayload = {
+      employeeId: personId,
+      fullName: `${employee.firstName} ${employee.lastName}`,
+      faceImage: optimizedFaceImage,
+      deviceKey: deviceKey,
+      secret: employee.facility.configuration?.deviceSecret || '123456',
+      verificationStyle: 0
+    };
+
+    try {
+      // Attempt device enrollment
+      const javaResponse = await axios.post(
+        `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/register`,
+        javaServicePayload,
+        {
+          timeout: 60000,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
+
+      if (isSuccess) {
+        console.log(`✅ Device sync successful!`);
+        
+        // Update employee record
+        employee.deviceSynced = true;
+        employee.biometricData.syncStatus = 'synced';
+        employee.biometricData.lastXO5Sync = new Date();
+        employee.biometricData.lastSyncAttempt = new Date();
+        employee.biometricData.syncError = null;
+        await employee.save();
+
+        return res.json({
+          success: true,
+          message: 'Employee synced to biometric device successfully',
+          data: {
+            employeeId: employee._id,
+            deviceSynced: true,
+            syncStatus: 'synced',
+            lastSync: employee.biometricData.lastXO5Sync
+          }
+        });
+      } else {
+        const errorCode = javaResponse.data.code || 'UNKNOWN';
+        const errorMsg = javaResponse.data.msg || javaResponse.data.message || 'Unknown device error';
+        
+        console.warn(`⚠️ Device sync failed: [${errorCode}] ${errorMsg}`);
+        
+        // Update with failure
+        employee.deviceSynced = false;
+        employee.biometricData.syncStatus = 'failed';
+        employee.biometricData.syncError = `[${errorCode}] ${errorMsg}`;
+        employee.biometricData.lastSyncAttempt = new Date();
+        await employee.save();
+
+        return res.status(502).json({
+          success: false,
+          message: errorMsg,
+          deviceErrorCode: errorCode,
+          canRetry: true,
+          data: {
+            employeeId: employee._id,
+            syncStatus: 'failed',
+            lastAttempt: employee.biometricData.lastSyncAttempt
+          }
+        });
+      }
+
+    } catch (deviceError) {
+      console.error(`❌ Device sync error:`, deviceError.message);
+      
+      // Update with error
+      employee.deviceSynced = false;
+      employee.biometricData.syncStatus = 'failed';
+      employee.biometricData.syncError = deviceError.message;
+      employee.biometricData.lastSyncAttempt = new Date();
+      await employee.save();
+
+      return res.status(503).json({
+        success: false,
+        message: deviceError.code === 'ECONNREFUSED' 
+          ? 'Device service unavailable' 
+          : 'Failed to connect to device service',
+        error: deviceError.message,
+        canRetry: true
+      });
+    }
+
+  } catch (error) {
+    console.error('Retry device sync error:', error);
     res.status(500).json({
       success: false,
       message: error.message

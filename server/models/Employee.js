@@ -163,6 +163,28 @@ const employeeSchema = new mongoose.Schema({
     xo5DeviceKey: String, // Device key from XO5
     lastXO5Sync: Date
   },
+  // Device sync status tracking for database-first architecture
+  deviceSyncStatus: {
+    type: String,
+    enum: ['pending', 'syncing', 'synced', 'failed'],
+    default: 'pending'
+  },
+  deviceSyncAttempts: {
+    type: Number,
+    default: 0
+  },
+  lastDeviceSyncAttempt: {
+    type: Date,
+    default: null
+  },
+  deviceSyncError: {
+    type: String,
+    default: null
+  },
+  deviceSynced: {
+    type: Boolean,
+    default: false
+  },
   workingDays: [{
     type: String,
     enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']

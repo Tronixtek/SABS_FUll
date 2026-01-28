@@ -660,7 +660,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       const constraints = { 
         video: { 
           width: { ideal: 640 }, 
-          height: { ideal: 480 }
+          height: { ideal: 480 },
+          aspectRatio: { ideal: 1.333 } // Prefer 4:3 ratio to prevent stretching
         },
         audio: false
       };
@@ -717,14 +718,29 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    // Set optimal canvas size for XO5 device (higher resolution for better face detection)
-    const targetWidth = 640;  // Optimal resolution for XO5 
-    const targetHeight = 480; // 4:3 aspect ratio standard
+    // Calculate dimensions maintaining aspect ratio
+    const videoAspectRatio = video.videoWidth / video.videoHeight;
+    let targetWidth, targetHeight;
+    
+    // Target 640x480 as base, but maintain aspect ratio
+    if (videoAspectRatio > 1.33) {
+      // Wider than 4:3 (e.g., 16:9) - fit by width
+      targetWidth = 640;
+      targetHeight = Math.round(640 / videoAspectRatio);
+    } else {
+      // Taller or 4:3 - fit by height  
+      targetHeight = 480;
+      targetWidth = Math.round(480 * videoAspectRatio);
+    }
+    
+    // Ensure minimum dimensions for face detection
+    if (targetWidth < 480) targetWidth = 480;
+    if (targetHeight < 480) targetHeight = 480;
     
     canvas.width = targetWidth;
     canvas.height = targetHeight;
 
-    // Draw and scale video frame to optimal size for XO5
+    // Draw video frame maintaining aspect ratio (no stretching)
     context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, targetWidth, targetHeight);
 
     // Apply image enhancement for better face detection in low light
@@ -876,12 +892,12 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     try {
       // Reset status
       setRegistrationStatus({ 
-        deviceSync: 'loading', 
-        databaseSave: null, 
-        message: 'Starting employee registration...' 
+        deviceSync: null, 
+        databaseSave: 'loading', 
+        message: 'Saving employee to database...' 
       });
 
-      console.log('🚀 Starting enhanced employee registration flow...');
+      console.log('🚀 Starting employee registration (Database-First)...');
       
       // Prepare registration payload
       const registrationPayload = {
@@ -890,71 +906,71 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         profileImage: capturedImage
       };
 
-      console.log('� Sending registration request to MERN backend...');
+      console.log('📤 Sending registration request...');
       
-      // Call the enhanced registration endpoint
+      // Call the registration endpoint
       const response = await axios.post('/api/employees/register', registrationPayload);
       
       console.log('📨 Registration response:', response.data);
 
       if (response.data.success) {
-        const { steps } = response.data.data;
+        const { employee, deviceEnrollment, selfServiceCredentials, steps } = response.data.data;
         
-        // Update status to show successful device enrollment
-        if (steps.deviceEnrollment === 'completed') {
-          setRegistrationStatus(prev => ({ 
-            ...prev, 
-            deviceSync: 'success', 
-            databaseSave: 'loading',
-            message: 'Device enrollment successful, saving to database...' 
-          }));
+        // Database save completed
+        setRegistrationStatus(prev => ({ 
+          ...prev, 
+          databaseSave: 'success',
+          deviceSync: deviceEnrollment.status === 'success' ? 'success' : 
+                      deviceEnrollment.status === 'failed' ? 'failed' : 
+                      deviceEnrollment.status === 'error' ? 'error' : null,
+          message: steps.deviceEnrollment === 'success' 
+            ? '✅ Employee registered and synced to device!' 
+            : steps.deviceEnrollment === 'failed' || steps.deviceEnrollment === 'error'
+            ? '✅ Employee saved! Device sync failed (can retry later)'
+            : '✅ Employee saved successfully!'
+        }));
 
-          // Update status to show successful database save
-          if (steps.databaseSave === 'completed') {
-            setRegistrationStatus(prev => ({ 
-              ...prev, 
-              databaseSave: 'success',
-              message: '✅ Employee registration completed successfully!' 
-            }));
-            
-            // Display generated PIN if available
-            if (response.data.data.selfServiceCredentials) {
-              const credentials = response.data.data.selfServiceCredentials;
-              const employee = response.data.data.employee;
-              
-              // Show PIN in an alert with copy functionality
-              const pinMessage = 
-                `✅ EMPLOYEE CREATED SUCCESSFULLY!\n\n` +
-                `Employee: ${employee.firstName} ${employee.lastName}\n` +
-                `Employee ID: ${employee.employeeId}\n` +
-                `Staff ID: ${credentials.staffId}\n\n` +
-                `🔑 SELF-SERVICE PORTAL CREDENTIALS:\n` +
-                `Staff ID: ${credentials.staffId}\n` +
-                `PIN: ${credentials.pin}\n\n` +
-                `⚠️ IMPORTANT:\n` +
-                `• This PIN will only be shown ONCE\n` +
-                `• Please save it securely\n` +
-                `• Give this PIN to the employee\n` +
-                `• Employee will be required to change PIN on first login\n\n` +
-                `Employee Portal: ${window.location.origin}/employee-login`;
-              
-              alert(pinMessage);
-              
-              // Also show a success toast
-              toast.success(
-                `Employee created! PIN: ${credentials.pin} (shown in alert)`, 
-                { duration: 10000 }
-              );
-            } else {
-              toast.success('Employee registered successfully!', { duration: 4000 });
-            }
-            
-            return { success: true, data: response.data };
-          }
+        // Show warnings if device enrollment failed
+        if (deviceEnrollment.status === 'failed' || deviceEnrollment.status === 'error') {
+          toast.error(
+            `Device enrollment ${deviceEnrollment.status}: ${deviceEnrollment.message}\n\n` +
+            `Employee record saved successfully.\n` +
+            `You can retry device sync later from the employee list.`,
+            { duration: 8000 }
+          );
         }
         
-        // If we reach here, something went wrong with the steps
-        throw new Error('Registration completed but steps verification failed');
+        // Display generated PIN
+        if (selfServiceCredentials) {
+          const pinMessage = 
+            `✅ EMPLOYEE ${deviceEnrollment.deviceSynced ? 'REGISTERED' : 'CREATED'} SUCCESSFULLY!\n\n` +
+            `Employee: ${employee.firstName} ${employee.lastName}\n` +
+            `Employee ID: ${employee.employeeId}\n` +
+            `Staff ID: ${selfServiceCredentials.staffId}\n\n` +
+            `🔑 SELF-SERVICE PORTAL CREDENTIALS:\n` +
+            `Staff ID: ${selfServiceCredentials.staffId}\n` +
+            `PIN: ${selfServiceCredentials.pin}\n\n` +
+            `${!deviceEnrollment.deviceSynced ? '⚠️ DEVICE SYNC STATUS: Failed\n' : ''}` +
+            `${!deviceEnrollment.deviceSynced ? 'Face enrollment to device failed but employee record was saved.\n' : ''}` +
+            `${!deviceEnrollment.deviceSynced ? 'You can retry device sync later.\n\n' : ''}` +
+            `⚠️ IMPORTANT:\n` +
+            `• This PIN will only be shown ONCE\n` +
+            `• Please save it securely\n` +
+            `• Give this PIN to the employee\n` +
+            `• Employee will be required to change PIN on first login\n\n` +
+            `Employee Portal: ${window.location.origin}/employee-login`;
+          
+          alert(pinMessage);
+          
+          toast.success(
+            `Employee saved! PIN: ${selfServiceCredentials.pin} (shown in alert)`, 
+            { duration: 10000 }
+          );
+        } else {
+          toast.success('Employee saved successfully!', { duration: 4000 });
+        }
+        
+        return { success: true, data: response.data };
         
       } else {
         throw new Error(response.data.message || 'Registration failed');
@@ -969,69 +985,92 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       const message = errorData.message || error.message || 'Registration failed';
       
       // Update status based on which step failed
-      if (step === 'device_enrollment') {
-        setRegistrationStatus(prev => ({ 
-          ...prev, 
-          deviceSync: 'error',
-          message: `Device enrollment failed: ${message}` 
-        }));
+      if (step === 'database_save') {
+        setRegistrationStatus({ 
+          databaseSave: 'error',
+          deviceSync: null,
+          message: `Database save failed: ${message}` 
+        });
         
-        // Check for specific error codes and display appropriate messages
-        const deviceErrorCode = errorData.deviceErrorCode;
-        const recommendations = errorData.recommendations || [];
-        
-        // Check if this is a face detection error
-        if (message.includes('FACE_NOT_DETECTED') || message.includes('No face detected')) {
-          // Face detection failed - this is expected and user-friendly
-          let errorMsg = 'Face Detection Failed\n\n';
-          if (message.includes(':')) {
-            errorMsg += message.split(':')[1].trim();
-          } else {
-            errorMsg += 'The captured image does not contain a detectable face.\n\n';
-            errorMsg += 'Please ensure:\n';
-            errorMsg += '• Face is clearly visible and centered\n';
-            errorMsg += '• Good lighting without shadows\n';
-            errorMsg += '• Front-facing (not at an angle)\n';
-            errorMsg += '• No sunglasses, hats, or masks\n';
-            errorMsg += '• Face occupies at least 30% of the image';
-          }
-          toast.error(errorMsg, { duration: 10000 });
-        } else if (deviceErrorCode === '1500') {
-          // Face image quality/detection error
-          let errorMsg = message;
-          if (recommendations.length > 0) {
-            errorMsg += '\n\nRecommendations:\n' + recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n');
-          }
-          toast.error(errorMsg, { duration: 10000 });
-        } else if (errorData.error === 'SERVICE_UNAVAILABLE') {
-          toast.error('Device service is unavailable. Please check the service status.');
-        } else if (errorData.error === 'TIMEOUT') {
-          if (errorData.possibleSuccess) {
-            toast.error(
-              `⏱️ Device enrollment timed out!\n\n` +
-              `The employee may have been successfully enrolled on the device.\n` +
-              `Please check the device and try again if needed.\n\n` +
-              `Employee ID: ${errorData.employeeId || 'N/A'}`,
-              { duration: 8000 }
-            );
-          } else {
-            toast.error('Device enrollment timed out. Please check device connectivity.');
-          }
-        } else if (deviceErrorCode === 'UNKNOWN' || !deviceErrorCode) {
-          // Unknown device error - show detailed troubleshooting steps
-          let errorMsg = 'Unknown Device Error: An unexpected error occurred during device enrollment.';
-          if (recommendations.length > 0) {
-            errorMsg += '\n\nTroubleshooting Steps:\n' + recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n');
-          } else {
-            // Fallback recommendations if backend doesn't provide any
-            errorMsg += '\n\nTroubleshooting Steps:\n';
-            errorMsg += '1. Check if the biometric device is powered on\n';
-            errorMsg += '2. Verify device network connectivity\n';
-            errorMsg += '3. Try recapturing the face image\n';
-            errorMsg += '4. Contact your system administrator if the issue persists';
-          }
-          toast.error(errorMsg, { duration: 10000 });
+        if (error.response?.status === 409) {
+          toast.error('Employee already exists with this email or employee ID.');
+        } else if (error.response?.status === 400) {
+          toast.error(`Validation error: ${message}`);
         } else {
+          toast.error(`Failed to save employee: ${message}`);
+        }
+      } else {
+        // Generic error (not specific to a step)
+        setRegistrationStatus({ 
+          databaseSave: 'error',
+          deviceSync: null,
+          message: `Registration failed: ${message}` 
+        });
+        
+        if (error.response?.status === 409) {
+          toast.error('Employee already exists with this email or employee ID.');
+        } else if (error.response?.status === 400) {
+          toast.error(`Validation error: ${message}`);
+        } else {
+          toast.error(`Registration failed: ${message}`);
+        }
+      }
+      
+      throw error;
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.employeeId.trim()) {
+      toast.error('Employee ID is required');
+      return;
+    }
+    
+    if (!formData.firstName.trim() || !formData.lastName.trim()) {
+      toast.error('First name and last name are required');
+      return;
+    }
+    
+    if (!formData.facility) {
+      toast.error('Please select a facility');
+      return;
+    }
+    
+    if (!formData.shift) {
+      toast.error('Please select a shift');
+      return;
+    }
+
+    // Check if facility supports smart integration for new employees
+    if (!employee) {
+      const selectedFacility = facilities.find(f => f._id === formData.facility);
+      
+      if (!selectedFacility) {
+        toast.error('Selected facility not found');
+        return;
+      }
+
+      const supportsSmartIntegration = selectedFacility.configuration?.integrationType === 'java-xo5';
+
+      if (!supportsSmartIntegration) {
+        toast.error('This facility does not support smart biometric device integration');
+        return;
+      }
+      
+      // Only require face image if facility supports integration
+      if (!capturedImage) {
+        toast.error('Please capture a face image for biometric enrollment');
+        return;
+      }
+    }
+
+    setLoading(true);
+
+    try {
+      if (employee) {
           // Generic device error with recommendations if available
           let errorMsg = `Device enrollment error: ${errorData.deviceError || message}`;
           if (recommendations.length > 0) {
@@ -2180,7 +2219,8 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                           ref={videoRef}
                           autoPlay
                           playsInline
-                          className="w-full h-80 object-cover"
+                          muted
+                          className="w-full h-80 object-contain"
                         />
                         {/* Face guide overlay */}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

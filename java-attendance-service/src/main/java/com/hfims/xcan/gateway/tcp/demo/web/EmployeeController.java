@@ -263,6 +263,140 @@ public class EmployeeController extends BaseController {
     }
 
     /**
+     * Upload Face Image Only (Database-First Architecture)
+     * This endpoint is called AFTER employee is saved to database
+     * It only handles device synchronization
+     */
+    @PostMapping("/upload-face")
+    public BaseResult uploadFaceImageToDevice(@RequestBody FaceUploadRequest request) {
+        System.out.println("=== FACE UPLOAD REQUEST (Database-First) ===");
+        System.out.println("Employee ID: " + request.getEmployeeId());
+        System.out.println("Full Name: " + request.getFullName());
+        System.out.println("Device Key: " + request.getDeviceKey());
+        
+        try {
+            // Validate input
+            if (request.getEmployeeId() == null || request.getEmployeeId().trim().isEmpty()) {
+                return ResultWrapper.wrapFailure("1001", "Employee ID is required");
+            }
+            if (request.getFaceImage() == null || request.getFaceImage().trim().isEmpty()) {
+                return ResultWrapper.wrapFailure("1001", "Face image is required");
+            }
+            if (request.getDeviceKey() == null || request.getSecret() == null) {
+                return ResultWrapper.wrapFailure("1001", "Device credentials are required");
+            }
+            
+            // Convert to EmployeeRegistrationRequest for compatibility
+            EmployeeRegistrationRequest registrationRequest = new EmployeeRegistrationRequest();
+            registrationRequest.setEmployeeId(request.getEmployeeId());
+            registrationRequest.setFullName(request.getFullName());
+            registrationRequest.setFaceImage(request.getFaceImage());
+            registrationRequest.setDeviceKey(request.getDeviceKey());
+            registrationRequest.setSecret(request.getSecret());
+            registrationRequest.setVerificationStyle(request.getVerificationStyle());
+            registrationRequest.setForceUpdate(true); // Always allow updates in database-first mode
+            
+            // Submit to queue
+            int queuePosition = queuedRequests.incrementAndGet();
+            System.out.println("📊 Queue Position: " + queuePosition);
+            
+            Future<BaseResult> future = deviceExecutor.submit(() -> processEnrollmentToDevice(registrationRequest));
+            BaseResult result = future.get(DEVICE_OPERATION_TIMEOUT, TimeUnit.MILLISECONDS);
+            
+            processedRequests.incrementAndGet();
+            return result;
+            
+        } catch (TimeoutException e) {
+            failedRequests.incrementAndGet();
+            return ResultWrapper.wrapFailure("TIMEOUT", "Device operation timed out. Please retry.");
+        } catch (Exception e) {
+            failedRequests.incrementAndGet();
+            e.printStackTrace();
+            return ResultWrapper.wrapFailure("1000", "Face upload failed: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Delete Person from Device
+     * Allows cleanup of person records from device
+     */
+    @PostMapping("/delete-person")
+    public BaseResult deletePersonFromDevice(@RequestBody DeletePersonRequest request) {
+        System.out.println("=== DELETE PERSON REQUEST ===");
+        System.out.println("Employee ID: " + request.getEmployeeId());
+        System.out.println("Device Key: " + request.getDeviceKey());
+        
+        try {
+            if (request.getEmployeeId() == null || request.getEmployeeId().trim().isEmpty()) {
+                return ResultWrapper.wrapFailure("1001", "Employee ID is required");
+            }
+            if (request.getDeviceKey() == null || request.getSecret() == null) {
+                return ResultWrapper.wrapFailure("1001", "Device credentials are required");
+            }
+            
+            HfDeviceResp response = deletePersonFromDevice(
+                request.getEmployeeId(), 
+                request.getDeviceKey(), 
+                request.getSecret()
+            );
+            
+            if ("000".equals(response.getCode())) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("employeeId", request.getEmployeeId());
+                data.put("status", "deleted");
+                data.put("message", "Person deleted successfully from device");
+                return ResultWrapper.wrapSuccess(data);
+            } else {
+                return ResultWrapper.wrapFailure(response.getCode(), "Failed to delete person: " + response.getMsg());
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultWrapper.wrapFailure("1000", "Delete operation failed: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Get Person Info from Device
+     * Retrieves person information from the device
+     */
+    @PostMapping("/get-person")
+    public BaseResult getPersonFromDevice(@RequestBody GetPersonRequest request) {
+        System.out.println("=== GET PERSON REQUEST ===");
+        System.out.println("Employee ID: " + request.getEmployeeId());
+        
+        try {
+            if (request.getEmployeeId() == null || request.getEmployeeId().trim().isEmpty()) {
+                return ResultWrapper.wrapFailure("1001", "Employee ID is required");
+            }
+            if (request.getDeviceKey() == null || request.getSecret() == null) {
+                return ResultWrapper.wrapFailure("1001", "Device credentials are required");
+            }
+            
+            // Get person info from device
+            HfDeviceResp response = getPersonInfo(request.getEmployeeId(), request.getDeviceKey(), request.getSecret());
+            
+            if ("000".equals(response.getCode())) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("employeeId", request.getEmployeeId());
+                data.put("exists", true);
+                data.put("deviceResponse", response.getData());
+                return ResultWrapper.wrapSuccess(data);
+            } else {
+                Map<String, Object> data = new HashMap<>();
+                data.put("employeeId", request.getEmployeeId());
+                data.put("exists", false);
+                data.put("message", response.getMsg());
+                return ResultWrapper.wrapSuccess(data);
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResultWrapper.wrapFailure("1000", "Get person operation failed: " + e.getMessage());
+        }
+    }
+
+    /**
      * Register Employee and Upload Face Image
      */
     @PostMapping("/register")
@@ -2247,6 +2381,33 @@ public class EmployeeController extends BaseController {
             throw new Exception("Person deletion failed: " + e.getMessage());
         }
     }
+    
+    /**
+     * Get person info from device
+     */
+    private HfDeviceResp getPersonInfo(String employeeId, String deviceKey, String secret) throws Exception {
+        try {
+            System.out.println("=== GETTING PERSON INFO ===");
+            System.out.println("Employee ID: " + employeeId);
+            
+            // Try to use PersonFind method
+            HfDeviceResp response = findSpecificPerson(employeeId, deviceKey, secret);
+            
+            if (response != null && "000".equals(response.getCode())) {
+                System.out.println("✅ Person found on device");
+                return response;
+            }
+            
+            // If not found, return the response anyway
+            System.out.println("⚠️ Person not found or error occurred");
+            return response;
+            
+        } catch (Exception e) {
+            System.err.println("Failed to get person info: " + e.getMessage());
+            e.printStackTrace();
+            throw new Exception("Get person info failed: " + e.getMessage());
+        }
+    }
 }
 
 /**
@@ -2285,6 +2446,72 @@ class GetEmployeeRequest {
  * Request class for deleting employee
  */
 class DeleteEmployeeRequest {
+    private String employeeId;
+    private String deviceKey;
+    private String secret;
+
+    public String getEmployeeId() { return employeeId; }
+    public void setEmployeeId(String employeeId) { this.employeeId = employeeId; }
+    
+    public String getDeviceKey() { return deviceKey; }
+    public void setDeviceKey(String deviceKey) { this.deviceKey = deviceKey; }
+    
+    public String getSecret() { return secret; }
+    public void setSecret(String secret) { this.secret = secret; }
+}
+
+/**
+ * Request class for uploading face image only (database-first approach)
+ */
+class FaceUploadRequest {
+    private String employeeId;
+    private String fullName;
+    private String faceImage;
+    private String deviceKey;
+    private String secret;
+    private Integer verificationStyle;
+
+    public String getEmployeeId() { return employeeId; }
+    public void setEmployeeId(String employeeId) { this.employeeId = employeeId; }
+    
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+    
+    public String getFaceImage() { return faceImage; }
+    public void setFaceImage(String faceImage) { this.faceImage = faceImage; }
+    
+    public String getDeviceKey() { return deviceKey; }
+    public void setDeviceKey(String deviceKey) { this.deviceKey = deviceKey; }
+    
+    public String getSecret() { return secret; }
+    public void setSecret(String secret) { this.secret = secret; }
+    
+    public Integer getVerificationStyle() { return verificationStyle; }
+    public void setVerificationStyle(Integer verificationStyle) { this.verificationStyle = verificationStyle; }
+}
+
+/**
+ * Request class for deleting person from device
+ */
+class DeletePersonRequest {
+    private String employeeId;
+    private String deviceKey;
+    private String secret;
+
+    public String getEmployeeId() { return employeeId; }
+    public void setEmployeeId(String employeeId) { this.employeeId = employeeId; }
+    
+    public String getDeviceKey() { return deviceKey; }
+    public void setDeviceKey(String deviceKey) { this.deviceKey = deviceKey; }
+    
+    public String getSecret() { return secret; }
+    public void setSecret(String secret) { this.secret = secret; }
+}
+
+/**
+ * Request class for getting person from device
+ */
+class GetPersonRequest {
     private String employeeId;
     private String deviceKey;
     private String secret;
