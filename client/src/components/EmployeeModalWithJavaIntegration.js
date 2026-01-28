@@ -1020,6 +1020,72 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     }
   };
 
+  /**
+   * Handle retry device sync for failed enrollments
+   */
+  const handleRetryDeviceSync = async () => {
+    if (!employee || !employee._id) {
+      toast.error('No employee selected for retry');
+      return;
+    }
+
+    // Check if we have a captured image, if not prompt user to capture
+    if (!capturedImage) {
+      toast.error('Please capture a face image before retrying device sync');
+      setShowCamera(true);
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      toast.loading('Retrying device synchronization...', { id: 'retry-sync' });
+      
+      const payload = {
+        faceImage: capturedImage
+      };
+
+      const response = await axios.post(`/api/employees/${employee._id}/retry-device-sync`, payload);
+      
+      toast.dismiss('retry-sync');
+      
+      if (response.data.success) {
+        const { deviceSync } = response.data.data;
+        
+        if (deviceSync.status === 'synced') {
+          toast.success('Device synchronization successful! Employee enrolled to biometric device.');
+          
+          // Update local employee data
+          employee.deviceSyncStatus = 'synced';
+          employee.deviceSyncAttempts = (employee.deviceSyncAttempts || 0) + 1;
+          employee.lastDeviceSyncAttempt = new Date();
+          
+          // Close modal after successful sync
+          setTimeout(() => {
+            onClose(true);
+          }, 1500);
+        } else if (deviceSync.status === 'failed') {
+          toast.error(`Device sync failed: ${deviceSync.message || 'Unknown error'}`);
+          
+          // Update employee with new attempt count
+          employee.deviceSyncStatus = 'failed';
+          employee.deviceSyncAttempts = (employee.deviceSyncAttempts || 0) + 1;
+          employee.deviceSyncError = deviceSync.message;
+        }
+      } else {
+        toast.error(response.data.message || 'Retry failed');
+      }
+    } catch (error) {
+      console.error('❌ Retry device sync error:', error);
+      toast.dismiss('retry-sync');
+      
+      const message = error.response?.data?.message || error.message || 'Retry failed';
+      toast.error(`Failed to retry sync: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -1065,97 +1131,6 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         toast.error('Please capture a face image for biometric enrollment');
         return;
       }
-    }
-
-    setLoading(true);
-
-    try {
-      if (employee) {
-          // Generic device error with recommendations if available
-          let errorMsg = `Device enrollment error: ${errorData.deviceError || message}`;
-          if (recommendations.length > 0) {
-            errorMsg += '\n\nRecommendations:\n' + recommendations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n');
-          }
-          toast.error(errorMsg, { duration: 8000 });
-        }
-        
-      } else if (step === 'database_save') {
-        setRegistrationStatus(prev => ({ 
-          ...prev, 
-          deviceSync: 'success',
-          databaseSave: 'error',
-          message: `Database save failed: ${message}` 
-        }));
-        
-        toast.error('Device enrollment succeeded but database save failed. Contact administrator.');
-        
-      } else {
-        // Validation or unknown errors
-        setRegistrationStatus(prev => ({ 
-          ...prev, 
-          deviceSync: 'error',
-          message: `Registration failed: ${message}` 
-        }));
-        
-        if (error.response?.status === 409) {
-          toast.error('Employee already exists with this email or employee ID.');
-        } else if (error.response?.status === 400) {
-          toast.error(`Validation error: ${message}`);
-        } else {
-          toast.error(`Registration failed: ${message}`);
-        }
-      }
-      
-      throw error;
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validate required fields
-    if (!formData.employeeId.trim()) {
-      toast.error('Employee ID is required');
-      return;
-    }
-    
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      toast.error('First name and last name are required');
-      return;
-    }
-    
-    if (!formData.facility) {
-      toast.error('Please select a facility');
-      return;
-    }
-    
-    if (!formData.shift) {
-      toast.error('Please select a shift');
-      return;
-    }
-
-    // Check if facility supports smart integration for new employees
-    if (!employee) {
-      const selectedFacility = facilities.find(f => f._id === formData.facility);
-      
-      if (!selectedFacility) {
-        toast.error('Selected facility not found');
-        return;
-      }
-      
-      if (selectedFacility.configuration?.integrationType !== 'java-xo5') {
-        toast.error(
-          `Facility "${selectedFacility.name}" does not support smart device integration. ` +
-          `Please select a facility with smart integration or contact your administrator.`
-        );
-        return;
-      }
-    }
-    
-    // Validate face capture for new employees
-    if (!employee && !capturedImage) {
-      toast.error('Please capture a face photo before submitting');
-      return;
     }
 
     setLoading(true);
@@ -1290,9 +1265,40 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b">
-          <h3 className="text-xl font-bold text-gray-900">
-            {employee ? 'Edit Employee' : 'Register New Employee'}
-          </h3>
+          <div className="flex items-center space-x-3">
+            <h3 className="text-xl font-bold text-gray-900">
+              {employee ? 'Edit Employee' : 'Register New Employee'}
+            </h3>
+            
+            {/* Device Sync Status Badge (for existing employees) */}
+            {employee && employee.deviceSyncStatus && (
+              <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                employee.deviceSyncStatus === 'synced' 
+                  ? 'bg-green-100 text-green-800'
+                  : employee.deviceSyncStatus === 'failed'
+                  ? 'bg-red-100 text-red-800'
+                  : employee.deviceSyncStatus === 'pending'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : employee.deviceSyncStatus === 'syncing'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {employee.deviceSyncStatus === 'synced' && '✓ Device Synced'}
+                {employee.deviceSyncStatus === 'failed' && '✗ Sync Failed'}
+                {employee.deviceSyncStatus === 'pending' && '⏳ Pending Sync'}
+                {employee.deviceSyncStatus === 'syncing' && '⟳ Syncing...'}
+                {!['synced', 'failed', 'pending', 'syncing'].includes(employee.deviceSyncStatus) && employee.deviceSyncStatus}
+              </span>
+            )}
+            
+            {/* Sync error tooltip */}
+            {employee && employee.deviceSyncStatus === 'failed' && employee.deviceSyncError && (
+              <span className="text-xs text-red-600" title={employee.deviceSyncError}>
+                ℹ {employee.deviceSyncError.substring(0, 30)}{employee.deviceSyncError.length > 30 ? '...' : ''}
+              </span>
+            )}
+          </div>
+          
           <button
             onClick={() => onClose(false)}
             className="text-gray-400 hover:text-gray-500"
@@ -2304,6 +2310,21 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
               >
                 Cancel
               </button>
+              
+              {/* Retry Device Sync Button - Show for existing employees with failed sync */}
+              {employee && (employee.deviceSyncStatus === 'failed' || employee.deviceSyncStatus === 'pending') && (
+                <button
+                  type="button"
+                  onClick={handleRetryDeviceSync}
+                  disabled={loading}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  title="Retry synchronizing this employee to the biometric device"
+                >
+                  <ArrowPathIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Retry Device Sync
+                </button>
+              )}
+              
               <button
                 type="submit"
                 disabled={loading || registrationStatus.deviceSync === 'loading'}
