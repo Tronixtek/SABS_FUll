@@ -932,11 +932,16 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
 
         // Show warnings if device enrollment failed
         if (deviceEnrollment.status === 'failed' || deviceEnrollment.status === 'error') {
+          // Extract exact error details from Java service
+          const errorCode = deviceEnrollment.errorCode ? `[${deviceEnrollment.errorCode}] ` : '';
+          const errorMessage = deviceEnrollment.message || 'Unknown device error';
+          
           toast.error(
-            `Device enrollment ${deviceEnrollment.status}: ${deviceEnrollment.message}\n\n` +
-            `Employee record saved successfully.\n` +
-            `You can retry device sync later from the employee list.`,
-            { duration: 8000 }
+            `❌ Device Enrollment Failed\n\n` +
+            `${errorCode}${errorMessage}\n\n` +
+            `✅ Employee record saved to database.\n` +
+            `You can retry device sync later.`,
+            { duration: 10000 }
           );
         }
         
@@ -1050,37 +1055,45 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
       toast.dismiss('retry-sync');
       
       if (response.data.success) {
-        const { deviceSync } = response.data.data;
+        toast.success('✅ Device synchronization successful! Employee enrolled to biometric device.');
         
-        if (deviceSync.status === 'synced') {
-          toast.success('Device synchronization successful! Employee enrolled to biometric device.');
-          
-          // Update local employee data
-          employee.deviceSyncStatus = 'synced';
-          employee.deviceSyncAttempts = (employee.deviceSyncAttempts || 0) + 1;
-          employee.lastDeviceSyncAttempt = new Date();
-          
-          // Close modal after successful sync
-          setTimeout(() => {
-            onClose(true);
-          }, 1500);
-        } else if (deviceSync.status === 'failed') {
-          toast.error(`Device sync failed: ${deviceSync.message || 'Unknown error'}`);
-          
-          // Update employee with new attempt count
-          employee.deviceSyncStatus = 'failed';
-          employee.deviceSyncAttempts = (employee.deviceSyncAttempts || 0) + 1;
-          employee.deviceSyncError = deviceSync.message;
-        }
+        // Update local employee data
+        employee.deviceSyncStatus = 'synced';
+        employee.deviceSyncAttempts = (employee.deviceSyncAttempts || 0) + 1;
+        employee.lastDeviceSyncAttempt = new Date();
+        
+        // Close modal after successful sync
+        setTimeout(() => {
+          onClose(true);
+        }, 1500);
       } else {
-        toast.error(response.data.message || 'Retry failed');
+        // Show detailed error from backend
+        const errorMsg = response.data.message || 'Unknown error';
+        const errorCode = response.data.deviceErrorCode ? `[${response.data.deviceErrorCode}] ` : '';
+        
+        toast.error(
+          `❌ Device Sync Failed\n\n${errorCode}${errorMsg}`,
+          { duration: 8000 }
+        );
+        
+        // Update employee with new attempt count
+        employee.deviceSyncStatus = 'failed';
+        employee.deviceSyncAttempts = (employee.deviceSyncAttempts || 0) + 1;
+        employee.deviceSyncError = errorMsg;
       }
     } catch (error) {
       console.error('❌ Retry device sync error:', error);
       toast.dismiss('retry-sync');
       
-      const message = error.response?.data?.message || error.message || 'Retry failed';
-      toast.error(`Failed to retry sync: ${message}`);
+      // Extract detailed error message from Java service
+      const responseData = error.response?.data || {};
+      const deviceErrorCode = responseData.deviceErrorCode ? `[${responseData.deviceErrorCode}] ` : '';
+      const message = responseData.message || error.message || 'Retry failed';
+      
+      toast.error(
+        `❌ Device Sync Failed\n\n${deviceErrorCode}${message}`,
+        { duration: 8000 }
+      );
     } finally {
       setLoading(false);
     }
