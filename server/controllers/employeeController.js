@@ -677,7 +677,7 @@ exports.retryDeviceSync = async (req, res) => {
       console.log('📥 Java Service Response:', JSON.stringify(javaResponse.data, null, 2));
 
       const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
-      const isDuplicate = javaResponse.data.code === "100911"; // Employee already exists on device
+      const isDuplicate = javaResponse.data.code === "100911" || javaResponse.data.code === "DUPLICATE_EMPLOYEE"; // Employee already exists on device
       
       // Handle success: false with no error details - check Java service logs for actual error
       if (javaResponse.data.success === false && !javaResponse.data.code) {
@@ -780,7 +780,7 @@ exports.retryDeviceSync = async (req, res) => {
         errorMessage = javaErrorData.msg || javaErrorData.message || 'Unknown device error';
         
         // Check if this is a duplicate employee error (treat as success)
-        if (errorCode === '100911') {
+        if (errorCode === '100911' || errorCode === 'DUPLICATE_EMPLOYEE') {
           console.log(`✅ Device sync successful (employee already exists on device)`);
           
           employee.deviceSynced = true;
