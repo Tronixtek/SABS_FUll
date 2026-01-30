@@ -1272,6 +1272,7 @@ exports.bulkSyncEmployees = async (req, res) => {
         const employee = await Employee.findById(employeeId).populate('facility shift');
         
         if (!employee) {
+          console.log(`❌ SKIP: Employee not found (ID: ${employeeId})`);
           results.skipped.push({
             employeeId,
             reason: 'Employee not found'
@@ -1280,6 +1281,9 @@ exports.bulkSyncEmployees = async (req, res) => {
         }
 
         if (!employee.facility || !employee.facility.configuration || !employee.facility.configuration.deviceKey) {
+          console.log(`❌ SKIP: ${employee.firstName} ${employee.lastName} - Facility device not configured`);
+          console.log(`   Facility: ${employee.facility?.name || 'none'}`);
+          console.log(`   Device Key: ${employee.facility?.configuration?.deviceKey || 'none'}`);
           results.skipped.push({
             employeeId,
             name: `${employee.firstName} ${employee.lastName}`,
@@ -1298,6 +1302,9 @@ exports.bulkSyncEmployees = async (req, res) => {
         // Get profile image
         let capturedImage = employee.profileImage || employee.capturedImage;
         if (!capturedImage) {
+          console.log(`❌ SKIP: ${employee.firstName} ${employee.lastName} - No profile image available`);
+          console.log(`   profileImage: ${employee.profileImage || 'none'}`);
+          console.log(`   capturedImage: ${employee.capturedImage || 'none'}`);
           results.skipped.push({
             employeeId,
             name: `${employee.firstName} ${employee.lastName}`,
@@ -1313,9 +1320,14 @@ exports.bulkSyncEmployees = async (req, res) => {
         if (capturedImage.startsWith('/uploads/') || capturedImage.startsWith('uploads/')) {
           try {
             const imagePath = path.join(__dirname, '..', '..', capturedImage);
+            console.log(`📷 Reading image file: ${imagePath}`);
             const imageBuffer = fs.readFileSync(imagePath);
             optimizedFaceImage = imageBuffer.toString('base64');
+            console.log(`✅ Image converted to base64 (${Math.round(optimizedFaceImage.length / 1024)}KB)`);
           } catch (fileError) {
+            console.log(`❌ SKIP: ${employee.firstName} ${employee.lastName} - Failed to read image file`);
+            console.log(`   Error: ${fileError.message}`);
+            console.log(`   Path: ${capturedImage}`);
             results.skipped.push({
               employeeId,
               name: `${employee.firstName} ${employee.lastName}`,
@@ -1324,6 +1336,7 @@ exports.bulkSyncEmployees = async (req, res) => {
             continue;
           }
         } else if (capturedImage.startsWith('http://') || capturedImage.startsWith('https://')) {
+          console.log(`❌ SKIP: ${employee.firstName} ${employee.lastName} - Remote URL not supported`);
           results.skipped.push({
             employeeId,
             name: `${employee.firstName} ${employee.lastName}`,
@@ -1332,6 +1345,7 @@ exports.bulkSyncEmployees = async (req, res) => {
           continue;
         } else {
           // Already base64, extract if data URI
+          console.log(`📷 Using base64 image (${Math.round(capturedImage.length / 1024)}KB)`);
           if (optimizedFaceImage.includes(',')) {
             optimizedFaceImage = optimizedFaceImage.split(',')[1];
           }
