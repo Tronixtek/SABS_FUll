@@ -7,6 +7,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.List;
 
@@ -24,14 +25,21 @@ public class WebConfig implements WebMvcConfigurer {
     }
     
     @Override
-    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
+    public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
         // Configure Jackson to properly serialize all fields
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
-        
-        MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
-        converter.setObjectMapper(objectMapper);
-        
-        converters.add(converter);
+        for (HttpMessageConverter<?> converter : converters) {
+            if (converter instanceof MappingJackson2HttpMessageConverter) {
+                MappingJackson2HttpMessageConverter jacksonConverter = (MappingJackson2HttpMessageConverter) converter;
+                ObjectMapper objectMapper = jacksonConverter.getObjectMapper();
+                
+                // Don't fail on empty beans
+                objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+                
+                // Include non-null values
+                objectMapper.setSerializationInclusion(JsonInclude.Include.ALWAYS);
+                
+                System.out.println("✅ Configured Jackson ObjectMapper for proper serialization");
+            }
+        }
     }
 }
