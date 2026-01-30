@@ -675,12 +675,18 @@ exports.retryDeviceSync = async (req, res) => {
       );
 
       const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
+      const isDuplicate = javaResponse.data.code === "100911"; // Employee already exists on device
 
-      if (isSuccess) {
-        console.log(`✅ Device sync successful!`);
+      if (isSuccess || isDuplicate) {
+        if (isDuplicate) {
+          console.log(`✅ Device sync successful (employee already exists on device)`);
+        } else {
+          console.log(`✅ Device sync successful!`);
+        }
         
-        // Update employee record
+        // Update employee record - update both fields for compatibility
         employee.deviceSynced = true;
+        employee.deviceSyncStatus = 'synced'; // Add this field
         employee.biometricData.syncStatus = 'synced';
         employee.biometricData.lastXO5Sync = new Date();
         employee.biometricData.lastSyncAttempt = new Date();
@@ -689,10 +695,13 @@ exports.retryDeviceSync = async (req, res) => {
 
         return res.json({
           success: true,
-          message: 'Employee synced to biometric device successfully',
+          message: isDuplicate 
+            ? 'Employee already synced to biometric device' 
+            : 'Employee synced to biometric device successfully',
           data: {
             employeeId: employee._id,
             deviceSynced: true,
+            deviceSyncStatus: 'synced',
             syncStatus: 'synced',
             lastSync: employee.biometricData.lastXO5Sync
           }
@@ -703,8 +712,9 @@ exports.retryDeviceSync = async (req, res) => {
         
         console.warn(`⚠️ Device sync failed: [${errorCode}] ${errorMsg}`);
         
-        // Update with failure
+        // Update with failure - update both fields for compatibility
         employee.deviceSynced = false;
+        employee.deviceSyncStatus = 'failed'; // Add this field
         employee.biometricData.syncStatus = 'failed';
         employee.biometricData.syncError = `[${errorCode}] ${errorMsg}`;
         employee.biometricData.lastSyncAttempt = new Date();
@@ -717,6 +727,7 @@ exports.retryDeviceSync = async (req, res) => {
           canRetry: true,
           data: {
             employeeId: employee._id,
+            deviceSyncStatus: 'failed',
             syncStatus: 'failed',
             lastAttempt: employee.biometricData.lastSyncAttempt
           }
