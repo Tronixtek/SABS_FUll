@@ -1,6 +1,7 @@
 package com.hfims.xcan.gateway.tcp.demo.support;
 
 import com.hfims.xcan.gateway.netty.error.CgiErrorEnum;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -14,6 +15,10 @@ public class BaseResult implements Serializable {
     private String msg;
     private Long ts;
 
+    // Add explicit success field for JSON serialization
+    @JsonProperty("success")
+    private Boolean success;
+
     public BaseResult() {
     }
 
@@ -25,6 +30,7 @@ public class BaseResult implements Serializable {
         this.code = code;
         this.msg = msg;
         this.ts = System.currentTimeMillis();
+        this.success = CgiErrorEnum.CODE_000.getCode().equals(code);
     }
 
     public Boolean isSuccess() {

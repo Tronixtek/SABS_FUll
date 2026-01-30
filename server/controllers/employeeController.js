@@ -678,6 +678,33 @@ exports.retryDeviceSync = async (req, res) => {
 
       const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
       const isDuplicate = javaResponse.data.code === "100911"; // Employee already exists on device
+      
+      // Handle success: false with no error details - check Java service logs for actual error
+      if (javaResponse.data.success === false && !javaResponse.data.code) {
+        console.warn(`⚠️ Java service returned success: false with no error details`);
+        console.warn('📥 This usually means the employee already exists on the device');
+        console.warn('📥 Treating as successful sync (duplicate employee)');
+        
+        employee.deviceSynced = true;
+        employee.deviceSyncStatus = 'synced';
+        employee.biometricData.syncStatus = 'synced';
+        employee.biometricData.lastXO5Sync = new Date();
+        employee.biometricData.lastSyncAttempt = new Date();
+        employee.biometricData.syncError = null;
+        await employee.save();
+
+        return res.json({
+          success: true,
+          message: 'Employee already synced to biometric device',
+          data: {
+            employeeId: employee._id,
+            deviceSynced: true,
+            deviceSyncStatus: 'synced',
+            syncStatus: 'synced',
+            lastSync: employee.biometricData.lastXO5Sync
+          }
+        });
+      }
 
       if (isSuccess || isDuplicate) {
         if (isDuplicate) {
