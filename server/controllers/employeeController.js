@@ -521,6 +521,36 @@ exports.updateEmployee = async (req, res) => {
     // Clean up empty string values for ObjectId fields to prevent cast errors
     const updateData = { ...req.body };
     
+    // Handle face image update if provided
+    if (updateData.capturedImage && updateData.capturedImage.startsWith('data:image')) {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Extract base64 data
+      const faceImageData = updateData.capturedImage.replace(/^data:image\/[a-z]+;base64,/, '');
+      
+      // Generate filename
+      const filename = `face-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const uploadDir = path.join(__dirname, '../uploads/public-registrations');
+      
+      // Ensure directory exists
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      // Save image file
+      const filepath = path.join(uploadDir, filename);
+      fs.writeFileSync(filepath, Buffer.from(faceImageData, 'base64'));
+      
+      // Update the profileImage path
+      updateData.profileImage = `/uploads/public-registrations/${filename}`;
+      
+      console.log('✅ Updated profile image:', updateData.profileImage);
+    }
+    
+    // Remove capturedImage from updateData as it's not a DB field
+    delete updateData.capturedImage;
+    
     // List of fields that are ObjectId references
     const objectIdFields = ['facility', 'department', 'shift', 'salaryGrade'];
     

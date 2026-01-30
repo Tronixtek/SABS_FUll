@@ -1239,8 +1239,9 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
           updatePayload.cadre = formData.customCadre;
         }
         
+        // Include captured image for update
         if (capturedImage) {
-          updatePayload.profileImage = capturedImage;
+          updatePayload.capturedImage = capturedImage;
         }
         
         const response = await axios.put(`/api/employees/${employee._id}`, updatePayload);
