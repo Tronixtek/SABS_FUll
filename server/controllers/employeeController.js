@@ -1280,24 +1280,27 @@ exports.bulkSyncEmployees = async (req, res) => {
           continue;
         }
 
-        if (!employee.facility || !employee.facility.configuration || !employee.facility.configuration.deviceKey) {
-          console.log(`❌ SKIP: ${employee.firstName} ${employee.lastName} - Facility device not configured`);
-          console.log(`   Facility: ${employee.facility?.name || 'none'}`);
-          console.log(`   Device Key: ${employee.facility?.configuration?.deviceKey || 'none'}`);
+        if (!employee.facility) {
+          console.log(`❌ SKIP: ${employee.firstName} ${employee.lastName} - No facility assigned`);
           results.skipped.push({
             employeeId,
             name: `${employee.firstName} ${employee.lastName}`,
-            reason: 'Facility device not configured'
+            reason: 'No facility assigned'
           });
           continue;
         }
 
-        // Use the same sync logic as retry-device-sync
+        // Use the same sync logic as retry-device-sync - same device key fallback
         const axios = require('axios');
         const fs = require('fs');
         const path = require('path');
-        const deviceKey = employee.facility.configuration.deviceKey;
+        
+        // Use same device key logic as single sync - with fallback to facility code
+        const facilityDeviceId = (employee.facility.deviceInfo?.deviceId || employee.facility.code).toLowerCase();
+        const deviceKey = employee.facility.configuration?.deviceKey?.toLowerCase() || facilityDeviceId;
         const personId = employee.employeeId;
+        
+        console.log(`📱 Device Key: ${deviceKey} (from ${employee.facility.configuration?.deviceKey ? 'config' : 'facility code'})`);
 
         // Get profile image
         let capturedImage = employee.profileImage || employee.capturedImage;
