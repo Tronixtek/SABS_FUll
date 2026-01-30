@@ -75,40 +75,44 @@ const Employees = () => {
       return;
     }
 
-    if (!window.confirm(`Sync ${selectedEmployees.length} employee(s) to biometric device?`)) {
+    if (!window.confirm(`Sync ${selectedEmployees.length} employee(s) to biometric device?\n\nThis will process them sequentially to avoid device conflicts.`)) {
       return;
     }
 
     setBulkSyncing(true);
     const API_URL = process.env.REACT_APP_API_URL || '';
-    let successCount = 0;
-    let failCount = 0;
+    const loadingToast = toast.loading(`Syncing ${selectedEmployees.length} employees...`);
 
-    for (const employeeId of selectedEmployees) {
-      try {
-        const response = await axios.post(`${API_URL}/api/employees/${employeeId}/retry-device-sync`);
-        if (response.data.success) {
-          successCount++;
-        } else {
-          failCount++;
+    try {
+      const response = await axios.post(`${API_URL}/api/employees/bulk-sync`, {
+        employeeIds: selectedEmployees
+      });
+
+      toast.dismiss(loadingToast);
+
+      if (response.data.success) {
+        const { successful, failed, skipped } = response.data.data;
+        
+        if (successful.length > 0) {
+          toast.success(`✅ Successfully synced ${successful.length} employee(s)`, { duration: 5000 });
         }
-      } catch (error) {
-        failCount++;
-        console.error(`Failed to sync employee ${employeeId}:`, error);
-      }
-    }
+        if (failed.length > 0) {
+          toast.error(`❌ Failed to sync ${failed.length} employee(s)`, { duration: 5000 });
+        }
+        if (skipped.length > 0) {
+          toast.info(`⚠️ Skipped ${skipped.length} employee(s)`, { duration: 5000 });
+        }
 
-    setBulkSyncing(false);
-    setSelectedEmployees([]);
-    
-    if (successCount > 0) {
-      toast.success(`Successfully synced ${successCount} employee(s)`);
+        setSelectedEmployees([]);
+        fetchEmployees();
+      }
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error(error.response?.data?.message || 'Bulk sync failed');
+      console.error('Bulk sync error:', error);
+    } finally {
+      setBulkSyncing(false);
     }
-    if (failCount > 0) {
-      toast.error(`Failed to sync ${failCount} employee(s)`);
-    }
-    
-    fetchEmployees();
   };
 
   const toggleEmployeeSelection = (employeeId) => {

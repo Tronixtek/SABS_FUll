@@ -1235,3 +1235,187 @@ exports.generateNextEmployeeId = async (req, res) => {
   }
 };
 
+// @desc    Bulk sync employees to device
+// @route   POST /api/employees/bulk-sync
+// @access  Private
+exports.bulkSyncEmployees = async (req, res) => {
+  try {
+    const { employeeIds } = req.body;
+
+    if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an array of employee IDs to sync'
+      });
+    }
+
+    console.log(`\n🔄 ===== BULK DEVICE SYNC (${employeeIds.length} employees) =====`);
+
+    const results = {
+      total: employeeIds.length,
+      successful: [],
+      failed: [],
+      skipped: []
+    };
+
+    // Process employees sequentially to avoid overwhelming the device
+    for (const employeeId of employeeIds) {
+      try {
+        console.log(`\n🔄 Processing employee ${results.successful.length + results.failed.length + results.skipped.length + 1}/${employeeIds.length}`);
+        
+        const employee = await Employee.findById(employeeId).populate('facility shift');
+        
+        if (!employee) {
+          results.skipped.push({
+            employeeId,
+            reason: 'Employee not found'
+          });
+          continue;
+        }
+
+        if (!employee.facility || !employee.facility.configuration || !employee.facility.configuration.deviceKey) {
+          results.skipped.push({
+            employeeId,
+            name: `${employee.firstName} ${employee.lastName}`,
+            reason: 'Facility device not configured'
+          });
+          continue;
+        }
+
+        // Use the same sync logic as retry-device-sync
+        const axios = require('axios');
+        const deviceKey = employee.facility.configuration.deviceKey;
+        const personId = employee.employeeId;
+
+        // Get profile image
+        let capturedImage = employee.profileImage || employee.capturedImage;
+        if (!capturedImage) {
+          results.skipped.push({
+            employeeId,
+            name: `${employee.firstName} ${employee.lastName}`,
+            reason: 'No profile image available'
+          });
+          continue;
+        }
+
+        // Prepare image data
+        let optimizedFaceImage = capturedImage;
+        if (capturedImage.startsWith('http://') || capturedImage.startsWith('https://') || capturedImage.startsWith('/uploads/')) {
+          results.skipped.push({
+            employeeId,
+            name: `${employee.firstName} ${employee.lastName}`,
+            reason: 'Image must be base64 encoded'
+          });
+          continue;
+        }
+        
+        if (optimizedFaceImage.includes(',')) {
+          optimizedFaceImage = optimizedFaceImage.split(',')[1];
+        }
+        optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
+
+        const javaServicePayload = {
+          employeeId: personId,
+          fullName: `${employee.firstName} ${employee.lastName}`,
+          faceImage: optimizedFaceImage,
+          deviceKey: deviceKey,
+          secret: employee.facility.configuration?.deviceSecret || '123456',
+          verificationStyle: 0
+        };
+
+        try {
+          const javaResponse = await axios.post(
+            `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/register`,
+            javaServicePayload,
+            {
+              timeout: 60000,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
+
+          const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
+          const isDuplicate = javaResponse.data.code === "100911" || javaResponse.data.code === "DUPLICATE_EMPLOYEE";
+
+          if (isSuccess || isDuplicate) {
+            employee.deviceSynced = true;
+            employee.deviceSyncStatus = 'synced';
+            employee.biometricData.syncStatus = 'synced';
+            employee.biometricData.lastXO5Sync = new Date();
+            employee.biometricData.lastSyncAttempt = new Date();
+            employee.biometricData.syncError = null;
+            await employee.save();
+
+            results.successful.push({
+              employeeId,
+              name: `${employee.firstName} ${employee.lastName}`,
+              message: isDuplicate ? 'Already synced' : 'Synced successfully'
+            });
+          } else {
+            employee.deviceSyncStatus = 'failed';
+            employee.biometricData.syncStatus = 'failed';
+            await employee.save();
+
+            results.failed.push({
+              employeeId,
+              name: `${employee.firstName} ${employee.lastName}`,
+              error: javaResponse.data.msg || 'Unknown error'
+            });
+          }
+        } catch (deviceError) {
+          const errorCode = deviceError.response?.data?.code;
+          const isDuplicate = errorCode === '100911' || errorCode === 'DUPLICATE_EMPLOYEE';
+
+          if (isDuplicate) {
+            employee.deviceSynced = true;
+            employee.deviceSyncStatus = 'synced';
+            employee.biometricData.syncStatus = 'synced';
+            employee.biometricData.lastXO5Sync = new Date();
+            employee.biometricData.lastSyncAttempt = new Date();
+            employee.biometricData.syncError = null;
+            await employee.save();
+
+            results.successful.push({
+              employeeId,
+              name: `${employee.firstName} ${employee.lastName}`,
+              message: 'Already synced'
+            });
+          } else {
+            employee.deviceSyncStatus = 'failed';
+            employee.biometricData.syncStatus = 'failed';
+            await employee.save();
+
+            results.failed.push({
+              employeeId,
+              name: `${employee.firstName} ${employee.lastName}`,
+              error: deviceError.response?.data?.msg || deviceError.message
+            });
+          }
+        }
+
+      } catch (error) {
+        console.error(`Error processing employee ${employeeId}:`, error);
+        results.failed.push({
+          employeeId,
+          error: error.message
+        });
+      }
+    }
+
+    console.log(`\n✅ Bulk sync complete: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped`);
+
+    res.json({
+      success: true,
+      message: `Bulk sync complete: ${results.successful.length} successful, ${results.failed.length} failed, ${results.skipped.length} skipped`,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('Bulk sync error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+

@@ -6,6 +6,7 @@ const {
   createEmployee,
   registerEmployeeWithDevice,
   retryDeviceSync,
+  bulkSyncEmployees,
   updateEmployee,
   deleteEmployee,
   forceDeleteEmployee,
@@ -22,6 +23,7 @@ router.get('/:id', checkPermission('view_attendance'), getEmployee);
 router.get('/:id/stats', checkPermission('view_attendance'), getEmployeeStats);
 router.post('/', checkPermission('manage_employees'), createEmployee);
 router.post('/register', checkPermission('manage_employees'), registerEmployeeWithDevice);
+router.post('/bulk-sync', checkPermission('manage_employees'), bulkSyncEmployees);
 router.post('/:id/retry-device-sync', checkPermission('manage_employees'), retryDeviceSync);
 router.put('/:id', checkPermission('manage_employees'), updateEmployee);
 router.delete('/:id', checkPermission('manage_employees'), deleteEmployee);
