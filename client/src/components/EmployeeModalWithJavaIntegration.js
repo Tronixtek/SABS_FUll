@@ -183,10 +183,19 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
 
   // Generic/Old Departments (previously used)
   const genericDepartments = [
+    'OPD',
+    'Pharmacy',
+    'ANC',
+    'Family Planning',
+    'Labour and Delivery',
+    'Laboratory',
+    'KSCHIMA',
+    'Records',
+    'Health Unit',
+    'Growth and Monitoring',
+    'Nutrition',
     'Medical Department',
     'Nursing Department',
-    'Laboratory Department',
-    'Pharmacy Department',
     'Administration Department',
     'Finance Department',
     'Human Resources',

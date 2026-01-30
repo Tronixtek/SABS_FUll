@@ -92,10 +92,11 @@ const PublicSelfRegister = () => {
   ];
 
   const genericDepartments = [
-    'Medical Department', 'Nursing Department', 'Laboratory Department', 'Pharmacy Department',
-    'Administration Department', 'Finance Department', 'Human Resources', 'IT Department',
-    'Public Health', 'Environmental Health', 'Records Department', 'Maintenance Department',
-    'Security Department', 'Other'
+    'OPD', 'Pharmacy', 'ANC', 'Family Planning', 'Labour and Delivery', 'Laboratory',
+    'KSCHIMA', 'Records', 'Health Unit', 'Growth and Monitoring', 'Nutrition',
+    'Medical Department', 'Nursing Department', 'Administration Department',
+    'Finance Department', 'Human Resources', 'IT Department', 'Public Health',
+    'Environmental Health', 'Maintenance Department', 'Security Department', 'Other'
   ];
 
   const allDepartments = [...kanoDepartments, ...genericDepartments];
