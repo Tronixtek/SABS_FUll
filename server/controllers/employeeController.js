@@ -52,15 +52,21 @@ exports.getEmployees = async (req, res) => {
       ];
     }
     
-    const skip = (page - 1) * limit;
+    // Don't apply pagination if limit is very high (client-side pagination)
+    const shouldPaginate = limit <= 100;
+    const skip = shouldPaginate ? (page - 1) * limit : 0;
     
-    const employees = await Employee.find(query)
+    const query_builder = Employee.find(query)
       .populate('facility', 'name code')
       .populate('shift', 'name code startTime endTime')
       .skip(skip)
-      .limit(parseInt(limit))
       .sort({ createdAt: -1 });
     
+    if (shouldPaginate) {
+      query_builder.limit(parseInt(limit));
+    }
+    
+    const employees = await query_builder;
     const total = await Employee.countDocuments(query);
     
     res.json({

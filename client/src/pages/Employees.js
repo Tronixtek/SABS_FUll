@@ -27,6 +27,7 @@ const Employees = () => {
       if (filters.search) params.append('search', filters.search);
       if (filters.facility) params.append('facility', filters.facility);
       if (filters.status) params.append('status', filters.status);
+      params.append('limit', '9999'); // Request all employees for client-side pagination
       
       const response = await axios.get(`/api/employees?${params}`);
       setEmployees(response.data.data);
