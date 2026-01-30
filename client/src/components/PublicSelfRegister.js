@@ -218,7 +218,7 @@ const PublicSelfRegister = () => {
 
   const fetchShifts = async () => {
     try {
-      const response = await axios.get('/api/shifts');
+      const response = await axios.get('/api/public/shifts');
       if (response.data.success) {
         setShifts(response.data.data);
       }

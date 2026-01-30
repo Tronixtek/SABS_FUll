@@ -374,4 +374,25 @@ router.get('/registration-status/:staffId', async (req, res) => {
   }
 });
 
+// @desc    Get all active shifts (PUBLIC - No Auth Required)
+// @route   GET /api/public/shifts
+// @access  Public
+router.get('/shifts', async (req, res) => {
+  try {
+    const shifts = await Shift.find({ status: 'active' })
+      .populate('facility', 'name code')
+      .sort({ name: 1 });
+    
+    res.json({
+      success: true,
+      data: shifts
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
