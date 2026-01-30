@@ -674,6 +674,8 @@ exports.retryDeviceSync = async (req, res) => {
         }
       );
 
+      console.log('📥 Java Service Response:', JSON.stringify(javaResponse.data, null, 2));
+
       const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
       const isDuplicate = javaResponse.data.code === "100911"; // Employee already exists on device
 
@@ -711,6 +713,7 @@ exports.retryDeviceSync = async (req, res) => {
         const errorMsg = javaResponse.data.msg || javaResponse.data.message || 'Unknown device error';
         
         console.warn(`⚠️ Device sync failed: [${errorCode}] ${errorMsg}`);
+        console.warn('📥 Full Java response:', JSON.stringify(javaResponse.data, null, 2));
         
         // Update with failure - update both fields for compatibility
         employee.deviceSynced = false;
@@ -736,7 +739,8 @@ exports.retryDeviceSync = async (req, res) => {
 
     } catch (deviceError) {
       console.error(`❌ Device sync error:`, deviceError.message);
-      console.error('Full error:', deviceError.response?.data || deviceError);
+      console.error('📥 Error response data:', JSON.stringify(deviceError.response?.data, null, 2));
+      console.error('📥 Error status:', deviceError.response?.status);
       
       // Extract detailed error from Java service response
       let errorMessage = 'Unknown device error';
