@@ -1,16 +1,15 @@
 package com.hfims.xcan.gateway.tcp.demo.support;
 
 import com.hfims.xcan.gateway.netty.error.CgiErrorEnum;
-import lombok.Getter;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.Data;
 
 import java.io.Serializable;
 
 /**
  * 基本结果对象
  */
-@Getter
-@Setter
+@Data
 public class BaseResult implements Serializable {
     private String code;
     private String msg;
@@ -29,5 +28,11 @@ public class BaseResult implements Serializable {
         this.msg = msg;
         this.ts = System.currentTimeMillis();
         this.success = CgiErrorEnum.CODE_000.getCode().equals(code);
+    }
+    
+    // Mark the old isSuccess() method as ignored to avoid duplicate field
+    @JsonIgnore
+    public Boolean isSuccess() {
+        return success;
     }
 }

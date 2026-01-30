@@ -1,8 +1,7 @@
 package com.hfims.xcan.gateway.tcp.demo.support;
 
 import com.hfims.xcan.gateway.netty.error.CgiErrorEnum;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
@@ -11,8 +10,7 @@ import java.io.Serializable;
  * 数据结果对象
  */
 @EqualsAndHashCode(callSuper = true)
-@Getter
-@Setter
+@Data
 public class DataResult<T> extends BaseResult implements Serializable {
     private T data;
 
