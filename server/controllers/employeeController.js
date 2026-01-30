@@ -1284,6 +1284,8 @@ exports.bulkSyncEmployees = async (req, res) => {
 
         // Use the same sync logic as retry-device-sync
         const axios = require('axios');
+        const fs = require('fs');
+        const path = require('path');
         const deviceKey = employee.facility.configuration.deviceKey;
         const personId = employee.employeeId;
 
@@ -1298,20 +1300,37 @@ exports.bulkSyncEmployees = async (req, res) => {
           continue;
         }
 
-        // Prepare image data
+        // Prepare image data - handle file paths and base64
         let optimizedFaceImage = capturedImage;
-        if (capturedImage.startsWith('http://') || capturedImage.startsWith('https://') || capturedImage.startsWith('/uploads/')) {
+        
+        // If it's a file path, read and convert to base64
+        if (capturedImage.startsWith('/uploads/') || capturedImage.startsWith('uploads/')) {
+          try {
+            const imagePath = path.join(__dirname, '..', '..', capturedImage);
+            const imageBuffer = fs.readFileSync(imagePath);
+            optimizedFaceImage = imageBuffer.toString('base64');
+          } catch (fileError) {
+            results.skipped.push({
+              employeeId,
+              name: `${employee.firstName} ${employee.lastName}`,
+              reason: `Failed to read image file: ${fileError.message}`
+            });
+            continue;
+          }
+        } else if (capturedImage.startsWith('http://') || capturedImage.startsWith('https://')) {
           results.skipped.push({
             employeeId,
             name: `${employee.firstName} ${employee.lastName}`,
-            reason: 'Image must be base64 encoded'
+            reason: 'Remote URLs not supported, image must be local'
           });
           continue;
+        } else {
+          // Already base64, extract if data URI
+          if (optimizedFaceImage.includes(',')) {
+            optimizedFaceImage = optimizedFaceImage.split(',')[1];
+          }
         }
         
-        if (optimizedFaceImage.includes(',')) {
-          optimizedFaceImage = optimizedFaceImage.split(',')[1];
-        }
         optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
 
         const javaServicePayload = {

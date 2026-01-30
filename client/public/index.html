@@ -9,9 +9,51 @@
       name="description"
       content="SABS - Smart Attendance Biometric System"
     />
+    <!-- Cache Control for Mobile -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>SABS - Smart Attendance Biometric System</title>
+    <!-- Clear Cache Script -->
+    <script>
+      // Version check and cache clear
+      // UPDATE THIS VERSION NUMBER WHEN DEPLOYING NEW CHANGES
+      const APP_VERSION = 'v1.0.4';
+      const STORED_VERSION = localStorage.getItem('app_version');
+      const RELOAD_FLAG = sessionStorage.getItem('cache_cleared');
+      
+      if (STORED_VERSION !== APP_VERSION && !RELOAD_FLAG) {
+        console.log('🔄 New version detected. Clearing cache...');
+        
+        // Unregister service workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            registrations.forEach(reg => reg.unregister());
+          });
+        }
+        
+        // Clear all caches
+        if ('caches' in window) {
+          caches.keys().then(keys => {
+            keys.forEach(key => caches.delete(key));
+          });
+        }
+        
+        // Update version
+        localStorage.setItem('app_version', APP_VERSION);
+        
+        // Reload if not first visit (prevent infinite loop with session flag)
+        if (STORED_VERSION) {
+          sessionStorage.setItem('cache_cleared', 'true');
+          setTimeout(() => window.location.reload(true), 500);
+        }
+      } else if (RELOAD_FLAG) {
+        // Clear the reload flag after successful reload
+        sessionStorage.removeItem('cache_cleared');
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

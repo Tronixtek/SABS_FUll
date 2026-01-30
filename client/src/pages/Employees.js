@@ -13,6 +13,8 @@ const Employees = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [bulkSyncing, setBulkSyncing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filters, setFilters] = useState({
     search: '',
     facility: '',
@@ -124,10 +126,15 @@ const Employees = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedEmployees.length === employees.length) {
-      setSelectedEmployees([]);
+    const currentPageIds = currentEmployees.map(emp => emp._id);
+    const allCurrentSelected = currentPageIds.every(id => selectedEmployees.includes(id));
+    
+    if (allCurrentSelected) {
+      // Deselect all on current page
+      setSelectedEmployees(prev => prev.filter(id => !currentPageIds.includes(id)));
     } else {
-      setSelectedEmployees(employees.map(emp => emp._id));
+      // Select all on current page
+      setSelectedEmployees(prev => [...new Set([...prev, ...currentPageIds])]);
     }
   };
 
@@ -361,6 +368,23 @@ const Employees = () => {
     return `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badges[status] || 'bg-gray-100 text-gray-800'}`;
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(employees.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentEmployees = employees.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    setSelectedEmployees([]); // Clear selections when changing pages
+  };
+
+  const handleItemsPerPageChange = (value) => {
+    setItemsPerPage(value);
+    setCurrentPage(1); // Reset to first page when changing items per page
+    setSelectedEmployees([]);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -476,7 +500,7 @@ const Employees = () => {
                 <th className="py-4 px-6">
                   <input
                     type="checkbox"
-                    checked={selectedEmployees.length === employees.length && employees.length > 0}
+                    checked={currentEmployees.length > 0 && currentEmployees.every(emp => selectedEmployees.includes(emp._id))}
                     onChange={toggleSelectAll}
                     className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                   />
@@ -494,8 +518,8 @@ const Employees = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {employees.length > 0 ? (
-                employees.map((employee) => (
+              {currentEmployees.length > 0 ? (
+                currentEmployees.map((employee) => (
                   <tr key={employee._id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6">
                       <input
@@ -567,8 +591,8 @@ const Employees = () => {
 
         {/* Mobile Card View */}
         <div className="lg:hidden p-4 space-y-4">
-          {employees.length > 0 ? (
-            employees.map((employee) => (
+          {currentEmployees.length > 0 ? (
+            currentEmployees.map((employee) => (
               <div key={employee._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <div className="flex justify-between items-start mb-3">
                   <div>
@@ -639,6 +663,101 @@ const Employees = () => {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {employees.length > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              {/* Items per page */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">Show</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-sm text-gray-700">
+                  of {employees.length} employees
+                </span>
+              </div>
+
+              {/* Page info and navigation */}
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  
+                  {/* Page numbers */}
+                  <div className="hidden sm:flex gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'border border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Last
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {modalOpen && (
