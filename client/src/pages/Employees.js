@@ -11,6 +11,8 @@ const Employees = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [bulkSyncing, setBulkSyncing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     facility: '',
@@ -65,6 +67,94 @@ const Employees = () => {
   const handleEditEmployee = (employee) => {
     setSelectedEmployee(employee);
     setModalOpen(true);
+  };
+
+  const handleBulkSync = async () => {
+    if (selectedEmployees.length === 0) {
+      toast.error('Please select employees to sync');
+      return;
+    }
+
+    if (!window.confirm(`Sync ${selectedEmployees.length} employee(s) to biometric device?`)) {
+      return;
+    }
+
+    setBulkSyncing(true);
+    const API_URL = process.env.REACT_APP_API_URL || '';
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const employeeId of selectedEmployees) {
+      try {
+        const response = await axios.post(`${API_URL}/api/employees/${employeeId}/retry-device-sync`);
+        if (response.data.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        failCount++;
+        console.error(`Failed to sync employee ${employeeId}:`, error);
+      }
+    }
+
+    setBulkSyncing(false);
+    setSelectedEmployees([]);
+    
+    if (successCount > 0) {
+      toast.success(`Successfully synced ${successCount} employee(s)`);
+    }
+    if (failCount > 0) {
+      toast.error(`Failed to sync ${failCount} employee(s)`);
+    }
+    
+    fetchEmployees();
+  };
+
+  const toggleEmployeeSelection = (employeeId) => {
+    setSelectedEmployees(prev => 
+      prev.includes(employeeId) 
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedEmployees.length === employees.length) {
+      setSelectedEmployees([]);
+    } else {
+      setSelectedEmployees(employees.map(emp => emp._id));
+    }
+  };
+
+  const getSyncBadge = (employee) => {
+    const status = employee.deviceSyncStatus || employee.biometricData?.syncStatus || 'pending';
+    
+    switch (status) {
+      case 'synced':
+        return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+      case 'failed':
+        return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+      case 'syncing':
+        return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800';
+      default:
+        return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
+    }
+  };
+
+  const getSyncText = (employee) => {
+    const status = employee.deviceSyncStatus || employee.biometricData?.syncStatus || 'pending';
+    
+    switch (status) {
+      case 'synced':
+        return '✓ Synced';
+      case 'failed':
+        return '✗ Failed';
+      case 'syncing':
+        return '⟳ Syncing';
+      default:
+        return '⏳ Pending';
+    }
   };
 
   const handleDeleteEmployee = async (employee) => {
@@ -292,6 +382,30 @@ const Employees = () => {
           <p className="text-gray-600 mt-1">Manage your workforce and employee data</p>
         </div>
         <div className="flex items-center space-x-4">
+          {selectedEmployees.length > 0 && (
+            <button
+              onClick={handleBulkSync}
+              disabled={bulkSyncing}
+              className="w-full sm:w-auto bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {bulkSyncing ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Syncing {selectedEmployees.length}...
+                </>
+              ) : (
+                <>
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Sync ({selectedEmployees.length})
+                </>
+              )}
+            </button>
+          )}
           <button
             onClick={handleAddEmployee}
             className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
@@ -355,6 +469,14 @@ const Employees = () => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="py-4 px-6">
+                  <input
+                    type="checkbox"
+                    checked={selectedEmployees.length === employees.length && employees.length > 0}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Employee ID</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Staff ID</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Name</th>
@@ -363,6 +485,7 @@ const Employees = () => {
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Department</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Shift</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Status</th>
+                <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Device Sync</th>
                 <th className="text-left py-4 px-6 text-xs font-medium text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -370,6 +493,14 @@ const Employees = () => {
               {employees.length > 0 ? (
                 employees.map((employee) => (
                   <tr key={employee._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4 px-6">
+                      <input
+                        type="checkbox"
+                        checked={selectedEmployees.includes(employee._id)}
+                        onChange={() => toggleEmployeeSelection(employee._id)}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="py-4 px-6 text-sm font-medium text-gray-900">{employee.employeeId}</td>
                     <td className="py-4 px-6 text-sm font-semibold text-blue-700">{employee.staffId || 'N/A'}</td>
                     <td className="py-4 px-6 text-sm text-gray-900 font-medium">
@@ -386,6 +517,11 @@ const Employees = () => {
                     <td className="py-4 px-6">
                       <span className={getStatusBadge(employee.status)}>
                         {employee.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className={getSyncBadge(employee)}>
+                        {getSyncText(employee)}
                       </span>
                     </td>
                     <td className="py-4 px-6">
@@ -410,7 +546,7 @@ const Employees = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-gray-500">
+                  <td colSpan="11" className="py-12 text-center text-gray-500">
                     <div className="flex flex-col items-center">
                       <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
