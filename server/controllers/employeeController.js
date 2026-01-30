@@ -747,6 +747,31 @@ exports.retryDeviceSync = async (req, res) => {
         const javaErrorData = deviceError.response.data;
         errorCode = javaErrorData.code || 'ERROR';
         errorMessage = javaErrorData.msg || javaErrorData.message || 'Unknown device error';
+        
+        // Check if this is a duplicate employee error (treat as success)
+        if (errorCode === '100911') {
+          console.log(`✅ Device sync successful (employee already exists on device)`);
+          
+          employee.deviceSynced = true;
+          employee.deviceSyncStatus = 'synced';
+          employee.biometricData.syncStatus = 'synced';
+          employee.biometricData.lastXO5Sync = new Date();
+          employee.biometricData.lastSyncAttempt = new Date();
+          employee.biometricData.syncError = null;
+          await employee.save();
+
+          return res.json({
+            success: true,
+            message: 'Employee already synced to biometric device',
+            data: {
+              employeeId: employee._id,
+              deviceSynced: true,
+              deviceSyncStatus: 'synced',
+              syncStatus: 'synced',
+              lastSync: employee.biometricData.lastXO5Sync
+            }
+          });
+        }
       } else if (deviceError.code === 'ECONNREFUSED') {
         errorMessage = 'Device service is not running or unavailable';
         errorCode = 'CONNECTION_REFUSED';
