@@ -3,55 +3,12 @@ const Facility = require('../models/Facility');
 const axios = require('axios');
 const javaServiceClient = require('../services/javaServiceClient');
 const syncToDevice = require('./syncToDeviceHelper');
+const { generateUniqueEmployeeId } = require('../utils/idGenerator');
 
-// Helper function to generate unique employee ID
+// Helper function to generate unique employee ID (ATOMIC - prevents race conditions)
 const generateEmployeeId = async (facilityId) => {
-  try {
-    const facility = await Facility.findById(facilityId);
-    if (!facility) {
-      throw new Error('Facility not found');
-    }
-
-    // Use first 3 letters of facility name - REMOVE ALL NON-ALPHANUMERIC
-    let facilityPrefix = facility.name
-      .toUpperCase()
-      .replace(/[^A-Z]/g, '')  // Remove ALL non-alphabetic characters (no underscores!)
-      .substring(0, 3);         // Take first 3 letters
-    
-    // Ensure we have at least 3 characters (pad with X if needed)
-    while (facilityPrefix.length < 3) {
-      facilityPrefix += 'X';
-    }
-    
-    // Find the last employee ID for this facility (no underscore in search)
-    const lastEmployee = await Employee.findOne({
-      employeeId: { $regex: `^${facilityPrefix}` }
-    }).sort({ employeeId: -1 });
-
-    let nextNumber = 1;
-    if (lastEmployee) {
-      // Extract the number from the last employee ID (e.g., HOT00123 -> 123)
-      const match = lastEmployee.employeeId.match(/([0-9]+)$/);
-      if (match) {
-        nextNumber = parseInt(match[1]) + 1;
-      }
-    }
-
-    // Pad with zeros to make it 5 digits - NO UNDERSCORE!
-    const paddedNumber = String(nextNumber).padStart(5, '0');
-    const employeeId = `${facilityPrefix}${paddedNumber}`; // Removed underscore!
-
-    // Double-check uniqueness
-    const exists = await Employee.findOne({ employeeId });
-    if (exists) {
-      // If somehow exists, try the next number
-      return generateEmployeeId(facilityId);
-    }
-
-    return employeeId;
-  } catch (error) {
-    throw new Error(`Failed to generate employee ID: ${error.message}`);
-  }
+  // Use new atomic counter system
+  return generateUniqueEmployeeId(facilityId);
 };
 
 // @desc    Get all employees
@@ -301,12 +258,11 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     const facilityDeviceId = (facilityDoc.deviceInfo?.deviceId || facilityDoc.code || facility).toLowerCase();
     const deviceKey = facilityDoc.configuration?.deviceKey?.toLowerCase() || facilityDeviceId;
     
-    // Generate unique person ID for device
+    // Generate unique person ID for device (alphanumeric only - XO5 doesn't accept special chars)
+    // Format: EMPLOYEEID + RANDOM (e.g., PHC00001A7X2M)
+    // Employee ID is already unique, random suffix prevents edge-case collisions
     const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    let personId = `${employeeId}${randomSuffix}`;
-    if (personId.length > 32) {
-      personId = personId.substring(0, 32);
-    }
+    const personId = `${employeeId}${randomSuffix}`;
     
     const employeeData = {
       employeeId, staffId, firstName, lastName, email, phone, facility,

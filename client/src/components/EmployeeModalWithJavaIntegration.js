@@ -3,6 +3,8 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { XMarkIcon, CameraIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClose }) => {
   const [formData, setFormData] = useState({
     employeeId: employee?.employeeId || '',
@@ -42,7 +44,13 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
   const [loading, setLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
-  const [capturedImage, setCapturedImage] = useState(employee?.profileImage || null);
+  const [capturedImage, setCapturedImage] = useState(
+    employee?.profileImage 
+      ? (employee.profileImage.startsWith('data:') 
+          ? employee.profileImage 
+          : `${API_URL}${employee.profileImage}`)
+      : null
+  );
   const [stream, setStream] = useState(null);
   const [availableCameras, setAvailableCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState('');
@@ -1121,9 +1129,12 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
         employee.deviceSyncAttempts = (employee.deviceSyncAttempts || 0) + 1;
         employee.lastDeviceSyncAttempt = new Date();
         
-        // Close modal after successful sync
+        // Force re-render by updating state
+        setFormData(prev => ({ ...prev }));
+        
+        // Close modal after successful sync and trigger parent refresh
         setTimeout(() => {
-          onClose(true);
+          onClose(true); // Pass true to indicate data changed
         }, 1500);
       } else {
         // Show detailed error from backend
@@ -2363,7 +2374,24 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                         src={capturedImage}
                         alt="Employee"
                         className="w-full h-80 object-cover rounded-lg shadow-lg border-4 border-green-200"
+                        onError={(e) => {
+                          console.error('Failed to load image:', capturedImage);
+                          e.target.style.display = 'none';
+                          e.target.nextElementSibling.style.display = 'flex';
+                        }}
+                        onLoad={() => console.log('Image loaded successfully:', capturedImage)}
                       />
+                      <div style={{ display: 'none' }} className="absolute inset-0 bg-gray-100 rounded-lg shadow-lg border-4 border-yellow-200 flex flex-col items-center justify-center">
+                        <XCircleIcon className="h-16 w-16 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600">Image failed to load</p>
+                        <button
+                          type="button"
+                          onClick={retakeImage}
+                          className="mt-3 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          Capture new photo
+                        </button>
+                      </div>
                       <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
                         ✓ Captured
                       </div>

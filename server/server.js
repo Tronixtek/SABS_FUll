@@ -40,6 +40,7 @@ const payrollRoutes = require('./routes/payrollRoutes');
 const payrollSettingsRoutes = require('./routes/payrollSettingsRoutes');
 const salaryGradeRoutes = require('./routes/salaryGradeRoutes');
 const staffIdPrefixRoutes = require('./routes/staffIdPrefix');
+const publicRoutes = require('./routes/publicRoutes');
 
 // Models
 const Employee = require('./models/Employee');
@@ -53,8 +54,11 @@ const app = express();
 // Trust proxy for rate limiting (handles X-Forwarded-For headers)
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Security middleware - Configure helmet to allow cross-origin images
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
 app.use(compression());
 
 // Rate limiting - Increased for employee registration with face enrollment
@@ -95,6 +99,23 @@ if (process.env.NODE_ENV === 'development') {
 const uploadsPath = path.join(__dirname, 'uploads');
 console.log('📁 Serving static files from:', uploadsPath);
 console.log('📁 Directory exists:', fs.existsSync(uploadsPath));
+
+// Add CORS headers for static files
+app.use('/uploads', (req, res, next) => {
+  console.log('📥 Static file request:', req.url);
+  const fullPath = path.join(uploadsPath, req.url);
+  console.log('📂 Looking for file at:', fullPath);
+  console.log('📂 File exists:', fs.existsSync(fullPath));
+  
+  // Set CORS headers - use specific origin instead of wildcard when credentials are used
+  const origin = req.headers.origin || 'http://localhost:3000';
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
+
 app.use('/uploads', express.static(uploadsPath));
 
 // Database connection
@@ -133,6 +154,7 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll-settings', payrollSettingsRoutes);
 app.use('/api/salary-grades', salaryGradeRoutes);
 app.use('/api/staff-id-prefix', staffIdPrefixRoutes);
+app.use('/api/public', publicRoutes);
 
 // Debug route to check if files exist
 app.get('/uploads/debug', (req, res) => {

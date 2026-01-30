@@ -105,6 +105,11 @@ const facilitySchema = new mongoose.Schema({
       // XO5 device secret for Java service integration
       default: '123456'
     },
+    allowPublicRegistration: {
+      type: Boolean,
+      default: false,
+      // Enable public employee self-registration for this facility
+    },
     userApiUrl: {
       type: String,
       trim: true,

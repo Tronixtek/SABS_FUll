@@ -33,6 +33,9 @@ import EmployeeProfile from './pages/employee/EmployeeProfile';
 import EmployeePayslip from './pages/employee/EmployeePayslip';
 import LeaveBalance from './pages/employee/LeaveBalance';
 
+// Public Registration
+import PublicSelfRegister from './components/PublicSelfRegister';
+
 // Layout
 import Layout from './components/Layout';
 
@@ -45,6 +48,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/register" element={<PublicSelfRegister />} />
             
             {/* Staff Portal */}
             <Route path="/login" element={<Login />} />
