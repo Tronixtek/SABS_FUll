@@ -1,6 +1,7 @@
 package com.hfims.xcan.gateway.tcp.demo.support;
 
 import com.hfims.xcan.gateway.netty.error.CgiErrorEnum;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,7 @@ import java.io.Serializable;
 @Setter
 @NoArgsConstructor
 public class DataResult<T> extends BaseResult implements Serializable {
+    @JsonProperty("data")
     private T data;
 
     public DataResult(CgiErrorEnum errorCode) {
