@@ -677,13 +677,6 @@ exports.retryDeviceSync = async (req, res) => {
         message: 'Invalid image format - base64 validation failed'
       });
     }
-      console.error(`   First 100 chars: ${optimizedFaceImage.substring(0, 100)}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid image format. Image must be valid base64-encoded data.',
-        hint: 'Please recapture the photo or upload a different image'
-      });
-    }
 
     const estimatedSizeKB = Math.round((optimizedFaceImage.length * 3/4) / 1024);
     console.log(`   Image size: ${estimatedSizeKB}KB`);
