@@ -743,7 +743,12 @@ exports.retryDeviceSync = async (req, res) => {
         });
       } else {
         const errorCode = javaResponse.data.code || 'UNKNOWN';
-        const errorMsg = javaResponse.data.msg || javaResponse.data.message || 'Unknown device error';
+        let errorMsg = javaResponse.data.msg || javaResponse.data.message || 'Unknown device error';
+        
+        // Handle face quality errors (code 1006 or 101008 in message)
+        if (errorCode === '1006' || errorCode === '101008' || errorMsg.includes('101008') || errorMsg.toLowerCase().includes('face fails to merger') || errorMsg.toLowerCase().includes('failed to add face')) {
+          errorMsg = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
+        }
         
         console.warn(`⚠️ Device sync failed: [${errorCode}] ${errorMsg}`);
         console.warn('📥 Full Java response:', JSON.stringify(javaResponse.data, null, 2));
@@ -1404,10 +1409,18 @@ exports.bulkSyncEmployees = async (req, res) => {
             employee.biometricData.syncStatus = 'failed';
             await employee.save();
 
+            // Handle face quality errors
+            const errorCode = javaResponse.data.code || 'UNKNOWN';
+            let errorMsg = javaResponse.data.msg || 'Unknown error';
+            
+            if (errorCode === '1006' || errorCode === '101008' || errorMsg.includes('101008') || errorMsg.toLowerCase().includes('face fails to merger') || errorMsg.toLowerCase().includes('failed to add face')) {
+              errorMsg = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
+            }
+
             results.failed.push({
               employeeId,
               name: `${employee.firstName} ${employee.lastName}`,
-              error: javaResponse.data.msg || 'Unknown error'
+              error: errorMsg
             });
           }
         } catch (deviceError) {
