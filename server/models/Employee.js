@@ -98,7 +98,7 @@ const employeeSchema = new mongoose.Schema({
   },
   nationalId: {
     type: String,
-    required: true,
+    required: false,
     trim: true
   },
   gender: {
