@@ -1322,7 +1322,8 @@ exports.bulkSyncEmployees = async (req, res) => {
         // If it's a file path, read and convert to base64
         if (capturedImage.startsWith('/uploads/') || capturedImage.startsWith('uploads/')) {
           try {
-            const imagePath = path.join(__dirname, '..', '..', capturedImage);
+            // Files are in server/uploads/, so go up one level from controllers/
+            const imagePath = path.join(__dirname, '..', capturedImage);
             console.log(`📷 Reading image file: ${imagePath}`);
             const imageBuffer = fs.readFileSync(imagePath);
             optimizedFaceImage = imageBuffer.toString('base64');
