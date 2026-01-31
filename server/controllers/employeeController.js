@@ -809,6 +809,12 @@ exports.retryDeviceSync = async (req, res) => {
             }
           });
         }
+        
+        // Handle face quality/merger errors (101008)
+        if (errorCode === '101008' || errorMessage.toLowerCase().includes('face fails to merger') || errorMessage.toLowerCase().includes('failed to add face')) {
+          errorMessage = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
+          errorCode = 'POOR_IMAGE_QUALITY';
+        }
       } else if (deviceError.code === 'ECONNREFUSED') {
         errorMessage = 'Device service is not running or unavailable';
         errorCode = 'CONNECTION_REFUSED';
@@ -1427,10 +1433,18 @@ exports.bulkSyncEmployees = async (req, res) => {
             employee.biometricData.syncStatus = 'failed';
             await employee.save();
 
+            // Handle face quality errors
+            let errorMsg = deviceError.response?.data?.msg || deviceError.message;
+            const errorCode = deviceError.response?.data?.code;
+            
+            if (errorCode === '101008' || errorMsg.toLowerCase().includes('face fails to merger') || errorMsg.toLowerCase().includes('failed to add face')) {
+              errorMsg = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
+            }
+
             results.failed.push({
               employeeId,
               name: `${employee.firstName} ${employee.lastName}`,
-              error: deviceError.response?.data?.msg || deviceError.message
+              error: errorMsg
             });
           }
         }
