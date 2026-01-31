@@ -614,15 +614,8 @@ exports.retryDeviceSync = async (req, res) => {
       });
     }
 
-    // Check if already synced
-    if (employee.deviceSynced && employee.biometricData?.syncStatus === 'synced') {
-      return res.status(400).json({
-        success: false,
-        message: 'Employee is already synced to device',
-        syncStatus: employee.biometricData.syncStatus,
-        lastSync: employee.biometricData.lastXO5Sync
-      });
-    }
+    // Allow re-sync even if already synced (record may be deleted from device)
+    console.log(`\n🔄 ===== ${employee.deviceSynced ? 'RE-SYNC' : 'RETRY'} DEVICE SYNC =====`);
 
     // Check facility supports device integration
     if (employee.facility.configuration?.integrationType !== 'java-xo5') {

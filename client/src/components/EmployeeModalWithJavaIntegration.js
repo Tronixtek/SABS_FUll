@@ -2426,17 +2426,17 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 Cancel
               </button>
               
-              {/* Retry Device Sync Button - Show for existing employees with failed sync */}
-              {employee && (employee.deviceSyncStatus === 'failed' || employee.deviceSyncStatus === 'pending') && (
+              {/* Retry Device Sync Button - Always show for existing employees (record may be deleted from device) */}
+              {employee && (
                 <button
                   type="button"
                   onClick={handleRetryDeviceSync}
                   disabled={loading}
                   className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  title="Retry synchronizing this employee to the biometric device"
+                  title="Re-sync this employee to the biometric device (use if record was deleted from device)"
                 >
                   <ArrowPathIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  Retry Device Sync
+                  {employee.deviceSyncStatus === 'synced' ? 'Re-sync to Device' : 'Retry Device Sync'}
                 </button>
               )}
               
