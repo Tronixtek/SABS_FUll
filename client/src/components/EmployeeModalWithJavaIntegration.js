@@ -23,7 +23,6 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
     joiningDate: employee?.joiningDate ? employee.joiningDate.split('T')[0] : '',
     dateOfBirth: employee?.dateOfBirth ? employee.dateOfBirth.split('T')[0] : '',
     nationality: employee?.nationality || '',
-    nationalId: employee?.nationalId || '',
     gender: employee?.gender || '',
     education: employee?.education || '',
     bloodGroup: employee?.bloodGroup || '',
@@ -2079,19 +2078,6 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">National ID / Passport *</label>
-                  <input
-                    type="text"
-                    name="nationalId"
-                    value={formData.nationalId}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="National ID or Passport Number"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-700">Date of Birth *</label>
                   <input
                     type="date"
@@ -2203,6 +2189,7 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                         <li>• Look directly at the camera</li>
                         <li>• Ensure good lighting</li>
                         <li>• Remove glasses if possible</li>
+                        <li>• No cap or head covering</li>
                         <li>• Keep a neutral expression</li>
                         <li>• Make sure face is clearly visible</li>
                       </ul>

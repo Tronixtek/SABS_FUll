@@ -332,12 +332,19 @@ exports.registerEmployeeWithDevice = async (req, res) => {
       console.log(`   Facility Device: ${facilityDeviceId}`);
 
       try {
-        // Optimize face image
-        let optimizedFaceImage = faceImage;
-        if (faceImage.includes('data:image')) {
-          optimizedFaceImage = faceImage.split(',')[1];
-        }
-        optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
+// Optimize face image - clean up data URI prefix if present
+    let optimizedFaceImage = faceImage;
+    if (faceImage.startsWith('data:')) {
+      // Extract base64 part after comma
+      const parts = faceImage.split(',');
+      optimizedFaceImage = parts.length > 1 ? parts[1] : parts[0];
+    } else if (faceImage.includes('data:image')) {
+      // Handle malformed data URI
+      optimizedFaceImage = faceImage.split(',').pop();
+    }
+    
+    // Remove whitespace and any non-base64 characters (only keep valid base64 chars)
+    optimizedFaceImage = optimizedFaceImage.replace(/[^A-Za-z0-9+/=]/g, '');
 
         const estimatedSizeKB = Math.round((optimizedFaceImage.length * 3/4) / 1024);
         console.log(`   Image size: ${estimatedSizeKB}KB`);
@@ -642,12 +649,41 @@ exports.retryDeviceSync = async (req, res) => {
     const deviceKey = employee.facility.configuration?.deviceKey?.toLowerCase() || facilityDeviceId;
     const personId = employee.biometricData?.xo5PersonSn || employee.biometricData?.faceId;
 
-    // Optimize face image
+    // Optimize face image - clean up data URI prefix if present
     let optimizedFaceImage = faceImage;
-    if (faceImage.includes('data:image')) {
+    if (faceImage.startsWith('data:')) {
+      // Remove data URI prefix (data:image/jpeg;base64,)
+      optimizedFaceImage = faceImage.split(',')[1];
+    } else if (faceImage.includes('data:image')) {
+      // Fallback for partial match
       optimizedFaceImage = faceImage.split(',')[1];
     }
-    optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
+    
+    // Remove whitespace and any non-base64 characters (clean up automatically)
+    optimizedFaceImage = optimizedFaceImage.replace(/[^A-Za-z0-9+/=]/g, '');
+    
+    // Log warning if we cleaned up invalid characters
+    const originalLength = faceImage.length;
+    const cleanedLength = optimizedFaceImage.length;
+    if (originalLength !== cleanedLength) {
+      console.log(`   ⚠️ Cleaned up ${originalLength - cleanedLength} invalid characters from image data`);
+    }
+    
+    // Validate base64 format after cleanup
+    if (!/^[A-Za-z0-9+/=]+$/.test(optimizedFaceImage)) {
+      console.error(`❌ Invalid base64 format - contains illegal characters even after cleanup`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image format - base64 validation failed'
+      });
+    }
+      console.error(`   First 100 chars: ${optimizedFaceImage.substring(0, 100)}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image format. Image must be valid base64-encoded data.',
+        hint: 'Please recapture the photo or upload a different image'
+      });
+    }
 
     const estimatedSizeKB = Math.round((optimizedFaceImage.length * 3/4) / 1024);
     console.log(`   Image size: ${estimatedSizeKB}KB`);
@@ -1354,12 +1390,35 @@ exports.bulkSyncEmployees = async (req, res) => {
         } else {
           // Already base64, extract if data URI
           console.log(`📷 Using base64 image (${Math.round(capturedImage.length / 1024)}KB)`);
-          if (optimizedFaceImage.includes(',')) {
+          if (optimizedFaceImage.startsWith('data:')) {
+            // Remove data URI prefix (data:image/jpeg;base64,)
+            optimizedFaceImage = optimizedFaceImage.split(',')[1] || optimizedFaceImage;
+          } else if (optimizedFaceImage.includes(',')) {
+            // Fallback: split by comma if present
             optimizedFaceImage = optimizedFaceImage.split(',')[1];
           }
         }
         
-        optimizedFaceImage = optimizedFaceImage.replace(/\s+/g, '');
+        // Final cleanup: remove whitespace and any non-base64 characters (automatic cleanup)
+        const beforeCleanup = optimizedFaceImage.length;
+        optimizedFaceImage = optimizedFaceImage.replace(/[^A-Za-z0-9+/=]/g, '');
+        const afterCleanup = optimizedFaceImage.length;
+        
+        if (beforeCleanup !== afterCleanup) {
+          console.log(`   ⚠️ Cleaned up ${beforeCleanup - afterCleanup} invalid characters from image data`);
+        }
+        
+        // Validate base64 (should only contain A-Z, a-z, 0-9, +, /, =)
+        if (!/^[A-Za-z0-9+/=]+$/.test(optimizedFaceImage)) {
+          console.log(`❌ SKIP: ${employee.firstName} ${employee.lastName} - Invalid base64 format even after cleanup`);
+          console.log(`   First 100 chars: ${optimizedFaceImage.substring(0, 100)}`);
+          results.skipped.push({
+            employeeId,
+            name: `${employee.firstName} ${employee.lastName}`,
+            reason: 'Invalid base64 image format (contains illegal characters)'
+          });
+          continue;
+        }
 
         const javaServicePayload = {
           employeeId: personId,
