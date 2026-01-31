@@ -372,18 +372,11 @@ const EmployeeModal = ({ employee, facilities, shifts, onClose }) => {
               <input
                 type="text"
                 name="employeeId"
-                className={`input ${employee ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                className="input"
                 value={formData.employeeId}
                 onChange={handleChange}
                 required
-                disabled={!!employee}
-                title={employee ? 'Employee ID cannot be changed after registration' : ''}
               />
-              {employee && (
-                <p className="text-xs text-gray-500 mt-1">
-                  This ID is used for device registration and cannot be modified
-                </p>
-              )}
             </div>
 
             <div>

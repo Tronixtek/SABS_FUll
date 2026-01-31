@@ -1410,18 +1410,23 @@ const EmployeeModalWithJavaIntegration = ({ employee, facilities, shifts, onClos
                   <label className="block text-sm font-medium text-gray-700">
                     Device ID (System) *
                     {!employee && <span className="text-xs text-gray-500 ml-1">(Auto-generated)</span>}
+                    {employee && <span className="text-xs text-gray-500 ml-1">(Read-only)</span>}
                   </label>
                   <input
                     type="text"
                     name="employeeId"
-                    value={formData.employeeId}
+                    value={employee ? (employee.biometricData?.xo5PersonSn || formData.employeeId) : formData.employeeId}
                     onChange={handleChange}
                     required
-                    readOnly={!employee}
-                    className={`mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${!employee ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                    placeholder={!employee ? "Select facility to generate" : "e.g., EMP001"}
+                    readOnly
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 cursor-not-allowed focus:outline-none"
+                    placeholder={!employee ? "Select facility to generate" : "e.g., PHC00001A7X2M"}
                   />
-                  <p className="mt-1 text-xs text-gray-500">For biometric device only</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {employee && employee.biometricData?.xo5PersonSn 
+                      ? 'Full device ID with unique suffix (used for biometric enrollment)' 
+                      : 'For biometric device only'}
+                  </p>
                 </div>
                 
                 <div>
