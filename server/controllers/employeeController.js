@@ -768,7 +768,28 @@ exports.retryDeviceSync = async (req, res) => {
         let errorMsg = javaResponse.data.msg || javaResponse.data.message || 'Unknown device error';
         
         // Handle face quality errors (code 1006 or 101008 in message)
-        if (errorCode === '1006' || errorCode === '101008' || errorMsg.includes('101008') || errorMsg.toLowerCase().includes('face fails to merger') || errorMsg.toLowerCase().includes('failed to add face')) {
+        const isFaceMergeError = errorCode === '1006' || errorCode === '101008' || errorMsg.includes('101008') || errorMsg.toLowerCase().includes('face fails to merger') || errorMsg.toLowerCase().includes('failed to add face');
+        
+        if (isFaceMergeError) {
+          // Face merge failed - orphan person record may exist, try to clean up
+          console.warn(`⚠️ Face merge failed - attempting to clean up orphan person record`);
+          try {
+            const deletePayload = {
+              employeeId: personId, // Use the exact personId that was created
+              deviceKey: deviceKey,
+              secret: employee.facility.configuration?.deviceSecret || '123456'
+            };
+            
+            await axios.post(
+              `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/delete`,
+              deletePayload,
+              { timeout: 10000 }
+            );
+            console.log(`   ✅ Orphan person record cleaned up`);
+          } catch (cleanupError) {
+            console.warn(`   ⚠️ Cleanup failed (orphan may still exist):`, cleanupError.message);
+          }
+          
           errorMsg = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
         }
         
@@ -838,7 +859,28 @@ exports.retryDeviceSync = async (req, res) => {
         }
         
         // Handle face quality/merger errors (code 1006 or 101008 in message)
-        if (errorCode === '1006' || errorCode === '101008' || errorMessage.includes('101008') || errorMessage.toLowerCase().includes('face fails to merger') || errorMessage.toLowerCase().includes('failed to add face')) {
+        const isFaceMergeError = errorCode === '1006' || errorCode === '101008' || errorMessage.includes('101008') || errorMessage.toLowerCase().includes('face fails to merger') || errorMessage.toLowerCase().includes('failed to add face');
+        
+        if (isFaceMergeError) {
+          // Face merge failed - orphan person record may exist, try to clean up
+          console.warn(`⚠️ Face merge failed (catch block) - attempting to clean up orphan person record`);
+          try {
+            const deletePayload = {
+              employeeId: personId,
+              deviceKey: deviceKey,
+              secret: employee.facility.configuration?.deviceSecret || '123456'
+            };
+            
+            await axios.post(
+              `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/delete`,
+              deletePayload,
+              { timeout: 10000 }
+            );
+            console.log(`   ✅ Orphan person record cleaned up`);
+          } catch (cleanupError) {
+            console.warn(`   ⚠️ Cleanup failed (orphan may still exist):`, cleanupError.message);
+          }
+          
           errorMessage = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
           errorCode = 'POOR_IMAGE_QUALITY';
         }
