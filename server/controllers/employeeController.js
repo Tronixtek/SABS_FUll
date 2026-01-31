@@ -810,8 +810,8 @@ exports.retryDeviceSync = async (req, res) => {
           });
         }
         
-        // Handle face quality/merger errors (101008)
-        if (errorCode === '101008' || errorMessage.toLowerCase().includes('face fails to merger') || errorMessage.toLowerCase().includes('failed to add face')) {
+        // Handle face quality/merger errors (code 1006 or 101008 in message)
+        if (errorCode === '1006' || errorCode === '101008' || errorMessage.includes('101008') || errorMessage.toLowerCase().includes('face fails to merger') || errorMessage.toLowerCase().includes('failed to add face')) {
           errorMessage = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
           errorCode = 'POOR_IMAGE_QUALITY';
         }
@@ -1433,11 +1433,11 @@ exports.bulkSyncEmployees = async (req, res) => {
             employee.biometricData.syncStatus = 'failed';
             await employee.save();
 
-            // Handle face quality errors
+            // Handle face quality errors (code 1006 or 101008 in message)
             let errorMsg = deviceError.response?.data?.msg || deviceError.message;
             const errorCode = deviceError.response?.data?.code;
             
-            if (errorCode === '101008' || errorMsg.toLowerCase().includes('face fails to merger') || errorMsg.toLowerCase().includes('failed to add face')) {
+            if (errorCode === '1006' || errorCode === '101008' || errorMsg.includes('101008') || errorMsg.toLowerCase().includes('face fails to merger') || errorMsg.toLowerCase().includes('failed to add face')) {
               errorMsg = 'Photo quality issue: Please ensure the image meets requirements (clear face, good lighting, front-facing) and re-upload the photo';
             }
 
