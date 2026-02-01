@@ -1075,19 +1075,6 @@ const PublicSelfRegister = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">National ID / Passport *</label>
-                  <input
-                    type="text"
-                    name="nationalId"
-                    value={formData.nationalId}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="National ID or Passport Number"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-700">Date of Birth *</label>
                   <input
                     type="date"

@@ -244,40 +244,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Facility-wise Attendance */}
-      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-200">
-        <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">
-          Facility-wise Attendance
-        </h3>
-        <div className="h-64 sm:h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={analytics?.facilityWiseAttendance || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="facility.name" 
-                fontSize={12}
-                tick={{ fill: '#64748b' }}
-              />
-              <YAxis 
-                fontSize={12}
-                tick={{ fill: '#64748b' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Legend />
-              <Bar dataKey="present" fill="#10b981" name="Present" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="absent" fill="#ef4444" name="Absent" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       {/* Top Late Comers - Facility Grouped */}
       <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-200">
         <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">

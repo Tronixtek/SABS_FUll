@@ -59,16 +59,16 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
     const {
       firstName, lastName, email, phone, facility,
       department, designation, cadre, shift, staffId, dateOfBirth,
-      nationality, nationalId, gender, education,
+      nationality, gender, education,
       bloodGroup, allergies, address, faceImageBase64
     } = req.body;
 
     // ✅ STEP 1: VALIDATE REQUIRED FIELDS
-    if (!firstName || !lastName || !phone || !facility || !shift || !staffId || !dateOfBirth || !nationality || !nationalId || !gender) {
+    if (!firstName || !lastName || !phone || !facility || !shift || !staffId || !dateOfBirth || !nationality || !gender) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields',
-        required: ['firstName', 'lastName', 'phone', 'facility', 'shift', 'staffId', 'dateOfBirth', 'nationality', 'nationalId', 'gender']
+        required: ['firstName', 'lastName', 'phone', 'facility', 'shift', 'staffId', 'dateOfBirth', 'nationality', 'gender']
       });
     }
 
@@ -203,7 +203,6 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
       joiningDate: new Date(), // Registration date
       dateOfBirth,
       nationality,
-      nationalId,
       gender,
       education: education || 'Not Specified',
       bloodGroup: bloodGroup || undefined,
