@@ -705,7 +705,53 @@ exports.retryDeviceSync = async (req, res) => {
       console.log('📥 Java Service Response:', JSON.stringify(javaResponse.data, null, 2));
 
       const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
-      const isDuplicate = javaResponse.data.code === "100911" || javaResponse.data.code === "DUPLICATE_EMPLOYEE"; // Employee already exists on device
+      const isDuplicatePerson = javaResponse.data.code === "100911" || javaResponse.data.code === "DUPLICATE_EMPLOYEE"; // Person already exists
+      const isFaceAlreadyExists = javaResponse.data.code === "1500" || // Face already exists (orphan created)
+                                  (javaResponse.data.msg && javaResponse.data.msg.includes('101010')); // error code:101010
+      
+      // Handle face already exists error (101010) - orphan person created, need cleanup
+      if (isFaceAlreadyExists) {
+        console.warn(`⚠️ Face already exists on device - cleaning up orphan person record`);
+        
+        // Delete the orphan person record
+        try {
+          const deletePayload = {
+            employeeId: personId,
+            deviceKey: deviceKey,
+            secret: employee.facility.configuration?.deviceSecret || '123456'
+          };
+          
+          await axios.post(
+            `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/delete`,
+            deletePayload,
+            { timeout: 10000 }
+          );
+          console.log(`   ✅ Orphan person record deleted: ${personId}`);
+        } catch (cleanupError) {
+          console.warn(`   ⚠️ Failed to delete orphan record:`, cleanupError.message);
+        }
+        
+        // Update employee with failure
+        employee.deviceSynced = false;
+        employee.deviceSyncStatus = 'failed';
+        employee.biometricData.syncStatus = 'failed';
+        employee.biometricData.syncError = 'Face already exists - retry with clearer image';
+        employee.biometricData.lastSyncAttempt = new Date();
+        await employee.save();
+        
+        return res.status(409).json({
+          success: false,
+          message: 'This face is already registered on the device. Please retry with a clearer, better quality image.',
+          deviceErrorCode: '1500',
+          canRetry: true,
+          data: {
+            employeeId: employee._id,
+            deviceSyncStatus: 'failed',
+            syncStatus: 'failed',
+            lastAttempt: employee.biometricData.lastSyncAttempt
+          }
+        });
+      }
       
       // Handle success: false with no error details - check Java service logs for actual error
       if (javaResponse.data.success === false && !javaResponse.data.code) {
@@ -734,8 +780,8 @@ exports.retryDeviceSync = async (req, res) => {
         });
       }
 
-      if (isSuccess || isDuplicate) {
-        if (isDuplicate) {
+      if (isSuccess || isDuplicatePerson) {
+        if (isDuplicatePerson) {
           console.log(`✅ Device sync successful (employee already exists on device)`);
         } else {
           console.log(`✅ Device sync successful!`);
@@ -834,8 +880,8 @@ exports.retryDeviceSync = async (req, res) => {
         errorMessage = javaErrorData.msg || javaErrorData.message || 'Unknown device error';
         
         // Check if this is a duplicate employee error (treat as success)
-        if (errorCode === '100911' || errorCode === 'DUPLICATE_EMPLOYEE') {
-          console.log(`✅ Device sync successful (employee already exists on device)`);
+        if (errorCode === '100911' || errorCode === 'DUPLICATE_EMPLOYEE' || errorCode === '1500' || (errorMessage && errorMessage.includes('101010'))) {
+          console.log(`✅ Device sync successful (employee/face already exists on device)`);
           
           employee.deviceSynced = true;
           employee.deviceSyncStatus = 'synced';
@@ -1475,7 +1521,10 @@ exports.bulkSyncEmployees = async (req, res) => {
           );
 
           const isSuccess = javaResponse.data.code === "000" || javaResponse.data.success === true;
-          const isDuplicate = javaResponse.data.code === "100911" || javaResponse.data.code === "DUPLICATE_EMPLOYEE";
+          const isDuplicate = javaResponse.data.code === "100911" || 
+                             javaResponse.data.code === "DUPLICATE_EMPLOYEE" ||
+                             javaResponse.data.code === "1500" || // Face already exists
+                             (javaResponse.data.msg && javaResponse.data.msg.includes('101010')); // face already exists
 
           if (isSuccess || isDuplicate) {
             employee.deviceSynced = true;
@@ -1512,7 +1561,8 @@ exports.bulkSyncEmployees = async (req, res) => {
           }
         } catch (deviceError) {
           const errorCode = deviceError.response?.data?.code;
-          const isDuplicate = errorCode === '100911' || errorCode === 'DUPLICATE_EMPLOYEE';
+          const errorMsg = deviceError.response?.data?.msg;
+          const isDuplicate = errorCode === '100911' || errorCode === 'DUPLICATE_EMPLOYEE' || errorCode === '1500' || (errorMsg && errorMsg.includes('101010'));
 
           if (isDuplicate) {
             employee.deviceSynced = true;
