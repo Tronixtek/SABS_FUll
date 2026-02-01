@@ -658,16 +658,23 @@ exports.retryDeviceSync = async (req, res) => {
 
     // Optimize face image - clean up data URI prefix if present
     let optimizedFaceImage = faceImage;
+    console.log(`   📊 Original image length: ${faceImage.length} characters`);
+    console.log(`   📊 First 100 chars: ${faceImage.substring(0, 100)}`);
+    
     if (faceImage.startsWith('data:')) {
       // Remove data URI prefix (data:image/jpeg;base64,)
       optimizedFaceImage = faceImage.split(',')[1];
+      console.log(`   📊 After data URI removal: ${optimizedFaceImage.length} characters`);
     } else if (faceImage.includes('data:image')) {
       // Fallback for partial match
       optimizedFaceImage = faceImage.split(',')[1];
+      console.log(`   📊 After fallback split: ${optimizedFaceImage.length} characters`);
     }
     
     // Remove whitespace and any non-base64 characters (clean up automatically)
+    const beforeRegex = optimizedFaceImage.length;
     optimizedFaceImage = optimizedFaceImage.replace(/[^A-Za-z0-9+/=]/g, '');
+    console.log(`   📊 After regex cleanup: ${optimizedFaceImage.length} characters (removed ${beforeRegex - optimizedFaceImage.length})`);
     
     // Ensure proper base64 padding (length must be multiple of 4)
     const paddingNeeded = (4 - (optimizedFaceImage.length % 4)) % 4;
