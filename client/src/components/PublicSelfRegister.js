@@ -390,7 +390,7 @@ const PublicSelfRegister = () => {
 
       if (response.data.success) {
         setRegistrationSuccess(response.data.data);
-        toast.success('Registration successful!');
+        toast.success(response.data.message || 'Registration successful!');
         
         // Reset form
         setFormData({
@@ -424,6 +424,22 @@ const PublicSelfRegister = () => {
         setNationalitySearch('Nigerian');
       }
     } catch (error) {
+      // Check for face rejection error
+      if (error.response?.data?.error === 'FACE_REJECTED') {
+        toast.error(error.response.data.message, { duration: 6000 });
+        toast.info('Please retake your photo with better lighting and no glasses/cap', { duration: 6000 });
+        
+        // Clear captured image to force retake
+        setCapturedImage(null);
+        
+        // Scroll to camera section
+        setTimeout(() => {
+          document.getElementById('face-capture-section')?.scrollIntoView({ behavior: 'smooth' });
+        }, 500);
+        
+        return; // Don't reset form, let them retry
+      }
+      
       const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);
     } finally {
@@ -1119,7 +1135,7 @@ const PublicSelfRegister = () => {
             </div>
 
             {/* Face Capture Section */}
-            <div className="bg-gray-50 rounded-lg p-6">
+            <div id="face-capture-section" className="bg-gray-50 rounded-lg p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Biometric Photo *</h2>
               
               {!capturedImage ? (

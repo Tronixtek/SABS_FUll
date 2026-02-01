@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const Employee = require('../models/Employee');
 const Facility = require('../models/Facility');
 const Shift = require('../models/Shift');
@@ -247,18 +248,125 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
 
     // Populate relations
     await employee.populate([
-      { path: 'facility', select: 'name code' },
+      { path: 'facility', select: 'name code configuration deviceInfo' },
       { path: 'shift', select: 'name code startTime endTime' }
     ]);
 
     console.log('✅ Employee registered successfully:', employee._id);
-    console.log('⏳ Device sync status: pending (admin will sync)');
+    console.log('🔄 Attempting immediate device sync...');
+
+    // ✅ STEP 5: ATTEMPT IMMEDIATE DEVICE SYNC
+    let syncResult = { success: false, error: null };
+    
+    try {
+      // Read image file from disk and convert to base64
+      const imagePath = path.join(__dirname, '..', faceImageData);
+      const imageBuffer = fs.readFileSync(imagePath);
+      let base64Image = imageBuffer.toString('base64');
+      
+      // Clean up base64 (add padding if needed)
+      const paddingNeeded = (4 - (base64Image.length % 4)) % 4;
+      if (paddingNeeded > 0) {
+        base64Image += '='.repeat(paddingNeeded);
+      }
+      
+      // Prepare device sync payload
+      const javaServicePayload = {
+        employeeId: xo5PersonSn,
+        fullName: `${firstName} ${lastName}`,
+        faceImage: base64Image,
+        deviceKey: deviceKey,
+        secret: facilityDoc.configuration?.deviceSecret || '123456',
+        verificationStyle: 0
+      };
+      
+      console.log(`   Syncing to device: ${deviceKey}`);
+      const javaResponse = await axios.post(
+        `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/register`,
+        javaServicePayload,
+        { timeout: 60000 }
+      );
+      
+      console.log('📥 Device sync response:', javaResponse.data);
+      
+      // Check for face errors in deviceResponse field
+      const deviceResponse = javaResponse.data.data?.deviceResponse || '';
+      const isFaceError = javaResponse.data.code === "1500" ||
+                         (javaResponse.data.msg && javaResponse.data.msg.includes('101010')) ||
+                         deviceResponse.includes('101010') ||
+                         deviceResponse.toLowerCase().includes('face already exists') ||
+                         deviceResponse.includes('face image processing failed');
+      
+      if (isFaceError) {
+        console.warn('⚠️ Face image rejected by device');
+        syncResult.error = 'FACE_REJECTED';
+        syncResult.message = 'Face image quality issue. Please retake photo with better lighting, no glasses/cap.';
+        
+        // Update employee status
+        employee.deviceSyncStatus = 'failed';
+        employee.biometricData.syncStatus = 'failed';
+        employee.biometricData.syncError = syncResult.message;
+        await employee.save();
+        
+      } else if (javaResponse.data.success || javaResponse.data.code === "000") {
+        console.log('✅ Device sync successful!');
+        syncResult.success = true;
+        
+        // Update employee with sync success
+        employee.deviceSynced = true;
+        employee.deviceSyncStatus = 'synced';
+        employee.biometricData.syncStatus = 'synced';
+        employee.biometricData.lastXO5Sync = new Date();
+        employee.biometricData.syncError = null;
+        await employee.save();
+        
+      } else {
+        console.warn('⚠️ Device sync failed:', javaResponse.data.msg);
+        syncResult.error = 'SYNC_FAILED';
+        syncResult.message = javaResponse.data.msg || 'Device sync failed';
+        
+        employee.deviceSyncStatus = 'failed';
+        employee.biometricData.syncStatus = 'failed';
+        employee.biometricData.syncError = syncResult.message;
+        await employee.save();
+      }
+      
+    } catch (syncError) {
+      console.error('❌ Device sync error:', syncError.message);
+      syncResult.error = 'SYNC_ERROR';
+      syncResult.message = syncError.message;
+      
+      employee.deviceSyncStatus = 'failed';
+      employee.biometricData.syncStatus = 'failed';
+      employee.biometricData.syncError = syncError.message;
+      await employee.save();
+    }
+
     console.log('===== PUBLIC REGISTRATION COMPLETED =====\n');
 
-    // ✅ STEP 5: RETURN SUCCESS RESPONSE
+    // ✅ STEP 6: RETURN RESPONSE BASED ON SYNC RESULT
+    if (syncResult.error === 'FACE_REJECTED') {
+      // Face rejected - allow retry
+      return res.status(422).json({
+        success: false,
+        error: 'FACE_REJECTED',
+        message: syncResult.message,
+        canRetry: true,
+        data: {
+          employeeId: employee._id,
+          staffId: employee.staffId,
+          requiresImageRetake: true
+        }
+      });
+    }
+    
+    // Registration successful (device sync may have failed but employee is created)
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Your account has been created.',
+      message: syncResult.success 
+        ? 'Registration successful! Your biometric has been enrolled.'
+        : 'Registration successful! Your account has been created.',
+      deviceSyncStatus: employee.deviceSyncStatus,
       data: {
         employee: {
           id: employee._id,
@@ -271,7 +379,7 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
           facility: employee.facility,
           shift: employee.shift,
           status: employee.status,
-          deviceSyncStatus: 'pending'
+          deviceSyncStatus: employee.deviceSyncStatus
         },
         credentials: {
           staffId: employee.staffId,
