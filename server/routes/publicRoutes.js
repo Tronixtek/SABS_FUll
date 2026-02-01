@@ -259,15 +259,26 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
     let syncResult = { success: false, error: null };
     
     try {
-      // Read image file from disk and convert to base64
-      const imagePath = path.join(__dirname, '..', faceImageData);
-      const imageBuffer = fs.readFileSync(imagePath);
-      let base64Image = imageBuffer.toString('base64');
+      let base64Image;
+      
+      // Check if faceImageData is already base64 or a file path
+      if (req.file) {
+        // File upload - faceImageData is already base64 from line 136
+        base64Image = faceImageData;
+        console.log(`   Using base64 from file upload (${base64Image.length} chars)`);
+      } else if (faceImageBase64) {
+        // Base64 upload - faceImageData is already base64 from line 148
+        base64Image = faceImageData;
+        console.log(`   Using base64 from direct upload (${base64Image.length} chars)`);
+      } else {
+        throw new Error('No face image data available for sync');
+      }
       
       // Clean up base64 (add padding if needed)
       const paddingNeeded = (4 - (base64Image.length % 4)) % 4;
       if (paddingNeeded > 0) {
         base64Image += '='.repeat(paddingNeeded);
+        console.log(`   Added ${paddingNeeded} padding characters`);
       }
       
       // Prepare device sync payload
