@@ -494,7 +494,15 @@ const PublicSelfRegister = () => {
           </div>
 
           <button
-            onClick={() => setRegistrationSuccess(null)}
+            onClick={() => {
+              setRegistrationSuccess(null);
+              // Reset camera/upload state
+              setShowCamera(false);
+              setCapturedImage(null);
+              setUploadMethod('camera');
+              // Scroll to top
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
           >
             Register Another Employee
