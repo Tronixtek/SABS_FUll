@@ -297,18 +297,14 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
       });
     }
     
-    // Validate Java service is accessible before creating employee
+    // Optional: Check Java service availability (non-blocking - just log warning)
     try {
       const javaServiceUrl = process.env.JAVA_SERVICE_URL || 'http://localhost:8081';
-      const healthCheck = await axios.get(`${javaServiceUrl}/actuator/health`, { timeout: 5000 });
-      console.log('✅ Java service is available:', healthCheck.data.status);
+      const healthCheck = await axios.get(`${javaServiceUrl}/actuator/health`, { timeout: 3000 });
+      console.log('✅ Java service health check passed:', healthCheck.data.status);
     } catch (serviceError) {
-      console.error('❌ Java service unavailable:', serviceError.message);
-      return res.status(503).json({
-        success: false,
-        message: 'Biometric enrollment service is currently unavailable. Please try again later.',
-        error: 'SERVICE_UNAVAILABLE'
-      });
+      console.warn('⚠️ Java service health check failed (will try sync anyway):', serviceError.message);
+      // Continue with registration - sync will fail later if service is truly down
     }
 
     const employeeData = {
