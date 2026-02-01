@@ -1,6 +1,8 @@
 const Employee = require('../models/Employee');
 const Facility = require('../models/Facility');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const javaServiceClient = require('../services/javaServiceClient');
 const syncToDevice = require('./syncToDeviceHelper');
 const { generateUniqueEmployeeId } = require('../utils/idGenerator');
@@ -661,7 +663,37 @@ exports.retryDeviceSync = async (req, res) => {
     console.log(`   📊 Original image length: ${faceImage.length} characters`);
     console.log(`   📊 First 100 chars: ${faceImage.substring(0, 100)}`);
     
-    if (faceImage.startsWith('data:')) {
+    // Check if it's a file path/URL instead of base64 data
+    if (faceImage.startsWith('http://') || faceImage.startsWith('https://') || faceImage.startsWith('/uploads/') || faceImage.startsWith('uploads/')) {
+      console.log(`   📷 Image is a URL/path, reading from disk...`);
+      try {
+        // Extract the file path from URL if needed
+        let filePath = faceImage;
+        if (faceImage.startsWith('http')) {
+          // Extract path after domain: https://domain.com/uploads/... -> /uploads/...
+          const urlObj = new URL(faceImage);
+          filePath = urlObj.pathname;
+        }
+        
+        // Convert to absolute path: /uploads/... -> server/uploads/...
+        if (filePath.startsWith('/')) {
+          filePath = filePath.substring(1); // Remove leading slash
+        }
+        const absolutePath = path.join(__dirname, '..', filePath);
+        console.log(`   📂 Reading file: ${absolutePath}`);
+        
+        // Read file and convert to base64
+        const imageBuffer = fs.readFileSync(absolutePath);
+        optimizedFaceImage = imageBuffer.toString('base64');
+        console.log(`   ✅ File read successfully: ${Math.round(imageBuffer.length / 1024)}KB`);
+      } catch (fileError) {
+        console.error(`   ❌ Failed to read image file: ${fileError.message}`);
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to read employee image file'
+        });
+      }
+    } else if (faceImage.startsWith('data:')) {
       // Remove data URI prefix (data:image/jpeg;base64,)
       optimizedFaceImage = faceImage.split(',')[1];
       console.log(`   📊 After data URI removal: ${optimizedFaceImage.length} characters`);
