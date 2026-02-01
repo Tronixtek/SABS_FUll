@@ -345,6 +345,13 @@ exports.registerEmployeeWithDevice = async (req, res) => {
     
     // Remove whitespace and any non-base64 characters (only keep valid base64 chars)
     optimizedFaceImage = optimizedFaceImage.replace(/[^A-Za-z0-9+/=]/g, '');
+    
+    // Ensure proper base64 padding (length must be multiple of 4)
+    const paddingNeeded = (4 - (optimizedFaceImage.length % 4)) % 4;
+    if (paddingNeeded > 0) {
+      optimizedFaceImage += '='.repeat(paddingNeeded);
+      console.log(`   ✓ Added ${paddingNeeded} padding character(s) to base64 string`);
+    }
 
         const estimatedSizeKB = Math.round((optimizedFaceImage.length * 3/4) / 1024);
         console.log(`   Image size: ${estimatedSizeKB}KB`);
@@ -662,6 +669,13 @@ exports.retryDeviceSync = async (req, res) => {
     // Remove whitespace and any non-base64 characters (clean up automatically)
     optimizedFaceImage = optimizedFaceImage.replace(/[^A-Za-z0-9+/=]/g, '');
     
+    // Ensure proper base64 padding (length must be multiple of 4)
+    const paddingNeeded = (4 - (optimizedFaceImage.length % 4)) % 4;
+    if (paddingNeeded > 0) {
+      optimizedFaceImage += '='.repeat(paddingNeeded);
+      console.log(`   ✓ Added ${paddingNeeded} padding character(s) to base64 string`);
+    }
+    
     // Log warning if we cleaned up invalid characters
     const originalLength = faceImage.length;
     const cleanedLength = optimizedFaceImage.length;
@@ -675,6 +689,15 @@ exports.retryDeviceSync = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Invalid image format - base64 validation failed'
+      });
+    }
+    
+    // Final length check
+    if (optimizedFaceImage.length % 4 !== 0) {
+      console.error(`❌ Invalid base64 length: ${optimizedFaceImage.length} (must be multiple of 4)`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image format - incorrect base64 padding'
       });
     }
 
@@ -1506,6 +1529,13 @@ exports.bulkSyncEmployees = async (req, res) => {
         const beforeCleanup = optimizedFaceImage.length;
         optimizedFaceImage = optimizedFaceImage.replace(/[^A-Za-z0-9+/=]/g, '');
         const afterCleanup = optimizedFaceImage.length;
+        
+        // Ensure proper base64 padding (length must be multiple of 4)
+        const paddingNeeded = (4 - (optimizedFaceImage.length % 4)) % 4;
+        if (paddingNeeded > 0) {
+          optimizedFaceImage += '='.repeat(paddingNeeded);
+          console.log(`   ✓ Added ${paddingNeeded} padding character(s) to base64 string`);
+        }
         
         if (beforeCleanup !== afterCleanup) {
           console.log(`   ⚠️ Cleaned up ${beforeCleanup - afterCleanup} invalid characters from image data`);
