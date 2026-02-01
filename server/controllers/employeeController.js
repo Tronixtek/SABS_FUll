@@ -711,7 +711,9 @@ exports.retryDeviceSync = async (req, res) => {
       
       // Handle face already exists error (101010) - orphan person created, need cleanup
       if (isFaceAlreadyExists) {
-        console.warn(`⚠️ Face already exists on device - cleaning up orphan person record`);
+        console.warn(`⚠️ Face already exists on device (error 101010) - cleaning up orphan person record`);
+        console.log(`   Person ID to delete: ${personId}`);
+        console.log(`   Device Key: ${deviceKey}`);
         
         // Delete the orphan person record
         try {
@@ -721,14 +723,19 @@ exports.retryDeviceSync = async (req, res) => {
             secret: employee.facility.configuration?.deviceSecret || '123456'
           };
           
-          await axios.post(
+          console.log(`   🗑️ Calling delete endpoint: ${process.env.JAVA_SERVICE_URL}/api/employee/delete`);
+          const deleteResponse = await axios.post(
             `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/delete`,
             deletePayload,
             { timeout: 10000 }
           );
-          console.log(`   ✅ Orphan person record deleted: ${personId}`);
+          console.log(`   ✅ Orphan person record deleted successfully: ${personId}`);
+          console.log(`   Delete response:`, JSON.stringify(deleteResponse.data, null, 2));
         } catch (cleanupError) {
           console.warn(`   ⚠️ Failed to delete orphan record:`, cleanupError.message);
+          if (cleanupError.response) {
+            console.warn(`   Delete error response:`, JSON.stringify(cleanupError.response.data, null, 2));
+          }
         }
         
         // Update employee with failure
@@ -741,7 +748,7 @@ exports.retryDeviceSync = async (req, res) => {
         
         return res.status(409).json({
           success: false,
-          message: 'This face is already registered on the device. Please retry with a clearer, better quality image.',
+          message: 'Face already registered on device. Please capture a NEW photo without glasses, cap, or uniform. Ensure good lighting and retry.',
           deviceErrorCode: '1500',
           canRetry: true,
           data: {
@@ -798,7 +805,7 @@ exports.retryDeviceSync = async (req, res) => {
 
         return res.json({
           success: true,
-          message: isDuplicate 
+          message: isDuplicatePerson 
             ? 'Employee already synced to biometric device' 
             : 'Employee synced to biometric device successfully',
           data: {
