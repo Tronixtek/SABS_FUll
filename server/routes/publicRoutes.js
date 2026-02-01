@@ -4,9 +4,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 const Employee = require('../models/Employee');
 const Facility = require('../models/Facility');
 const Shift = require('../models/Shift');
+const queueManager = require('../services/enrollmentQueueManager');
 const { 
   generateUniqueEmployeeId, 
   generateUniqueStaffId,
@@ -44,12 +46,51 @@ const upload = multer({
   }
 });
 
+// ✅ RATE LIMITER: Prevent abuse on public registration endpoint
+const publicRegisterLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 10, // Maximum 10 requests per minute per IP
+  message: {
+    success: false,
+    error: 'Too many registration attempts from this IP. Please try again in a minute.',
+    retryAfter: 60
+  },
+  standardHeaders: true, // Return rate limit info in RateLimit-* headers
+  legacyHeaders: false, // Disable X-RateLimit-* headers
+  skipSuccessfulRequests: false, // Count all requests
+  skipFailedRequests: false
+});
+
+/**
+ * @desc    Get current enrollment queue status
+ * @route   GET /api/public/queue-status
+ * @access  Public
+ */
+router.get('/queue-status', (req, res) => {
+  try {
+    const stats = queueManager.getStats();
+    const recommendation = queueManager.getRecommendedAction();
+    
+    res.json({
+      success: true,
+      queue: stats,
+      recommendation
+    });
+  } catch (error) {
+    console.error('❌ Error getting queue status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve queue status'
+    });
+  }
+});
+
 /**
  * @desc    Public employee self-registration
  * @route   POST /api/public/self-register
  * @access  Public (no authentication required)
  */
-router.post('/self-register', upload.single('faceImage'), async (req, res) => {
+router.post('/self-register', publicRegisterLimiter, upload.single('faceImage'), async (req, res) => {
   try {
     console.log('\n🌐 ===== PUBLIC SELF-REGISTRATION STARTED =====');
     console.log('📋 Request Body:', {
@@ -373,8 +414,45 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
     console.log('✅ Employee registered successfully:', employee._id);
     console.log('🔄 Attempting immediate device sync...');
 
-    // ✅ STEP 5: ATTEMPT IMMEDIATE DEVICE SYNC
+    // ✅ STEP 5: CHECK QUEUE CAPACITY BEFORE DEVICE SYNC
+    if (!queueManager.hasCapacity()) {
+      console.warn('⚠️ Enrollment queue is full');
+      return res.status(503).json({
+        success: false,
+        error: 'QUEUE_FULL',
+        message: 'The enrollment system is currently at maximum capacity. Your account has been created but biometric enrollment is pending.',
+        accountCreated: true,
+        employeeId: employee.employeeId,
+        staffId: employee.staffId,
+        recommendation: 'Please try again in 30-60 minutes, or contact your facility administrator to complete enrollment.',
+        retryAfter: 1800 // 30 minutes in seconds
+      });
+    }
+
+    // Add to enrollment queue
+    let queueInfo;
+    try {
+      queueInfo = queueManager.addToQueue(employee._id.toString(), 'public');
+      console.log('📊 Added to enrollment queue:', queueInfo);
+    } catch (queueError) {
+      if (queueError.message === 'QUEUE_FULL') {
+        return res.status(503).json({
+          success: false,
+          error: 'QUEUE_FULL',
+          message: 'The enrollment system is currently at maximum capacity. Your account has been created but biometric enrollment is pending.',
+          accountCreated: true,
+          employeeId: employee.employeeId,
+          staffId: employee.staffId,
+          recommendation: 'Please try again in 30-60 minutes, or contact your facility administrator to complete enrollment.',
+          retryAfter: 1800
+        });
+      }
+      throw queueError;
+    }
+
+    // ✅ STEP 6: ATTEMPT IMMEDIATE DEVICE SYNC
     let syncResult = { success: false, error: null };
+    const syncStartTime = Date.now();
     
     try {
       let base64Image;
@@ -495,11 +573,17 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
       employee.biometricData.syncStatus = 'failed';
       employee.biometricData.syncError = syncError.message;
       await employee.save();
+    } finally {
+      // Record processing time and remove from queue
+      const processingTime = Date.now() - syncStartTime;
+      queueManager.recordProcessingTime(processingTime);
+      queueManager.removeFromQueue(employee._id.toString());
+      console.log(`⏱️ Processing completed in ${Math.ceil(processingTime / 1000)}s, removed from queue`);
     }
 
     console.log('===== PUBLIC REGISTRATION COMPLETED =====\n');
 
-    // ✅ STEP 6: RETURN RESPONSE BASED ON SYNC RESULT
+    // ✅ STEP 7: RETURN RESPONSE BASED ON SYNC RESULT
     if (syncResult.error === 'FACE_REJECTED') {
       // Face rejected - allow retry
       return res.status(422).json({
@@ -522,6 +606,10 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
         ? 'Registration successful! Your biometric has been enrolled.'
         : 'Registration successful! Your account has been created.',
       deviceSyncStatus: employee.deviceSyncStatus,
+      queueInfo: queueInfo ? {
+        message: queueInfo.message,
+        processingTime: Math.ceil((Date.now() - syncStartTime) / 1000)
+      } : undefined,
       data: {
         employee: {
           id: employee._id,

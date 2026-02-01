@@ -4,9 +4,8 @@ import toast from 'react-hot-toast';
 import { CameraIcon, CheckCircleIcon, XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 const PublicSelfRegister = () => {
-  const [facilities, setFacilities] = useState([]);
-  const [shifts, setShifts] = useState([]);
-  const [formData, setFormData] = useState({
+  // Define initial form state
+  const initialFormData = {
     staffId: '',
     firstName: '',
     lastName: '',
@@ -35,7 +34,11 @@ const PublicSelfRegister = () => {
       zipCode: '',
       country: 'Nigeria'
     }
-  });
+  };
+
+  const [facilities, setFacilities] = useState([]);
+  const [shifts, setShifts] = useState([]);
+  const [formData, setFormData] = useState(initialFormData);
   
   const [showCamera, setShowCamera] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
@@ -45,6 +48,12 @@ const PublicSelfRegister = () => {
   const [loadingFacilities, setLoadingFacilities] = useState(true);
   const [registrationSuccess, setRegistrationSuccess] = useState(null);
   const [uploadMethod, setUploadMethod] = useState('camera');
+  const [enrollmentProgress, setEnrollmentProgress] = useState({
+    stage: null, // 'validating', 'creating', 'enrolling', 'complete'
+    queuePosition: null,
+    estimatedWait: null,
+    message: null
+  });
   const [availableCameras, setAvailableCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState('');
   const [availablePrefixes, setAvailablePrefixes] = useState([]);
@@ -377,6 +386,12 @@ const PublicSelfRegister = () => {
     }
 
     setLoading(true);
+    setEnrollmentProgress({
+      stage: 'validating',
+      message: 'Validating your information...',
+      queuePosition: null,
+      estimatedWait: null
+    });
 
     try {
       const payload = {
@@ -386,10 +401,28 @@ const PublicSelfRegister = () => {
         faceImageBase64: capturedImage
       };
 
+      // Update progress
+      setEnrollmentProgress({
+        stage: 'creating',
+        message: 'Creating your account...',
+        queuePosition: null,
+        estimatedWait: null
+      });
+
       const response = await axios.post('/api/public/self-register', payload);
 
       if (response.data.success) {
-        setRegistrationSuccess(response.data.data);
+        setEnrollmentProgress({
+          stage: 'complete',
+          message: response.data.queueInfo?.message || 'Registration complete!',
+          queuePosition: null,
+          estimatedWait: null
+        });
+        
+        setRegistrationSuccess({
+          ...response.data.data,
+          queueInfo: response.data.queueInfo
+        });
         toast.success(response.data.message || 'Registration successful!');
         
         // Reset form
@@ -424,6 +457,31 @@ const PublicSelfRegister = () => {
         setNationalitySearch('Nigerian');
       }
     } catch (error) {
+      // Check for queue full error
+      if (error.response?.status === 503 && error.response?.data?.error === 'QUEUE_FULL') {
+        toast.error(error.response.data.message, { duration: 8000 });
+        toast.info(error.response.data.recommendation, { duration: 8000 });
+        setEnrollmentProgress({
+          stage: null,
+          message: null,
+          queuePosition: null,
+          estimatedWait: null
+        });
+        return;
+      }
+      
+      // Check for rate limit error
+      if (error.response?.status === 429) {
+        toast.error(error.response.data.error || 'Too many requests. Please wait before trying again.', { duration: 5000 });
+        setEnrollmentProgress({
+          stage: null,
+          message: null,
+          queuePosition: null,
+          estimatedWait: null
+        });
+        return;
+      }
+      
       // Check for face rejection error
       if (error.response?.data?.error === 'FACE_REJECTED') {
         toast.error(error.response.data.message, { duration: 6000 });
@@ -431,6 +489,12 @@ const PublicSelfRegister = () => {
         
         // Clear captured image to force retake
         setCapturedImage(null);
+        setEnrollmentProgress({
+          stage: null,
+          message: null,
+          queuePosition: null,
+          estimatedWait: null
+        });
         
         // Scroll to camera section
         setTimeout(() => {
@@ -442,6 +506,12 @@ const PublicSelfRegister = () => {
       
       const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);
+      setEnrollmentProgress({
+        stage: null,
+        message: null,
+        queuePosition: null,
+        estimatedWait: null
+      });
     } finally {
       setLoading(false);
     }
@@ -495,11 +565,18 @@ const PublicSelfRegister = () => {
 
           <button
             onClick={() => {
+              // Reset all state
               setRegistrationSuccess(null);
-              // Reset camera/upload state
+              setFormData(initialFormData);
               setShowCamera(false);
               setCapturedImage(null);
               setUploadMethod('camera');
+              setDepartmentSearch('');
+              setUnitSearch('');
+              setDesignationSearch('');
+              setCadreSearch('');
+              setNationalitySearch('Nigerian');
+              setSelectedPrefixType('');
               // Scroll to top
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
@@ -1326,7 +1403,44 @@ const PublicSelfRegister = () => {
             </div>
 
             {/* Submit Button */}
-            <div className="flex justify-center">
+            <div className="flex flex-col items-center space-y-4">
+              {/* Progress Indicator */}
+              {loading && enrollmentProgress.stage && (
+                <div className="w-full max-w-md bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <ArrowPathIcon className="h-6 w-6 text-blue-600 animate-spin" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900">
+                        {enrollmentProgress.stage === 'validating' && '1/3 Validating Information'}
+                        {enrollmentProgress.stage === 'creating' && '2/3 Creating Account'}
+                        {enrollmentProgress.stage === 'enrolling' && '3/3 Enrolling Biometric'}
+                        {enrollmentProgress.stage === 'complete' && '✓ Complete'}
+                      </p>
+                      <p className="text-sm text-blue-700">{enrollmentProgress.message}</p>
+                      {enrollmentProgress.queuePosition && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Queue position: {enrollmentProgress.queuePosition}
+                          {enrollmentProgress.estimatedWait && ` • Est. wait: ${enrollmentProgress.estimatedWait} min`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="mt-3 bg-blue-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: enrollmentProgress.stage === 'validating' ? '33%' :
+                               enrollmentProgress.stage === 'creating' ? '66%' :
+                               enrollmentProgress.stage === 'enrolling' ? '90%' : '100%'
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              
               <button
                 type="submit"
                 disabled={loading || !capturedImage}
@@ -1335,7 +1449,10 @@ const PublicSelfRegister = () => {
                 {loading ? (
                   <>
                     <ArrowPathIcon className="h-5 w-5 animate-spin mr-2" />
-                    Registering...
+                    {enrollmentProgress.stage === 'validating' && 'Validating...'}
+                    {enrollmentProgress.stage === 'creating' && 'Creating Account...'}
+                    {enrollmentProgress.stage === 'enrolling' && 'Enrolling Biometric...'}
+                    {!enrollmentProgress.stage && 'Registering...'}
                   </>
                 ) : (
                   'Complete Registration'
