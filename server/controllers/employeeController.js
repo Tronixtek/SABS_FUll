@@ -704,8 +704,8 @@ exports.retryDeviceSync = async (req, res) => {
 
       console.log('📥 Java Service Response:', JSON.stringify(javaResponse.data, null, 2));
 
-      // Check for face already exists error in deviceResponse field
-      const deviceResponse = javaResponse.data.deviceResponse || '';
+      // Check for face already exists error in deviceResponse field (nested in data.data)
+      const deviceResponse = javaResponse.data.data?.deviceResponse || '';
       console.log('🔍 Checking deviceResponse field:', deviceResponse);
       console.log('🔍 javaResponse.data.code:', javaResponse.data.code);
       console.log('🔍 javaResponse.data.msg:', javaResponse.data.msg);
@@ -714,7 +714,7 @@ exports.retryDeviceSync = async (req, res) => {
       const isFaceAlreadyExists = javaResponse.data.code === "1500" || // Face already exists (orphan created)
                                   (javaResponse.data.msg && javaResponse.data.msg.includes('101010')) || // error code in msg
                                   deviceResponse.includes('101010') || // error code in deviceResponse
-                                  deviceResponse.includes('face already exists'); // text match
+                                  deviceResponse.toLowerCase().includes('face already exists'); // text match (case insensitive)
       
       console.log('🔍 isFaceAlreadyExists:', isFaceAlreadyExists);
       
