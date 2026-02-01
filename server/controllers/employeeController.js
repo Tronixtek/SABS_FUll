@@ -706,13 +706,23 @@ exports.retryDeviceSync = async (req, res) => {
 
       // Check for face already exists error in deviceResponse field
       const deviceResponse = javaResponse.data.deviceResponse || '';
+      console.log('🔍 Checking deviceResponse field:', deviceResponse);
+      console.log('🔍 javaResponse.data.code:', javaResponse.data.code);
+      console.log('🔍 javaResponse.data.msg:', javaResponse.data.msg);
+      console.log('🔍 javaResponse.data.success:', javaResponse.data.success);
+      
       const isFaceAlreadyExists = javaResponse.data.code === "1500" || // Face already exists (orphan created)
                                   (javaResponse.data.msg && javaResponse.data.msg.includes('101010')) || // error code in msg
                                   deviceResponse.includes('101010') || // error code in deviceResponse
                                   deviceResponse.includes('face already exists'); // text match
       
+      console.log('🔍 isFaceAlreadyExists:', isFaceAlreadyExists);
+      
       const isDuplicatePerson = javaResponse.data.code === "100911" || javaResponse.data.code === "DUPLICATE_EMPLOYEE"; // Person already exists
       const isSuccess = (javaResponse.data.code === "000" || javaResponse.data.success === true) && !isFaceAlreadyExists; // Success only if no face error
+      
+      console.log('🔍 isDuplicatePerson:', isDuplicatePerson);
+      console.log('🔍 isSuccess:', isSuccess);
       
       // Handle face already exists error (101010) - orphan person created, need cleanup
       if (isFaceAlreadyExists) {
