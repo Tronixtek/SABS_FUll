@@ -72,6 +72,33 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
         required: ['firstName', 'lastName', 'phone', 'facility', 'shift', 'staffId', 'dateOfBirth', 'nationality', 'gender']
       });
     }
+    
+    // Validate face image is provided
+    if (!req.file && !faceImageBase64) {
+      return res.status(400).json({
+        success: false,
+        message: 'Face image is required. Please capture or upload your photo.',
+        field: 'faceImage'
+      });
+    }
+    
+    // Validate email format if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+        field: 'email'
+      });
+    }
+    
+    // Validate phone number format (basic validation)
+    if (phone && !/^[\d\s\-\+\(\)]+$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone number format',
+        field: 'phone'
+      });
+    }
 
     // Check if staffId already exists
     const existingEmployee = await Employee.findOne({ staffId });
@@ -207,18 +234,47 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
       try {
         const buffer = Buffer.from(faceImageData, 'base64');
         console.log('📦 Buffer size:', buffer.length, 'bytes');
+        
+        // Validate buffer size (max 10MB)
+        if (buffer.length > 10 * 1024 * 1024) {
+          return res.status(400).json({
+            success: false,
+            message: 'Image file too large. Maximum size is 10MB.',
+            field: 'faceImage'
+          });
+        }
+        
+        // Validate buffer is not empty
+        if (buffer.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid image data. Please try again.',
+            field: 'faceImage'
+          });
+        }
+        
         fs.writeFileSync(filepath, buffer);
         console.log('✅ File write successful');
         
         // Verify file was written
-        if (fs.existsSync(filepath)) {
-          const stats = fs.statSync(filepath);
-          console.log('✅ File verified - size:', stats.size, 'bytes');
-        } else {
-          console.log('❌ File write failed - file does not exist after write');
+        if (!fs.existsSync(filepath)) {
+          console.error('❌ File write failed - file does not exist after write');
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to save image file. Please try again.'
+          });
         }
+        
+        const stats = fs.statSync(filepath);
+        console.log('✅ File verified - size:', stats.size, 'bytes');
+        
       } catch (err) {
         console.error('❌ Error writing file:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to process image. Please try again.',
+          error: err.message
+        });
       }
       
       profileImagePath = `/uploads/public-registrations/${filename}`;
@@ -230,6 +286,30 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
 
     const facilityDeviceId = (facilityDoc.deviceInfo?.deviceId || facilityDoc.code || facility).toLowerCase();
     const deviceKey = facilityDoc.configuration?.deviceKey?.toLowerCase() || facilityDeviceId;
+    
+    // Check if facility has device configuration
+    if (!facilityDoc.deviceInfo?.deviceId && !facilityDoc.code) {
+      console.warn('⚠️ Facility has no device configuration');
+      return res.status(400).json({
+        success: false,
+        message: 'This facility is not configured for biometric enrollment. Please contact admin.',
+        error: 'FACILITY_NOT_CONFIGURED'
+      });
+    }
+    
+    // Validate Java service is accessible before creating employee
+    try {
+      const javaServiceUrl = process.env.JAVA_SERVICE_URL || 'http://localhost:8081';
+      const healthCheck = await axios.get(`${javaServiceUrl}/actuator/health`, { timeout: 5000 });
+      console.log('✅ Java service is available:', healthCheck.data.status);
+    } catch (serviceError) {
+      console.error('❌ Java service unavailable:', serviceError.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Biometric enrollment service is currently unavailable. Please try again later.',
+        error: 'SERVICE_UNAVAILABLE'
+      });
+    }
 
     const employeeData = {
       employeeId,
@@ -355,10 +435,36 @@ router.post('/self-register', upload.single('faceImage'), async (req, res) => {
         syncResult.error = 'FACE_REJECTED';
         syncResult.message = 'Face image quality issue. Please retake photo with better lighting, no glasses/cap.';
         
+        // Try to clean up orphan person record on device
+        try {
+          console.log('🗑️ Attempting to delete orphan person record...');
+          const deletePayload = {
+            employeeId: xo5PersonSn,
+            deviceKey: deviceKey,
+            secret: facilityDoc.configuration?.deviceSecret || '123456'
+          };
+          
+          const deleteResponse = await axios.post(
+            `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/delete`,
+            deletePayload,
+            { timeout: 10000 }
+          );
+          
+          if (deleteResponse.data.success) {
+            console.log('✅ Orphan person record deleted successfully');
+          } else {
+            console.log('⚠️ Orphan cleanup response:', deleteResponse.data.msg);
+          }
+        } catch (cleanupError) {
+          console.warn('⚠️ Orphan cleanup failed (may not exist):', cleanupError.message);
+          // Don't fail registration due to cleanup error
+        }
+        
         // Update employee status
         employee.deviceSyncStatus = 'failed';
         employee.biometricData.syncStatus = 'failed';
         employee.biometricData.syncError = syncResult.message;
+        employee.biometricData.lastSyncAttempt = new Date();
         await employee.save();
         
       } else if (javaResponse.data.success || javaResponse.data.code === "000") {
@@ -606,9 +712,32 @@ async function retryDeviceSync(employee, faceImageData, res) {
       syncResult.error = 'FACE_REJECTED';
       syncResult.message = 'Face image quality issue. Please retake photo with better lighting, no glasses/cap.';
       
+      // Try to clean up orphan person record
+      try {
+        console.log('🗑️ Attempting to delete orphan person record (retry)...');
+        const deletePayload = {
+          employeeId: xo5PersonSn,
+          deviceKey: deviceKey,
+          secret: employee.facility.configuration?.deviceSecret || '123456'
+        };
+        
+        const deleteResponse = await axios.post(
+          `${process.env.JAVA_SERVICE_URL || 'http://localhost:8081'}/api/employee/delete`,
+          deletePayload,
+          { timeout: 10000 }
+        );
+        
+        if (deleteResponse.data.success) {
+          console.log('✅ Orphan person record deleted successfully');
+        }
+      } catch (cleanupError) {
+        console.warn('⚠️ Orphan cleanup failed:', cleanupError.message);
+      }
+      
       employee.deviceSyncStatus = 'failed';
       employee.biometricData.syncStatus = 'failed';
       employee.biometricData.syncError = syncResult.message;
+      employee.biometricData.lastSyncAttempt = new Date();
       await employee.save();
       
       return res.status(422).json({
