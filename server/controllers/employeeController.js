@@ -1132,30 +1132,23 @@ exports.deleteEmployee = async (req, res) => {
 
         console.log(`   Java service response:`, deleteResponse.data);
 
-        if (!deleteResponse.data.success) {
-          // Device deletion failed - CANNOT proceed with database deletion
+        // Check if employee not found on device (error 1003) - this is OK, proceed with DB deletion
+        if (deleteResponse.data.code === '1003' || deleteResponse.data.errorCode === '1003') {
+          console.log(`⚠️ Employee not found on device (already deleted or never synced)`);
+          console.log(`✅ Proceeding with database deletion since device is clean`);
+          // Continue to step 3 - database deletion
+        } else if (!deleteResponse.data.success) {
+          // Other device deletion errors - BLOCK database deletion
           console.log(`❌ Device deletion failed - BLOCKING database deletion`);
-          
-          if (deleteResponse.data.errorCode === '1003') {
-            return res.status(400).json({
-              success: false,
-              message: 'Employee not found on biometric device',
-              error: 'EMPLOYEE_NOT_ON_DEVICE',
-              details: {
-                employeeId: employee.employeeId,
-                deviceId: employee.deviceId,
-                canForceDelete: true,
-                suggestion: 'Employee may have been deleted from device manually. Use force delete if needed.'
-              }
-            });
-          }
           
           return res.status(503).json({
             success: false,
-            message: `Device deletion failed: ${deleteResponse.data.message}`,
+            message: `Device deletion failed: ${deleteResponse.data.msg || deleteResponse.data.message}`,
             error: 'DEVICE_DELETION_FAILED',
             details: deleteResponse.data
           });
+        } else {
+          console.log(`✅ Device deletion successful`);
         }
 
         // ✅ STEP 3: DEVICE DELETION SUCCESSFUL - NOW SAFE TO DELETE FROM DATABASE
