@@ -295,10 +295,18 @@ const EmployeeDashboard = () => {
   const getTodayStatus = () => {
     if (loadingAttendance) return { value: 'Loading...', color: 'text-gray-600', bgColor: 'bg-gray-100' };
     if (!todayAttendance) return { value: 'Not Clocked In', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
+    
+    // Check if employee has clocked in (has checkIn time but no checkOut)
+    if (todayAttendance.checkIn?.time && !todayAttendance.checkOut?.time) {
+      return { value: 'Clocked In', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+    }
+    
+    // If both check-in and check-out exist, show status
     if (todayAttendance.status === 'present') return { value: 'Present', color: 'text-green-600', bgColor: 'bg-green-100' };
     if (todayAttendance.status === 'absent') return { value: 'Absent', color: 'text-red-600', bgColor: 'bg-red-100' };
     if (todayAttendance.status === 'on-leave') return { value: 'On Leave', color: 'text-blue-600', bgColor: 'bg-blue-100' };
     if (todayAttendance.status === 'late') return { value: 'Late Arrival', color: 'text-orange-600', bgColor: 'bg-orange-100' };
+    
     return { value: todayAttendance.status, color: 'text-gray-600', bgColor: 'bg-gray-100' };
   };
   
@@ -308,7 +316,7 @@ const EmployeeDashboard = () => {
     {
       name: 'Today\'s Attendance',
       value: todayStatus.value,
-      subtitle: todayAttendance?.checkIn ? `In: ${new Date(todayAttendance.checkIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '',
+      subtitle: todayAttendance?.checkIn?.time ? `In: ${new Date(todayAttendance.checkIn.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '',
       icon: ClockIcon,
       color: todayStatus.color,
       bgColor: todayStatus.bgColor,
