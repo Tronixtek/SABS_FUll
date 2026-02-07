@@ -62,18 +62,38 @@ const EmployeeDashboard = () => {
     try {
       setLoadingShift(true);
       const token = localStorage.getItem('employeeToken');
+      const employeeId = employee?._id || employee?.id;
+      
+      console.log('Fetching shift for employee:', employeeId);
+      
+      if (!employeeId) {
+        console.error('No employee ID available');
+        setLoadingShift(false);
+        return;
+      }
+      
       const response = await axios.get(
-        `${API_URL}/api/rosters/assignments/current/${employee.id}`,
+        `${API_URL}/api/rosters/assignments/current/${employeeId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
+      console.log('Shift response:', response.data);
+      
       if (response.data.success && response.data.data) {
         setCurrentShift(response.data.data);
+      } else {
+        // Fallback to employee.shift if roster not available
+        if (employee?.shift) {
+          console.log('Using fallback shift:', employee.shift);
+          setCurrentShift({ shift: employee.shift });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch current shift:', error);
+      console.error('Error details:', error.response?.data);
       // Fallback to employee.shift if roster not available
       if (employee?.shift) {
+        console.log('Using fallback shift after error:', employee.shift);
         setCurrentShift({ shift: employee.shift });
       }
     } finally {
@@ -420,7 +440,7 @@ const EmployeeDashboard = () => {
         </div>
 
         {/* Current Shift Card */}
-        {currentShift && (
+        {!loadingShift && currentShift && (
           <div className="bg-white shadow rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -456,6 +476,25 @@ const EmployeeDashboard = () => {
                 </p>
               </div>
             )}
+          </div>
+        )}
+        
+        {loadingShift && (
+          <div className="bg-white shadow rounded-lg p-6 mb-8 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Loading shift information...</span>
+          </div>
+        )}
+        
+        {!loadingShift && !currentShift && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+            <div className="flex items-center">
+              <ExclamationCircleIcon className="h-6 w-6 text-yellow-600 mr-3" />
+              <div>
+                <h3 className="text-sm font-semibold text-yellow-800">No Shift Assigned</h3>
+                <p className="text-sm text-yellow-700 mt-1">Please contact your administrator to assign you a shift.</p>
+              </div>
+            </div>
           </div>
         )}
 

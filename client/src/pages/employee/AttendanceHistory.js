@@ -45,8 +45,19 @@ const AttendanceHistory = () => {
         }
       });
 
+      console.log('Attendance response:', response.data);
+
       if (response.data.success) {
         const records = response.data.data || [];
+        console.log('Attendance records:', records);
+        
+        // Log first record to see structure
+        if (records.length > 0) {
+          console.log('First record sample:', records[0]);
+          console.log('CheckIn:', records[0].checkIn);
+          console.log('CheckOut:', records[0].checkOut);
+        }
+        
         setAttendance(records);
         
         // Calculate stats
@@ -59,6 +70,7 @@ const AttendanceHistory = () => {
       }
     } catch (error) {
       console.error('Failed to fetch attendance:', error);
+      console.error('Error details:', error.response?.data);
     } finally {
       setLoading(false);
     }
@@ -66,22 +78,43 @@ const AttendanceHistory = () => {
 
   const formatTime = (timeString) => {
     if (!timeString) return '-';
-    const date = new Date(timeString);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: true 
-    });
+    try {
+      const date = new Date(timeString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', timeString);
+        return '-';
+      }
+      return date.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return '-';
+    }
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return '-';
+      }
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '-';
+    }
   };
 
   const getStatusBadge = (status) => {
