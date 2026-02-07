@@ -88,28 +88,49 @@ const EmployeeDashboard = () => {
   const fetchAttendanceData = async () => {
     try {
       setLoadingAttendance(true);
+      const token = localStorage.getItem('employeeToken');
       
-      // Fetch today's attendance
+      // Fetch today's attendance using employee auth endpoint
       const today = new Date().toISOString().split('T')[0];
       const todayResponse = await axios.get(
-        `${API_URL}/api/attendance/employee/${employee.employeeId}?date=${today}`
+        `${API_URL}/api/employee-auth/my-attendance`,
+        { 
+          params: { 
+            startDate: today, 
+            endDate: today 
+          },
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
       
-      if (todayResponse.data.success && todayResponse.data.data.attendance.length > 0) {
-        setTodayAttendance(todayResponse.data.data.attendance[0]);
+      console.log('Today attendance response:', todayResponse.data);
+      
+      if (todayResponse.data.success && todayResponse.data.data.length > 0) {
+        setTodayAttendance(todayResponse.data.data[0]);
+      } else {
+        setTodayAttendance(null);
       }
       
       // Fetch this month's attendance count
       const currentDate = new Date();
-      const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split('T')[0];
       
       const monthResponse = await axios.get(
-        `${API_URL}/api/attendance/employee/${employee.employeeId}?startDate=${firstDay.toISOString().split('T')[0]}&endDate=${lastDay.toISOString().split('T')[0]}`
+        `${API_URL}/api/employee-auth/my-attendance`,
+        { 
+          params: { 
+            startDate: firstDay, 
+            endDate: lastDay 
+          },
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
       
+      console.log('Month attendance response:', monthResponse.data);
+      
       if (monthResponse.data.success) {
-        const attendance = monthResponse.data.data.attendance || [];
+        const attendance = monthResponse.data.data || [];
         const presentDays = attendance.filter(a => a.status === 'present' || a.status === 'on-leave').length;
         const totalWorkingDays = new Date().getDate(); // Days elapsed in current month
         setMonthAttendance({ present: presentDays, total: totalWorkingDays });
