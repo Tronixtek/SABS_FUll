@@ -54,8 +54,13 @@ const AttendanceHistory = () => {
         // Log first record to see structure
         if (records.length > 0) {
           console.log('First record sample:', records[0]);
-          console.log('CheckIn:', records[0].checkIn);
-          console.log('CheckOut:', records[0].checkOut);
+          console.log('CheckIn object:', records[0].checkIn);
+          console.log('CheckIn.time:', records[0].checkIn?.time);
+          console.log('CheckOut object:', records[0].checkOut);
+          console.log('CheckOut.time:', records[0].checkOut?.time);
+          console.log('Status:', records[0].status);
+          console.log('TotalHours:', records[0].totalHours);
+          console.log('WorkDuration:', records[0].workDuration);
         }
         
         setAttendance(records);
@@ -299,13 +304,13 @@ const AttendanceHistory = () => {
                         {formatDate(record.date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatTime(record.checkIn)}
+                        {formatTime(record.checkIn?.time || record.checkIn)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatTime(record.checkOut)}
+                        {formatTime(record.checkOut?.time || record.checkOut)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.totalHours ? `${record.totalHours.toFixed(2)}h` : '-'}
+                        {record.totalHours ? `${record.totalHours.toFixed(2)}h` : (record.workDuration ? `${(record.workDuration / 60).toFixed(2)}h` : '-')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {getStatusBadge(record.status)}

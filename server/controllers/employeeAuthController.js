@@ -262,14 +262,77 @@ exports.getMyAttendance = async (req, res) => {
 
     console.log('Attendance query:', query);
 
-    // Fetch attendance records
-    const attendance = await Attendance.find(query)
-      .sort({ date: -1 })
+    // Fetch attendance records and aggregate by date
+    const rawAttendance = await Attendance.find(query)
+      .sort({ date: -1, timestamp: 1 })
       .lean();
 
-    console.log(`Found ${attendance.length} attendance records`);
+    console.log(`Found ${rawAttendance.length} attendance records`);
+
+    // Aggregate records by date to show daily summaries
+    const dailyAttendance = {};
+    
+    rawAttendance.forEach(record => {
+      const dateKey = record.date.toISOString().split('T')[0];
+      
+      if (!dailyAttendance[dateKey]) {
+        dailyAttendance[dateKey] = {
+          _id: record._id,
+          date: record.date,
+          employeeId: record.employeeId,
+          facility: record.facility,
+          status: record.status || 'present',
+          totalHours: record.workHours || 0,
+          workDuration: record.workDuration || 0,
+          checkIn: null,
+          checkOut: null,
+          lateArrival: record.lateArrival || 0,
+          earlyDeparture: record.earlyDeparture || 0,
+          overtime: record.overtime || 0,
+          breaks: record.breaks || []
+        };
+      }
+      
+      // Set check-in time from timestamp if type is check-in
+      if (record.type === 'check-in' && record.timestamp) {
+        dailyAttendance[dateKey].checkIn = {
+          time: record.timestamp,
+          method: record.checkIn?.method || 'fingerprint'
+        };
+      }
+      
+      // Set check-out time from timestamp if type is check-out
+      if (record.type === 'check-out' && record.timestamp) {
+        dailyAttendance[dateKey].checkOut = {
+          time: record.timestamp,
+          method: record.checkOut?.method || 'fingerprint'
+        };
+        // Update work hours if we have both check-in and check-out
+        if (dailyAttendance[dateKey].checkIn?.time) {
+          const checkInTime = new Date(dailyAttendance[dateKey].checkIn.time);
+          const checkOutTime = new Date(record.timestamp);
+          const hours = (checkOutTime - checkInTime) / (1000 * 60 * 60);
+          dailyAttendance[dateKey].totalHours = hours;
+          dailyAttendance[dateKey].workDuration = hours * 60;
+        }
+      }
+      
+      // Update status and other fields from the most recent record
+      if (record.status) dailyAttendance[dateKey].status = record.status;
+      if (record.workHours) dailyAttendance[dateKey].totalHours = record.workHours;
+      if (record.lateArrival) dailyAttendance[dateKey].lateArrival = record.lateArrival;
+      if (record.earlyDeparture) dailyAttendance[dateKey].earlyDeparture = record.earlyDeparture;
+      if (record.overtime) dailyAttendance[dateKey].overtime = record.overtime;
+    });
+
+    // Convert to array and sort by date descending
+    const attendance = Object.values(dailyAttendance).sort((a, b) => 
+      new Date(b.date) - new Date(a.date)
+    );
+
+    console.log(`Aggregated into ${attendance.length} daily records`);
     if (attendance.length > 0) {
-      console.log('First record:', attendance[0]);
+      console.log('First aggregated record:', attendance[0]);
     }
 
     res.status(200).json({
