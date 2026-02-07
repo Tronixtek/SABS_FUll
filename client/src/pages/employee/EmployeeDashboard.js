@@ -62,18 +62,11 @@ const EmployeeDashboard = () => {
     try {
       setLoadingShift(true);
       const token = localStorage.getItem('employeeToken');
-      const employeeId = employee?._id || employee?.id;
       
-      console.log('Fetching shift for employee:', employeeId);
-      
-      if (!employeeId) {
-        console.error('No employee ID available');
-        setLoadingShift(false);
-        return;
-      }
+      console.log('Fetching shift for employee');
       
       const response = await axios.get(
-        `${API_URL}/api/rosters/assignments/current/${employeeId}`,
+        `${API_URL}/api/employee-auth/my-shift`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -82,20 +75,11 @@ const EmployeeDashboard = () => {
       if (response.data.success && response.data.data) {
         setCurrentShift(response.data.data);
       } else {
-        // Fallback to employee.shift if roster not available
-        if (employee?.shift) {
-          console.log('Using fallback shift:', employee.shift);
-          setCurrentShift({ shift: employee.shift });
-        }
+        console.log('No shift data available');
       }
     } catch (error) {
       console.error('Failed to fetch current shift:', error);
       console.error('Error details:', error.response?.data);
-      // Fallback to employee.shift if roster not available
-      if (employee?.shift) {
-        console.log('Using fallback shift after error:', employee.shift);
-        setCurrentShift({ shift: employee.shift });
-      }
     } finally {
       setLoadingShift(false);
     }

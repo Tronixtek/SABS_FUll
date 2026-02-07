@@ -242,8 +242,15 @@ exports.getMyAttendance = async (req, res) => {
     const Attendance = require('../models/Attendance');
     const { startDate, endDate } = req.query;
 
-    // Build query
-    const query = { employeeId: req.employee.employeeId };
+    console.log('Fetching attendance for employee:', {
+      _id: req.employee._id,
+      employeeId: req.employee.employeeId,
+      startDate,
+      endDate
+    });
+
+    // Build query - use employee ObjectId for better performance
+    const query = { employee: req.employee._id };
 
     // Add date range if provided
     if (startDate && endDate) {
@@ -253,10 +260,17 @@ exports.getMyAttendance = async (req, res) => {
       };
     }
 
+    console.log('Attendance query:', query);
+
     // Fetch attendance records
     const attendance = await Attendance.find(query)
       .sort({ date: -1 })
       .lean();
+
+    console.log(`Found ${attendance.length} attendance records`);
+    if (attendance.length > 0) {
+      console.log('First record:', attendance[0]);
+    }
 
     res.status(200).json({
       success: true,
@@ -267,7 +281,68 @@ exports.getMyAttendance = async (req, res) => {
     console.error('Get my attendance error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching attendance records'
+      message: 'Error fetching attendance records',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get employee's current shift assignment
+// @route   GET /api/employee-auth/my-shift
+// @access  Private (Employee)
+exports.getMyShift = async (req, res) => {
+  try {
+    const MonthlyRoster = require('../models/MonthlyRoster');
+    const ShiftAssignment = require('../models/ShiftAssignment');
+    const today = new Date();
+
+    console.log('Fetching shift for employee:', {
+      _id: req.employee._id,
+      employeeId: req.employee.employeeId,
+      date: today
+    });
+
+    // Try to get shift from roster first
+    const assignment = await ShiftAssignment.getActiveAssignment(req.employee._id);
+    
+    if (assignment) {
+      console.log('Found active roster assignment:', assignment);
+      return res.json({
+        success: true,
+        data: assignment
+      });
+    }
+
+    // Fallback to employee's default shift
+    const Employee = require('../models/Employee');
+    const employee = await Employee.findById(req.employee._id)
+      .populate('shift')
+      .populate('facility');
+    
+    if (employee?.shift) {
+      console.log('Using employee default shift:', employee.shift);
+      return res.json({
+        success: true,
+        data: {
+          shift: employee.shift,
+          facility: employee.facility,
+          assignmentType: 'default',
+          source: 'employee-record'
+        }
+      });
+    }
+
+    console.log('No shift found for employee');
+    res.json({
+      success: true,
+      data: null
+    });
+  } catch (error) {
+    console.error('Error fetching employee shift:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch shift information',
+      error: error.message
     });
   }
 };
