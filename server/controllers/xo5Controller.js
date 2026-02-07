@@ -2,6 +2,7 @@ const Employee = require('../models/Employee');
 const Attendance = require('../models/Attendance');
 const Facility = require('../models/Facility');
 const Shift = require('../models/Shift');
+const MonthlyRoster = require('../models/MonthlyRoster');
 const LeaveRequest = require('../models/LeaveRequest');
 const moment = require('moment-timezone');
 const { attendanceLogger } = require('../utils/logger');
@@ -169,17 +170,25 @@ async function processXO5Attendance(xo5Record, deviceId) {
       };
     }
     
-    if (!employee.shift) {
-      attendanceLogger.warn(`⚠️ No shift assigned to employee: ${employee.firstName} ${employee.lastName}`);
+    // Parse the attendance time first to determine which shift to use
+    const attendanceTime = new Date(parseInt(xo5Record.recordTime));
+    const attendanceDate = moment(attendanceTime).startOf('day').toDate();
+    
+    // Get employee's shift for this specific date (uses roster if available)
+    let employeeShift = await MonthlyRoster.getEmployeeShiftForDate(employee._id, attendanceDate);
+    
+    if (!employeeShift) {
+      attendanceLogger.warn(`⚠️ No shift assigned to employee: ${employee.firstName} ${employee.lastName} for date: ${moment(attendanceDate).format('YYYY-MM-DD')}`);
       return {
         success: false,
         message: `No shift assigned to employee: ${employee.firstName} ${employee.lastName}`
       };
     }
     
-    // Parse the attendance time
-    const attendanceTime = new Date(parseInt(xo5Record.recordTime));
-    const attendanceDate = moment(attendanceTime).startOf('day').toDate();
+    attendanceLogger.info(`✅ Using shift: ${employeeShift.name} for date: ${moment(attendanceDate).format('YYYY-MM-DD')}`);
+    
+    // Replace employee.shift references with employeeShift for this processing
+    const shift = employeeShift;
     
     // Normalize direction: 1,3 = check-in | 2,4 = check-out
     // Direction codes: 1=check-in, 2=break-out, 3=break-in, 4=check-out
@@ -245,8 +254,8 @@ async function processXO5Attendance(xo5Record, deviceId) {
     }
     
     // Create new attendance record for this specific event
-    const [startHour, startMinute] = employee.shift.startTime.split(':');
-    const [endHour, endMinute] = employee.shift.endTime.split(':');
+    const [startHour, startMinute] = shift.startTime.split(':');
+    const [endHour, endMinute] = shift.endTime.split(':');
     
     const scheduledCheckIn = moment(attendanceDate)
       .hour(parseInt(startHour))
@@ -271,20 +280,20 @@ async function processXO5Attendance(xo5Record, deviceId) {
       const facilityTimezone = employee.facility?.timezone || 'UTC';
       
       // Calculate scheduled time for late arrival check IN THE FACILITY'S TIMEZONE
-      const [startHour, startMinute] = employee.shift.startTime.split(':');
+      const [startHour, startMinute] = shift.startTime.split(':');
       const scheduledCheckInTime = moment.tz(attendanceDate, facilityTimezone)
         .hour(parseInt(startHour))
         .minute(parseInt(startMinute))
         .second(0);
         
       const actualCheckIn = moment.tz(attendanceTime, facilityTimezone);
-      const graceMinutes = employee.shift.graceTime?.checkIn || 15;
+      const graceMinutes = shift.graceTime?.checkIn || 15;
       
       // DEBUG: Log all time calculations
       console.log('\n=== LATE DETECTION DEBUG ===');
       console.log('Facility Timezone:', facilityTimezone);
       console.log('Employee:', employee.firstName, employee.lastName);
-      console.log('Shift Start Time:', employee.shift.startTime);
+      console.log('Shift Start Time:', shift.startTime);
       console.log('Scheduled Check-in:', scheduledCheckInTime.format('YYYY-MM-DD HH:mm:ss Z'));
       console.log('Actual Check-in:', actualCheckIn.format('YYYY-MM-DD HH:mm:ss Z'));
       console.log('Grace Minutes:', graceMinutes);
@@ -361,7 +370,7 @@ async function processXO5Attendance(xo5Record, deviceId) {
         attendance.workDuration = Math.max(0, workMinutes);
         
         // Calculate overtime/undertime and detect half-day
-        const expectedMinutes = employee.shift.workingHours * 60;
+        const expectedMinutes = shift.workingHours * 60;
         const halfDayThreshold = expectedMinutes / 2; // Half of expected hours
         
         // Check if employee has approved leave for today

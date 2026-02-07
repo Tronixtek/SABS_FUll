@@ -35,6 +35,10 @@ const EmployeeDashboard = () => {
   const [monthAttendance, setMonthAttendance] = useState({ present: 0, total: 0 });
   const [loadingAttendance, setLoadingAttendance] = useState(true);
   
+  // Shift State
+  const [currentShift, setCurrentShift] = useState(null);
+  const [loadingShift, setLoadingShift] = useState(true);
+  
   // PIN Change State
   const [pinForm, setPinForm] = useState({
     currentPin: '',
@@ -50,8 +54,32 @@ const EmployeeDashboard = () => {
       fetchLeaveRequests();
       calculateLeaveBalance();
       fetchAttendanceData();
+      fetchCurrentShift();
     }
   }, [employee]);
+
+  const fetchCurrentShift = async () => {
+    try {
+      setLoadingShift(true);
+      const token = localStorage.getItem('employeeToken');
+      const response = await axios.get(
+        `${API_URL}/api/rosters/assignments/current/${employee.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success && response.data.data) {
+        setCurrentShift(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      // Fallback to employee.shift if roster not available
+      if (employee?.shift) {
+        setCurrentShift({ shift: employee.shift });
+      }
+    } finally {
+      setLoadingShift(false);
+    }
+  };
 
   const fetchAttendanceData = async () => {
     try {
@@ -390,6 +418,46 @@ const EmployeeDashboard = () => {
             </div>
           ))}
         </div>
+
+        {/* Current Shift Card */}
+        {currentShift && (
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <ClockIcon className="h-5 w-5 mr-2 text-blue-600" />
+                Your Current Shift
+              </h2>
+              {currentShift.assignmentType === 'roster-based' && (
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
+                  Monthly Roster
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">Shift Name</p>
+                <p className="text-lg font-semibold text-gray-900">{currentShift.shift?.name || 'N/A'}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">Working Hours</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {currentShift.shift?.startTime} - {currentShift.shift?.endTime}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-1">Duration</p>
+                <p className="text-lg font-semibold text-gray-900">{currentShift.shift?.workingHours || 0} hours</p>
+              </div>
+            </div>
+            {currentShift.effectiveTo && (
+              <div className="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> This shift is valid until {new Date(currentShift.effectiveTo).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="bg-white shadow rounded-lg p-6 mb-8">

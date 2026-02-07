@@ -24,6 +24,7 @@ import LeavePolicyManagement from './pages/LeavePolicyManagement';
 import PayrollManagement from './pages/PayrollManagement';
 import SalaryGrades from './pages/SalaryGrades';
 import StaffIdPrefixSettings from './pages/StaffIdPrefixSettings';
+import MonthlyRosterManagement from './pages/MonthlyRosterManagement';
 
 // Employee Portal Pages
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
@@ -63,6 +64,7 @@ function App() {
               <Route path="salary-grades" element={<SalaryGrades />} />
               <Route path="facilities" element={<Facilities />} />
               <Route path="shifts" element={<Shifts />} />
+              <Route path="rosters" element={<MonthlyRosterManagement />} />
               <Route path="reports" element={<Reports />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="users" element={<Users />} />

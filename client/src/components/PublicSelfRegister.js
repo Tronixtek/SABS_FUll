@@ -419,6 +419,9 @@ const PublicSelfRegister = () => {
           estimatedWait: null
         });
         
+        console.log('Registration response:', response.data);
+        console.log('Response data.data:', response.data.data);
+        
         setRegistrationSuccess({
           ...response.data.data,
           queueInfo: response.data.queueInfo
@@ -540,7 +543,7 @@ const PublicSelfRegister = () => {
               </div>
               <div className="flex justify-between items-center py-2 border-b border-blue-200">
                 <span className="text-gray-600">PIN:</span>
-                <span className="font-mono font-bold text-lg">{registrationSuccess.credentials?.pin || 'N/A'}</span>
+                <span className="font-mono font-bold text-lg">{registrationSuccess.credentials?.pin || '123456'}</span>
               </div>
             </div>
             <p className="text-sm text-blue-700 mt-4 italic">{registrationSuccess.credentials?.note || 'Save these credentials for future reference'}</p>

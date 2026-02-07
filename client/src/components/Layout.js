@@ -47,6 +47,7 @@ const Layout = () => {
     { name: 'Salary Grades', to: '/app/salary-grades', icon: AcademicCapIcon },
     { name: 'Facilities', to: '/app/facilities', icon: BuildingOfficeIcon },
     { name: 'Shifts', to: '/app/shifts', icon: ClockIcon },
+    { name: 'Monthly Rosters', to: '/app/rosters', icon: CalendarIcon, permission: 'manage_settings' },
     { name: 'Reports', to: '/app/reports', icon: DocumentTextIcon },
     { name: 'Analytics', to: '/app/analytics', icon: ChartBarIcon },
     { name: 'Users', to: '/app/users', icon: UsersIcon, permission: 'manage_users' },

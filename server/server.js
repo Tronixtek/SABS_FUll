@@ -41,6 +41,7 @@ const payrollSettingsRoutes = require('./routes/payrollSettingsRoutes');
 const salaryGradeRoutes = require('./routes/salaryGradeRoutes');
 const staffIdPrefixRoutes = require('./routes/staffIdPrefix');
 const publicRoutes = require('./routes/publicRoutes');
+const rosterRoutes = require('./routes/rosterRoutes');
 
 // Models
 const Employee = require('./models/Employee');
@@ -170,6 +171,7 @@ app.use('/api/payroll-settings', payrollSettingsRoutes);
 app.use('/api/salary-grades', salaryGradeRoutes);
 app.use('/api/staff-id-prefix', staffIdPrefixRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/rosters', rosterRoutes);
 
 // Debug route to check if files exist
 app.get('/uploads/debug', (req, res) => {

@@ -39,10 +39,15 @@ const RequestLeave = () => {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [selectedPolicy, setSelectedPolicy] = useState(null);
   const [loadingPolicy, setLoadingPolicy] = useState(false);
+  
+  // Shift information
+  const [currentShift, setCurrentShift] = useState(null);
+  const [loadingShift, setLoadingShift] = useState(false);
 
   // Load leave types from API
   useEffect(() => {
     fetchLeaveTypes();
+    fetchCurrentShift();
   }, []);
 
   const fetchLeaveTypes = async () => {
@@ -59,6 +64,29 @@ const RequestLeave = () => {
       }
     } catch (error) {
       console.error('Failed to fetch leave types:', error);
+    }
+  };
+
+  const fetchCurrentShift = async () => {
+    try {
+      setLoadingShift(true);
+      const token = localStorage.getItem('employeeToken');
+      const response = await axios.get(
+        `${API_URL}/api/rosters/assignments/current/${employee?.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data.success && response.data.data) {
+        setCurrentShift(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      // Fallback to employee.shift if available
+      if (employee?.shift) {
+        setCurrentShift({ shift: employee.shift });
+      }
+    } finally {
+      setLoadingShift(false);
     }
   };
 
@@ -283,6 +311,26 @@ const RequestLeave = () => {
 
       {/* Form */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Current Shift Info */}
+        {currentShift && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <ClockIcon className="h-5 w-5 text-blue-600 mr-3 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">Your Current Shift</h3>
+                <p className="text-sm text-blue-800">
+                  <strong>{currentShift.shift?.name}</strong> - {currentShift.shift?.startTime} to {currentShift.shift?.endTime} ({currentShift.shift?.workingHours}hrs)
+                </p>
+                {currentShift.effectiveTo && (
+                  <p className="text-xs text-blue-700 mt-1">
+                    Valid until {new Date(currentShift.effectiveTo).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="bg-white shadow rounded-lg p-6">
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-start">

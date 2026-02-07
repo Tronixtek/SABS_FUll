@@ -4,6 +4,7 @@ const Facility = require('../models/Facility');
 const Employee = require('../models/Employee');
 const Attendance = require('../models/Attendance');
 const Shift = require('../models/Shift');
+const MonthlyRoster = require('../models/MonthlyRoster');
 const moment = require('moment-timezone');
 const { syncLogger, userSyncLogger, attendanceLogger } = require('../utils/logger');
 const emailService = require('./emailService');
@@ -652,7 +653,7 @@ class DataSyncService {
       const employee = await Employee.findOne({
         facility: facility._id,
         $or: searchConditions,
-      }).populate('shift');
+      });
 
       if (!employee) {
         attendanceLogger.warn(`❌ Employee not found!`);
@@ -670,21 +671,23 @@ class DataSyncService {
       attendanceLogger.info(`   Device ID in DB: ${employee.deviceId}`);
       attendanceLogger.info(`   Card ID in DB: ${employee.biometricData?.cardId || 'N/A'}`);
 
-      const shift = employee.shift;
-      if (!shift) {
-        attendanceLogger.warn(`⚠️ No shift assigned to ${employee.firstName} ${employee.lastName}`);
-        attendanceLogger.warn(`   Please assign a shift to this employee in the system`);
-        return false;
-      }
-
-      attendanceLogger.info(`✅ Shift found: ${shift.name}`);
-      attendanceLogger.info(`   Working hours: ${shift.startTime} - ${shift.endTime}`);
-
       const timestamp = moment(rec.timestamp).tz(facility.timezone || 'Africa/Lagos');
       const dateOnly = timestamp.clone().startOf('day').toDate();
 
       attendanceLogger.info(`📅 Attendance date: ${dateOnly.toISOString()}`);
       attendanceLogger.info(`⏰ Check time: ${timestamp.format('YYYY-MM-DD HH:mm:ss')}`);
+
+      // Get shift for the attendance date (date-based lookup using roster)
+      let shift = await MonthlyRoster.getEmployeeShiftForDate(employee._id, dateOnly);
+      if (!shift) {
+        attendanceLogger.warn(`⚠️ No shift assigned to ${employee.firstName} ${employee.lastName} for date ${dateOnly.toISOString()}`);
+        attendanceLogger.warn(`   Please ensure employee is assigned to a roster or has a default shift`);
+        return false;
+      }
+
+      attendanceLogger.info(`✅ Shift found: ${shift.name}`);
+      attendanceLogger.info(`   Working hours: ${shift.startTime} - ${shift.endTime}`);
+      attendanceLogger.info(`   Source: ${shift._id.equals(employee.shift) ? 'Employee default shift' : 'Monthly roster'}`);
 
       let attendance = await Attendance.findOne({
         employee: employee._id,
