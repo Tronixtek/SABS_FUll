@@ -15,7 +15,19 @@ import {
   Coffee
 } from 'lucide-react';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const Attendance = () => {
+  // Helper function to format image URL
+  const formatImageUrl = (profileImage) => {
+    if (!profileImage) return null;
+    // If it's a base64 data URL, use it directly
+    if (profileImage.startsWith('data:')) return profileImage;
+    // If it's a full URL (starts with http), use it directly
+    if (profileImage.startsWith('http')) return profileImage;
+    // Otherwise, prepend API_URL
+    return `${API_URL}${profileImage}`;
+  };
   const [attendance, setAttendance] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -347,15 +359,19 @@ const Attendance = () => {
                           <div className="flex items-center gap-3">
                             {record.employee?.profileImage ? (
                               <img
-                                src={record.employee.profileImage}
+                                src={formatImageUrl(record.employee.profileImage)}
                                 alt={`${record.employee.firstName} ${record.employee.lastName}`}
                                 className="w-10 h-10 rounded-full object-cover"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = 'none';
+                                  e.target.nextElementSibling.style.display = 'flex';
+                                }}
                               />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                <Users className="w-5 h-5 text-gray-500" />
-                              </div>
-                            )}
+                            ) : null}
+                            <div className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center ${record.employee?.profileImage ? 'hidden' : ''}`}>
+                              <Users className="w-5 h-5 text-gray-500" />
+                            </div>
                             <div>
                               <div className="font-medium text-gray-900">
                                 {record.employee?.firstName} {record.employee?.lastName}
@@ -467,15 +483,19 @@ const Attendance = () => {
                       <div className="flex items-center gap-3">
                         {record.employee?.profileImage ? (
                           <img
-                            src={record.employee.profileImage}
+                            src={formatImageUrl(record.employee.profileImage)}
                             alt={`${record.employee.firstName} ${record.employee.lastName}`}
                             className="w-10 h-10 rounded-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                              e.target.nextElementSibling.style.display = 'flex';
+                            }}
                           />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                            <Users className="w-5 h-5 text-gray-500" />
-                          </div>
-                        )}
+                        ) : null}
+                        <div className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center ${record.employee?.profileImage ? 'hidden' : ''}`}>
+                          <Users className="w-5 h-5 text-gray-500" />
+                        </div>
                         <div>
                           <h3 className="font-semibold text-gray-900">
                             {record.employee?.firstName} {record.employee?.lastName}
