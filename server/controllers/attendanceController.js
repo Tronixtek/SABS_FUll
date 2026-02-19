@@ -72,13 +72,17 @@ exports.getAttendance = async (req, res) => {
       };
       
       const approvedLeaves = await LeaveRequest.find(leaveQuery)
+        .select('employee leaveType reason startDate endDate')
         .populate({
           path: 'employee',
+          select: 'employeeId firstName lastName department facility shift',
           populate: [
             { path: 'facility', select: 'name code' },
-            { path: 'shift', select: 'name code' }
+            { path: 'shift', select: 'name code startTime endTime' }
           ]
-        });
+        })
+        .limit(200) // Limit to avoid fetching thousands
+        .lean(); // Use lean for faster queries
       
       // Filter by facility if specified
       let onLeaveRecords = approvedLeaves
@@ -137,14 +141,24 @@ exports.getAttendance = async (req, res) => {
       employeeQuery.status = 'active';
       
       const allEmployees = await Employee.find(employeeQuery)
+        .select('employeeId firstName lastName department facility shift')
         .populate('facility', 'name code')
-        .populate('shift', 'name code');
+        .populate('shift', 'name code startTime endTime')
+        .limit(500) // Limit to avoid fetching thousands
+        .lean(); // Use lean for faster queries
       
       // Get date range
       const start = startDate ? new Date(startDate) : new Date();
       start.setHours(0, 0, 0, 0);
       const end = endDate ? new Date(endDate) : new Date();
       end.setHours(23, 59, 59, 999);
+      
+      // Limit date range to max 31 days
+      const maxDays = 31;
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      if (daysDiff > maxDays) {
+        end.setTime(start.getTime() + maxDays * 24 * 60 * 60 * 1000);
+      }
       
       // Generate dates array
       const dates = [];
@@ -210,8 +224,10 @@ exports.getAttendance = async (req, res) => {
     const rawAttendance = await Attendance.find(query)
       .populate('employee', 'employeeId firstName lastName department profileImage')
       .populate('facility', 'name code')
-      .populate('shift', 'name code')
-      .sort({ date: -1, timestamp: -1 });
+      .populate('shift', 'name code startTime endTime')
+      .sort({ date: -1, timestamp: -1 })
+      .limit(parseInt(limit) * 2) // Limit raw records to avoid fetching thousands
+      .lean(); // Use lean for faster queries
     
     // GENERATE ABSENT RECORDS for employees who didn't check in (for "All Status" view)
     // This ensures we always show all employees, not just those who checked in
@@ -229,14 +245,24 @@ exports.getAttendance = async (req, res) => {
       employeeQuery.status = 'active';
       
       const allEmployees = await Employee.find(employeeQuery)
+        .select('employeeId firstName lastName department facility shift')
         .populate('facility', 'name code')
-        .populate('shift', 'name code');
+        .populate('shift', 'name code startTime endTime')
+        .limit(500) // Limit to avoid fetching thousands
+        .lean(); // Use lean for faster queries
       
       // Get date range
       const start = startDate ? new Date(startDate) : new Date();
       start.setHours(0, 0, 0, 0);
       const end = endDate ? new Date(endDate) : new Date();
       end.setHours(23, 59, 59, 999);
+      
+      // Limit date range to max 31 days
+      const maxDays = 31;
+      const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      if (daysDiff > maxDays) {
+        end.setTime(start.getTime() + maxDays * 24 * 60 * 60 * 1000);
+      }
       
       // Generate dates array
       const dates = [];
