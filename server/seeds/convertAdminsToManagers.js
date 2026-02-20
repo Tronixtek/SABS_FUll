@@ -24,8 +24,8 @@ const convertAdminsToManagers = async () => {
       'zeesani35@gmail.com'
     ];
 
-    // Find PHC_HQ facility
-    const phcHQ = await Facility.findOne({ code: 'PHC_HQ' });
+    // Find PHC_HQ facility by name
+    const phcHQ = await Facility.findOne({ name: 'PHC_HQ' });
     
     if (!phcHQ) {
       console.error('❌ PHC_HQ facility not found!');
