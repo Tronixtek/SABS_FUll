@@ -56,7 +56,7 @@ const convertAdminsToManagers = async () => {
     });
     console.log('');
 
-    // Manager permissions (facility-level access)
+    // Facility manager permissions
     const managerPermissions = [
       'view_attendance',
       'edit_attendance',
@@ -67,7 +67,7 @@ const convertAdminsToManagers = async () => {
       'enroll_users'
     ];
 
-    // Update each user to manager
+    // Update each user to facility manager
     let successCount = 0;
     let errorCount = 0;
 
@@ -75,14 +75,14 @@ const convertAdminsToManagers = async () => {
       try {
         const oldRole = user.role;
         
-        user.role = 'manager';
+        user.role = 'facility-manager';
         user.facilities = [phcHQ._id];
         user.permissions = managerPermissions;
         
         await user.save();
         
         console.log(`✅ Converted: ${user.email}`);
-        console.log(`   - Role: ${oldRole} → manager`);
+        console.log(`   - Role: ${oldRole} → facility-manager`);
         console.log(`   - Facility: ${phcHQ.name}`);
         console.log(`   - Permissions: ${managerPermissions.length} assigned`);
         console.log('');
@@ -104,7 +104,7 @@ const convertAdminsToManagers = async () => {
 
     // Show all managers for PHC_HQ
     const phcManagers = await User.find({
-      role: 'manager',
+      role: 'facility-manager',
       facilities: phcHQ._id
     });
 
