@@ -1709,4 +1709,124 @@ exports.bulkSyncEmployees = async (req, res) => {
   }
 };
 
+/**
+ * Get all registered persons from the biometric device
+ * @desc    Fetch all employees registered on the device with their photos
+ * @route   POST /api/employees/device/get-all-persons
+ * @access  Private
+ */
+exports.getAllPersonsFromDevice = async (req, res) => {
+  try {
+    console.log('\n========================================');
+    console.log('🔍 FETCH ALL PERSONS FROM DEVICE');
+    console.log('========================================\n');
 
+    const { deviceKey, secret } = req.body;
+
+    // Validate required fields
+    if (!deviceKey || !secret) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device key and secret are required'
+      });
+    }
+
+    console.log(`📡 Device Key: ${deviceKey}`);
+    console.log(`🔐 Secret: ${secret.substring(0, 4)}***`);
+
+    // Call Java service to get all persons from device
+    const javaServiceUrl = process.env.JAVA_SERVICE_URL || 'http://localhost:8081';
+    const endpoint = `${javaServiceUrl}/api/device/get-all-persons`;
+
+    console.log(`\n📞 Calling Java service: ${endpoint}`);
+
+    try {
+      const response = await axios.post(endpoint, {
+        deviceKey,
+        secret
+      }, {
+        timeout: 60000, // 60 second timeout for large lists
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log(`\n✅ Java service response received`);
+      console.log(`   Status: ${response.status}`);
+      console.log(`   Success: ${response.data?.success}`);
+
+      if (response.data?.success) {
+        const persons = response.data?.data?.persons || [];
+        const totalPersons = response.data?.data?.totalPersons || 0;
+
+        console.log(`\n📊 Device Registry:`);
+        console.log(`   Total persons on device: ${totalPersons}`);
+        console.log(`   Persons with photos: ${persons.filter(p => p.hasPhoto).length}`);
+        console.log(`   Persons without photos: ${persons.filter(p => !p.hasPhoto).length}`);
+
+        // Log sample of first few persons
+        if (persons.length > 0) {
+          console.log(`\n👥 Sample of registered persons:`);
+          persons.slice(0, 5).forEach((person, index) => {
+            console.log(`   ${index + 1}. ${person.name} (ID: ${person.employeeId}) - Photo: ${person.hasPhoto ? '✅' : '❌'}`);
+          });
+          if (persons.length > 5) {
+            console.log(`   ... and ${persons.length - 5} more`);
+          }
+        }
+
+        return res.json({
+          success: true,
+          message: `Retrieved ${totalPersons} persons from device`,
+          data: {
+            totalPersons,
+            persons,
+            deviceKey,
+            timestamp: new Date()
+          }
+        });
+
+      } else {
+        console.error(`\n❌ Java service returned error: ${response.data?.message}`);
+        
+        return res.status(400).json({
+          success: false,
+          message: response.data?.message || 'Failed to fetch persons from device',
+          data: response.data?.data
+        });
+      }
+
+    } catch (javaServiceError) {
+      console.error(`\n❌ Java service error:`, javaServiceError.message);
+      
+      if (javaServiceError.response) {
+        console.error(`   Status: ${javaServiceError.response.status}`);
+        console.error(`   Data:`, javaServiceError.response.data);
+        
+        return res.status(javaServiceError.response.status || 500).json({
+          success: false,
+          message: javaServiceError.response.data?.message || 'Java service error',
+          error: javaServiceError.response.data
+        });
+      } else if (javaServiceError.code === 'ECONNREFUSED') {
+        return res.status(503).json({
+          success: false,
+          message: 'Java service is not running. Please start the Java attendance service.',
+          error: 'Service unavailable'
+        });
+      } else {
+        throw javaServiceError;
+      }
+    }
+
+  } catch (error) {
+    console.error('\n❌ Error fetching persons from device:', error.message);
+    console.error(error.stack);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch persons from device',
+      error: error.message
+    });
+  }
+};

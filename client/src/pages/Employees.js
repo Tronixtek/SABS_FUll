@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import EmployeeModalWithJavaIntegration from '../components/EmployeeModalWithJavaIntegration';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
@@ -20,6 +24,10 @@ const Employees = () => {
     facility: '',
     status: ''
   });
+  const [deviceModalOpen, setDeviceModalOpen] = useState(false);
+  const [devicePersons, setDevicePersons] = useState([]);
+  const [fetchingFromDevice, setFetchingFromDevice] = useState(false);
+  const [selectedFacilityForDevice, setSelectedFacilityForDevice] = useState('');
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -61,7 +69,213 @@ const Employees = () => {
       console.error('Failed to fetch shifts');
     }
   };
+  // Get filtered employees (already filtered by API based on filters state)
+  const getFilteredEmployees = () => {
+    return employees; // employees state already contains filtered results
+  };  // Helper function to convert image URL to base64
+  const getBase64Image = async (url) => {
+    try {
+      if (!url) return null;
+      
+      // If already base64, return as is
+      if (url.startsWith('data:')) return url;
+      
+      // Construct full URL if relative
+      const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+      
+      const response = await fetch(fullUrl);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error loading image:', error);
+      return null;
+    }
+  };
 
+  // Export employees to PDF with photos
+  const exportEmployeesToPDF = async () => {
+    try {
+      toast.loading('Generating PDF with photos...');
+      
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const photoSize = 25;
+      const rowHeight = 35;
+      const colWidth = (pageWidth - 2 * margin) / 2;
+      
+      // Add title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Employee Registry', pageWidth / 2, 20, { align: 'center' });
+      
+      // Add date
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, 27, { align: 'center' });
+      
+      let yPos = 40;
+      let xPos = margin;
+      let column = 0;
+      
+      // Get filtered employees
+      const employeesToExport = getFilteredEmployees();
+      
+      for (let i = 0; i < employeesToExport.length; i++) {
+        const employee = employeesToExport[i];
+        
+        // Check if we need a new page
+        if (yPos + rowHeight > pageHeight - margin) {
+          doc.addPage();
+          yPos = margin;
+          xPos = margin;
+          column = 0;
+        }
+        
+        // Draw border
+        doc.setDrawColor(200);
+        doc.rect(xPos, yPos, colWidth - 5, rowHeight);
+        
+        // Add photo
+        const photoX = xPos + 5;
+        const photoY = yPos + 5;
+        
+        try {
+          if (employee.profileImage) {
+            const imgData = await getBase64Image(employee.profileImage);
+            if (imgData) {
+              doc.addImage(imgData, 'JPEG', photoX, photoY, photoSize, photoSize);
+            } else {
+              // Draw placeholder
+              doc.setFillColor(220, 220, 220);
+              doc.circle(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 'F');
+              doc.setFontSize(8);
+              doc.text('No Photo', photoX + photoSize / 2, photoY + photoSize / 2, { align: 'center' });
+            }
+          } else {
+            // Draw placeholder
+            doc.setFillColor(220, 220, 220);
+            doc.circle(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 'F');
+            doc.setFontSize(8);
+            doc.text('No Photo', photoX + photoSize / 2, photoY + photoSize / 2, { align: 'center' });
+          }
+        } catch (err) {
+          console.error('Error adding photo:', err);
+          // Draw placeholder on error
+          doc.setFillColor(220, 220, 220);
+          doc.circle(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 'F');
+        }
+        
+        // Add text info
+        const textX = photoX + photoSize + 5;
+        const textY = photoY + 5;
+        
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${employee.firstName} ${employee.lastName}`, textX, textY);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`ID: ${employee.employeeId || 'N/A'}`, textX, textY + 5);
+        doc.text(`Staff ID: ${employee.staffId || 'N/A'}`, textX, textY + 10);
+        doc.text(`Dept: ${employee.department || 'N/A'}`, textX, textY + 15);
+        doc.text(`Status: ${employee.status || 'N/A'}`, textX, textY + 20);
+        
+        // Move to next position
+        column++;
+        if (column >= 2) {
+          column = 0;
+          xPos = margin;
+          yPos += rowHeight + 5;
+        } else {
+          xPos += colWidth;
+        }
+      }
+      
+      // Add footer
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        doc.text(`Total Employees: ${employeesToExport.length}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+      }
+      
+      // Save the PDF
+      doc.save(`Employee-Registry-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.dismiss();
+      toast.success(`Successfully exported ${employeesToExport.length} employees with photos!`);
+      
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      toast.dismiss();
+      toast.error('Failed to export employees. Please try again.');
+    }
+  };
+
+  // Fetch all persons from device
+  const handleFetchFromDevice = async () => {
+    if (!selectedFacilityForDevice) {
+      toast.error('Please select a facility first');
+      return;
+    }
+
+    const selectedFacility = facilities.find(f => f._id === selectedFacilityForDevice);
+    if (!selectedFacility) {
+      toast.error('Invalid facility selected');
+      return;
+    }
+
+    // Check if facility has device configuration
+    const deviceKey = selectedFacility.configuration?.deviceKey;
+    const deviceSecret = selectedFacility.configuration?.deviceSecret;
+
+    if (!deviceKey) {
+      toast.error('Selected facility does not have device credentials configured');
+      return;
+    }
+
+    setFetchingFromDevice(true);
+    const loadingToast = toast.loading('Fetching registered persons from device...');
+
+    try {
+      const response = await axios.post(`${API_URL}/api/employees/device/get-all-persons`, {
+        deviceKey: deviceKey,
+        secret: deviceSecret || '123456'
+      });
+
+      toast.dismiss(loadingToast);
+
+      if (response.data.success) {
+        const { totalPersons, persons } = response.data.data;
+        setDevicePersons(persons || []);
+        setDeviceModalOpen(true);
+        toast.success(`Found ${totalPersons} person(s) registered on device`);
+      } else {
+        toast.error(response.data.message || 'Failed to fetch persons from device');
+      }
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error('Device fetch error:', error);
+      
+      if (error.response?.status === 503) {
+        toast.error('Java device service is unavailable. Please ensure it is running.');
+      } else if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error('Failed to connect to device. Please check device connection.');
+      }
+    } finally {
+      setFetchingFromDevice(false);
+    }
+  };
+  
   const handleAddEmployee = () => {
     setSelectedEmployee(null);
     setModalOpen(true);
@@ -436,6 +650,26 @@ const Employees = () => {
             </button>
           )}
           <button
+            onClick={exportEmployeesToPDF}
+            className="w-full sm:w-auto bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" />
+            Export with Photos
+          </button>
+          <button
+            onClick={() => {
+              setDeviceModalOpen(true);
+              setDevicePersons([]);
+              setSelectedFacilityForDevice('');
+            }}
+            className="w-full sm:w-auto bg-gradient-to-r from-green-600 to-teal-600 text-white px-4 py-2 rounded-lg hover:from-green-700 hover:to-teal-700 transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Device Registry
+          </button>
+          <button
             onClick={handleAddEmployee}
             className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
           >
@@ -768,6 +1002,175 @@ const Employees = () => {
           shifts={shifts}
           onClose={handleModalClose}
         />
+      )}
+
+      {/* Device Registry Modal */}
+      {deviceModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold">Device Registry</h2>
+                <p className="text-green-100 text-sm">View all persons registered on biometric device</p>
+              </div>
+              <button
+                onClick={() => {
+                  setDeviceModalOpen(false);
+                  setDevicePersons([]);
+                  setSelectedFacilityForDevice('');
+                }}
+                className="text-white hover:text-gray-200 transition-colors"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {/* Facility Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Facility with Smart Device
+                </label>
+                <div className="flex gap-3">
+                  <select
+                    value={selectedFacilityForDevice}
+                    onChange={(e) => setSelectedFacilityForDevice(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="">-- Select Facility --</option>
+                    {facilities
+                      .filter(f => f.configuration?.integrationType === 'java-xo5' && f.configuration?.deviceKey)
+                      .map(facility => (
+                        <option key={facility._id} value={facility._id}>
+                          {facility.name} {facility.configuration?.deviceKey ? `(${facility.configuration.deviceKey.substring(0, 8)}...)` : ''}
+                        </option>
+                      ))
+                    }
+                  </select>
+                  <button
+                    onClick={handleFetchFromDevice}
+                    disabled={!selectedFacilityForDevice || fetchingFromDevice}
+                    className="px-6 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
+                  >
+                    {fetchingFromDevice ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Fetch from Device
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {facilities.filter(f => f.configuration?.integrationType === 'java-xo5' && f.configuration?.deviceKey).length === 0 && (
+                  <p className="mt-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                    ℹ️ No facilities with smart device configuration found. Please configure a facility with integration type "Smart Device (Full Management)" and device credentials.
+                  </p>
+                )}
+              </div>
+
+              {/* Results */}
+              {devicePersons.length > 0 ? (
+                <div>
+                  <div className="mb-4 flex justify-between items-center">
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Found {devicePersons.length} Person(s)
+                    </h3>
+                    <span className="text-sm text-gray-600">
+                      {devicePersons.filter(p => p.hasPhoto).length} with photos
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {devicePersons.map((person, index) => (
+                      <div
+                        key={index}
+                        className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow bg-white"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Photo */}
+                          <div className="flex-shrink-0">
+                            {person.photo ? (
+                              <img
+                                src={person.photo}
+                                alt={person.name}
+                                className="w-16 h-16 rounded-full object-cover border-2 border-green-500"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center"
+                              style={{ display: person.photo ? 'none' : 'flex' }}
+                            >
+                              <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                            </div>
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 truncate">
+                              {person.name || 'Unknown'}
+                            </h4>
+                            <p className="text-sm text-gray-600 mt-0.5">
+                              ID: <span className="font-mono text-xs">{person.employeeId}</span>
+                            </p>
+                            {person.department && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {person.department}
+                              </p>
+                            )}
+                            <div className="mt-2">
+                              {person.hasPhoto ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  Has Photo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                  No Photo
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <svg className="mx-auto h-24 w-24 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">No Data Yet</h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Select a facility and click "Fetch from Device" to view registered persons
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

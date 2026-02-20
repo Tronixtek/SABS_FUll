@@ -438,4 +438,206 @@ public class DeviceManagementController extends BaseController {
         }
         System.out.println("DEBUG - Device validation passed for: " + deviceKey);
     }
+
+    /**
+     * Get all registered persons from the device
+     * Returns list of employees with their photos
+     */
+    @PostMapping("/get-all-persons")
+    public ApiResponse<Map<String, Object>> getAllPersonsFromDevice(@RequestBody Map<String, Object> request) {
+        try {
+            System.out.println("=== GET ALL PERSONS FROM DEVICE REQUEST ===");
+            
+            String deviceKey = (String) request.get("deviceKey");
+            String secret = (String) request.get("secret");
+            
+            // Validate device credentials
+            validateCommon(deviceKey, secret);
+            
+            // Get host info
+            HostInfoDto hostInfo = getHostInfo();
+            
+            try {
+                // Try PersonFindListReq method
+                System.out.println("✅ Building PersonFindList request...");
+                Object personFindListReq = requestBuilderService.buildPersonFindListReq();
+                
+                Class<?> hostInfoClass = Class.forName("com.hfims.xcan.gateway.netty.client.dto.HostInfoDto");
+                Method personFindListMethod = HfDeviceClient.class.getMethod("personFindList", 
+                    hostInfoClass, String.class, String.class, personFindListReq.getClass());
+                
+                System.out.println("✅ Calling personFindList on device...");
+                HfDeviceResp response = (HfDeviceResp) personFindListMethod.invoke(null, hostInfo, deviceKey, secret, personFindListReq);
+                
+                Map<String, Object> resultData = new HashMap<>();
+                resultData.put("deviceKey", deviceKey);
+                resultData.put("timestamp", new Date());
+                
+                if (response != null && "000".equals(response.getCode())) {
+                    System.out.println("✅ PersonFindList successful - Code: " + response.getCode());
+                    
+                    List<Map<String, Object>> persons = new ArrayList<>();
+                    Object responseData = response.getData();
+                    
+                    if (responseData != null) {
+                        System.out.println("Response data type: " + responseData.getClass().getName());
+                        
+                        // Process response - could be List or Map
+                        if (responseData instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            List<Object> dataList = (List<Object>) responseData;
+                            System.out.println("Found " + dataList.size() + " persons on device");
+                            
+                            for (Object item : dataList) {
+                                if (item instanceof Map) {
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> personData = (Map<String, Object>) item;
+                                    Map<String, Object> person = extractPersonData(personData);
+                                    persons.add(person);
+                                }
+                            }
+                        } else if (responseData instanceof Map) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> personData = (Map<String, Object>) responseData;
+                            
+                            // Check if it contains a "list" or "data" field
+                            if (personData.containsKey("list")) {
+                                Object listData = personData.get("list");
+                                if (listData instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<Object> dataList = (List<Object>) listData;
+                                    System.out.println("Found " + dataList.size() + " persons in list field");
+                                    
+                                    for (Object item : dataList) {
+                                        if (item instanceof Map) {
+                                            @SuppressWarnings("unchecked")
+                                            Map<String, Object> itemMap = (Map<String, Object>) item;
+                                            Map<String, Object> person = extractPersonData(itemMap);
+                                            persons.add(person);
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Single person in response
+                                Map<String, Object> person = extractPersonData(personData);
+                                persons.add(person);
+                            }
+                        }
+                    } else {
+                        System.out.println("⚠️ Response data is null");
+                    }
+                    
+                    resultData.put("totalPersons", persons.size());
+                    resultData.put("persons", persons);
+                    resultData.put("status", "success");
+                    resultData.put("message", "Retrieved " + persons.size() + " persons from device");
+                    
+                    return ApiResponse.success("Persons retrieved successfully from device", resultData);
+                    
+                } else {
+                    String errorMsg = response != null ? response.getMsg() : "No response from device";
+                    System.err.println("❌ PersonFindList failed: " + errorMsg);
+                    
+                    resultData.put("status", "failed");
+                    resultData.put("error", errorMsg);
+                    resultData.put("totalPersons", 0);
+                    resultData.put("persons", new ArrayList<>());
+                    
+                    return ApiResponse.error("Failed to retrieve persons from device: " + errorMsg, resultData);
+                }
+                
+            } catch (ClassNotFoundException | NoSuchMethodException e) {
+                System.err.println("❌ PersonFindList method not available: " + e.getMessage());
+                
+                Map<String, Object> errorData = new HashMap<>();
+                errorData.put("error", "Device SDK does not support person listing");
+                errorData.put("suggestion", "This device/SDK version may not support fetching all persons at once");
+                
+                return ApiResponse.error("Person list functionality not available in this SDK version", errorData);
+                
+            } catch (Exception e) {
+                System.err.println("❌ Error fetching persons from device: " + e.getMessage());
+                e.printStackTrace();
+                
+                Map<String, Object> errorData = new HashMap<>();
+                errorData.put("error", e.getMessage());
+                errorData.put("deviceKey", deviceKey);
+                
+                return ApiResponse.error("Failed to fetch persons from device: " + e.getMessage(), errorData);
+            }
+            
+        } catch (CgiErrorException e) {
+            System.err.println("CGI Error: " + e.getMessage());
+            return ApiResponse.error("Device communication error: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            return ApiResponse.error("Internal server error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Extract person data from device response
+     */
+    private Map<String, Object> extractPersonData(Map<String, Object> personData) {
+        Map<String, Object> person = new HashMap<>();
+        
+        // Extract basic fields
+        Object snObj = personData.get("sn");
+        person.put("employeeId", snObj != null ? String.valueOf(snObj) : null);
+        person.put("sn", snObj);
+        
+        Object nameObj = personData.get("name");
+        person.put("name", nameObj != null ? String.valueOf(nameObj) : null);
+        
+        // Extract photo/face data
+        Object faceObj = personData.get("face");
+        if (faceObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> faceData = (Map<String, Object>) faceObj;
+            
+            // Get face image (base64)
+            Object imageObj = faceData.get("image");
+            if (imageObj != null) {
+                person.put("photo", imageObj); // Base64 image string
+                person.put("hasPhoto", true);
+            } else {
+                person.put("hasPhoto", false);
+            }
+            
+            // Get other face data
+            person.put("faceData", faceData);
+        } else if (faceObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<Object> faceList = (List<Object>) faceObj;
+            if (!faceList.isEmpty() && faceList.get(0) instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> faceData = (Map<String, Object>) faceList.get(0);
+                
+                Object imageObj = faceData.get("image");
+                if (imageObj != null) {
+                    person.put("photo", imageObj);
+                    person.put("hasPhoto", true);
+                } else {
+                    person.put("hasPhoto", false);
+                }
+                person.put("faceData", faceData);
+            }
+        } else {
+            person.put("hasPhoto", false);
+        }
+        
+        // Extract other available fields
+        if (personData.containsKey("idCard")) {
+            person.put("idCard", personData.get("idCard"));
+        }
+        if (personData.containsKey("type")) {
+            person.put("type", personData.get("type"));
+        }
+        if (personData.containsKey("department")) {
+            person.put("department", personData.get("department"));
+        }
+        
+        return person;
+    }
 }

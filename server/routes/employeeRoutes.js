@@ -11,7 +11,8 @@ const {
   deleteEmployee,
   forceDeleteEmployee,
   getEmployeeStats,
-  generateNextEmployeeId
+  generateNextEmployeeId,
+  getAllPersonsFromDevice
 } = require('../controllers/employeeController');
 const { protect, checkPermission } = require('../middleware/auth');
 
@@ -24,6 +25,7 @@ router.get('/:id/stats', checkPermission('view_attendance'), getEmployeeStats);
 router.post('/', checkPermission('manage_employees'), createEmployee);
 router.post('/register', checkPermission('manage_employees'), registerEmployeeWithDevice);
 router.post('/bulk-sync', checkPermission('manage_employees'), bulkSyncEmployees);
+router.post('/device/get-all-persons', checkPermission('view_attendance'), getAllPersonsFromDevice);
 router.post('/:id/retry-device-sync', checkPermission('manage_employees'), retryDeviceSync);
 router.put('/:id', checkPermission('manage_employees'), updateEmployee);
 router.delete('/:id', checkPermission('manage_employees'), deleteEmployee);
