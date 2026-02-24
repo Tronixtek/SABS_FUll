@@ -298,7 +298,11 @@ exports.getDashboardAnalytics = async (req, res) => {
         if (b.punctualityScore !== a.punctualityScore) {
           return b.punctualityScore - a.punctualityScore;
         }
-        return b.attendanceRate - a.attendanceRate;
+        if (b.attendanceRate !== a.attendanceRate) {
+          return b.attendanceRate - a.attendanceRate;
+        }
+        // Final tiebreaker: sort by employee ID for stability
+        return (a.employee.employeeId || '').localeCompare(b.employee.employeeId || '');
       })
       .slice(0, 5);
     
@@ -326,7 +330,18 @@ exports.getDashboardAnalytics = async (req, res) => {
         ...lateData,
         avgLateMinutes: lateData.lateCount > 0 ? Math.round(lateData.totalLateMinutes / lateData.lateCount) : 0
       }))
-      .sort((a, b) => b.lateCount - a.lateCount)
+      .sort((a, b) => {
+        // Sort by late count first
+        if (b.lateCount !== a.lateCount) {
+          return b.lateCount - a.lateCount;
+        }
+        // Tiebreaker: sort by average late minutes (more late = worse)
+        if (b.avgLateMinutes !== a.avgLateMinutes) {
+          return b.avgLateMinutes - a.avgLateMinutes;
+        }
+        // Final tiebreaker: employee ID for stability
+        return (a.employee.employeeId || '').localeCompare(b.employee.employeeId || '');
+      })
       .slice(0, 5);
     
     console.log('⏰ Frequent late arrivals:', frequentLateArrivalsList.length);
@@ -369,9 +384,16 @@ exports.getDashboardAnalytics = async (req, res) => {
           ...empData,
           avgLateMinutes: empData.lateCount > 0 ? Math.round(empData.totalLateMinutes / empData.lateCount) : 0
         }))
-        .sort((a, b) => b.lateCount - a.lateCount)
+        .sort((a, b) => {
+          if (b.lateCount !== a.lateCount) return b.lateCount - a.lateCount;
+          if (b.avgLateMinutes !== a.avgLateMinutes) return b.avgLateMinutes - a.avgLateMinutes;
+          return (a.employee.employeeId || '').localeCompare(b.employee.employeeId || '');
+        })
         .slice(0, 10) // Top 10 per facility
-    })).sort((a, b) => b.totalLateCount - a.totalLateCount);
+    })).sort((a, b) => {
+      if (b.totalLateCount !== a.totalLateCount) return b.totalLateCount - a.totalLateCount;
+      return (a.facility.name || '').localeCompare(b.facility.name || '');
+    });
     
     console.log('🏢 Facility-grouped late arrivals:', facilityGroupedLateArrivalsList.length);
     
@@ -660,7 +682,11 @@ exports.getEmployeePerformance = async (req, res) => {
         }
       },
       {
-        $sort: { 'metrics.attendanceRate': -1 }
+        $sort: { 
+          'metrics.attendanceRate': -1,
+          'metrics.punctualityScore': -1,
+          'employee.employeeId': 1
+        }
       },
       {
         $limit: parseInt(limit)

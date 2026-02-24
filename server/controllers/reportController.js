@@ -977,14 +977,14 @@ exports.generatePayrollPDF = async (req, res) => {
     // Table Header
     const tableTop = doc.y;
     const colWidths = {
-      empId: 50,
+      empId: 55,
       name: 100,
-      dept: 80,
-      hours: 50,
-      overtime: 50,
-      earnings: 80,
-      deductions: 80,
-      netPay: 80
+      dept: 140,
+      hours: 45,
+      overtime: 45,
+      earnings: 85,
+      deductions: 85,
+      netPay: 85
     };
 
     let currentX = 40;
@@ -1012,6 +1012,21 @@ exports.generatePayrollPDF = async (req, res) => {
     // Table Rows
     let y = tableTop + 20;
     doc.font('Helvetica').fontSize(8);
+
+    // Helper function to truncate text if too long
+    const truncateText = (text, maxWidth, fontSize = 8) => {
+      if (!text) return '';
+      doc.fontSize(fontSize);
+      const textWidth = doc.widthOfString(text);
+      if (textWidth <= maxWidth) return text;
+      
+      // Truncate with ellipsis
+      let truncated = text;
+      while (doc.widthOfString(truncated + '...') > maxWidth && truncated.length > 0) {
+        truncated = truncated.slice(0, -1);
+      }
+      return truncated + '...';
+    };
 
     for (const payroll of payrolls) {
       // Check if we need a new page
@@ -1049,10 +1064,11 @@ exports.generatePayrollPDF = async (req, res) => {
       currentX += colWidths.empId;
       
       const fullName = `${payroll.employee?.firstName || ''} ${payroll.employee?.lastName || ''}`.trim();
-      doc.text(fullName, currentX, y, { width: colWidths.name, align: 'left' });
+      doc.text(truncateText(fullName, colWidths.name), currentX, y, { width: colWidths.name, align: 'left' });
       currentX += colWidths.name;
       
-      doc.text(payroll.employee?.department || '', currentX, y, { width: colWidths.dept, align: 'left' });
+      const deptName = payroll.employee?.department || '';
+      doc.text(truncateText(deptName, colWidths.dept), currentX, y, { width: colWidths.dept, align: 'left' });
       currentX += colWidths.dept;
       
       doc.text(payroll.workHours.totalHours.toFixed(1), currentX, y, { width: colWidths.hours, align: 'right' });

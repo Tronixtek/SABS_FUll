@@ -293,9 +293,18 @@ PayrollSchema.statics.generateForEmployee = async function(employeeId, startDate
   const basicPay = baseSalary;
   const overtimePay = overtimeHours * hourlyRate * overtimeRate;
   
-  // Calculate deductions
-  const taxRate = customRates.taxRate !== undefined ? customRates.taxRate : (settings.taxRate || 0.10);
-  const pensionRate = customRates.pensionRate !== undefined ? customRates.pensionRate : (settings.pensionRate || 0.08);
+  // Calculate deductions - use salary grade rates if available, otherwise use custom rates or settings
+  let taxRate, pensionRate;
+  
+  if (employee.salaryGrade) {
+    // Use tax and pension rates from salary grade
+    taxRate = employee.salaryGrade.taxRate !== undefined ? employee.salaryGrade.taxRate / 100 : (settings.taxRate || 0.10);
+    pensionRate = employee.salaryGrade.pensionRate !== undefined ? employee.salaryGrade.pensionRate / 100 : (settings.pensionRate || 0.08);
+  } else {
+    // Fallback to custom rates or settings
+    taxRate = customRates.taxRate !== undefined ? customRates.taxRate : (settings.taxRate || 0.10);
+    pensionRate = customRates.pensionRate !== undefined ? customRates.pensionRate : (settings.pensionRate || 0.08);
+  }
   
   const grossPay = basicPay + overtimePay;
   const tax = grossPay * taxRate;

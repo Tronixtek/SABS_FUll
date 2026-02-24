@@ -40,6 +40,20 @@ const salaryGradeSchema = new mongoose.Schema({
     type: String
     // e.g., "Health Insurance", "Car Allowance", "Housing"
   }],
+  taxRate: {
+    type: Number,
+    default: 10,
+    min: 0,
+    max: 100
+    // Tax rate percentage for this salary grade
+  },
+  pensionRate: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+    // Pension contribution rate percentage for this salary grade
+  },
   isActive: {
     type: Boolean,
     default: true

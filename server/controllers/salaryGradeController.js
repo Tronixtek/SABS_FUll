@@ -75,7 +75,7 @@ exports.getSalaryGrade = async (req, res) => {
 // Create new salary grade
 exports.createSalaryGrade = async (req, res) => {
   try {
-    const { code, name, baseSalary, description, minSalary, maxSalary, benefits } = req.body;
+    const { code, name, baseSalary, description, minSalary, maxSalary, benefits, taxRate, pensionRate } = req.body;
 
     // Validate
     if (!code || !name || !baseSalary) {
@@ -117,6 +117,8 @@ exports.createSalaryGrade = async (req, res) => {
       minSalary,
       maxSalary,
       benefits: benefits || [],
+      taxRate: taxRate !== undefined ? taxRate : 10,
+      pensionRate: pensionRate !== undefined ? pensionRate : 0,
       createdBy: req.user.id,
       updatedBy: req.user.id
     });
@@ -140,7 +142,7 @@ exports.createSalaryGrade = async (req, res) => {
 // Update salary grade
 exports.updateSalaryGrade = async (req, res) => {
   try {
-    const { code, name, baseSalary, description, minSalary, maxSalary, benefits, isActive } = req.body;
+    const { code, name, baseSalary, description, minSalary, maxSalary, benefits, isActive, taxRate, pensionRate } = req.body;
 
     const grade = await SalaryGrade.findById(req.params.id);
     if (!grade) {
@@ -189,6 +191,8 @@ exports.updateSalaryGrade = async (req, res) => {
     if (maxSalary !== undefined) grade.maxSalary = maxSalary;
     if (benefits !== undefined) grade.benefits = benefits;
     if (isActive !== undefined) grade.isActive = isActive;
+    if (taxRate !== undefined) grade.taxRate = taxRate;
+    if (pensionRate !== undefined) grade.pensionRate = pensionRate;
     grade.updatedBy = req.user.id;
 
     await grade.save();

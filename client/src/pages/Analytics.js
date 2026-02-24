@@ -159,8 +159,15 @@ const Analytics = () => {
       totalOvertime: 0
     };
 
-    // Handle undefined or empty monthAttendance data
-    if (dashboardData?.monthAttendance && Array.isArray(dashboardData.monthAttendance)) {
+    // Check for monthlyStats first (new format), then fall back to monthAttendance (old format)
+    if (dashboardData?.monthlyStats) {
+      stats.present = dashboardData.monthlyStats.presentDays || 0;
+      stats.absent = dashboardData.monthlyStats.absentDays || 0;
+      stats.late = dashboardData.monthlyStats.lateDays || 0;
+      stats.totalWorkHours = dashboardData.monthlyStats.totalWorkHours || 0;
+      stats.totalOvertime = dashboardData.monthlyStats.totalOvertime || 0;
+    } else if (dashboardData?.monthAttendance && Array.isArray(dashboardData.monthAttendance)) {
+      // Legacy format
       dashboardData.monthAttendance.forEach(item => {
         if (item._id === 'present') stats.present = item.count;
         if (item._id === 'absent') stats.absent = item.count;

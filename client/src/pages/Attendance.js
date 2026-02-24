@@ -12,7 +12,13 @@ import {
   MinusCircle,
   Download,
   RefreshCw,
-  Coffee
+  Coffee,
+  Activity,
+  Briefcase,
+  Building2,
+  MapPin,
+  Mail,
+  Phone
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -44,6 +50,7 @@ const Attendance = () => {
     facility: '',
     status: ''
   });
+  const [employeeModal, setEmployeeModal] = useState({ isOpen: false, data: null, loading: false });
 
   useEffect(() => {
     fetchFacilities();
@@ -85,6 +92,67 @@ const Attendance = () => {
       halfDay: records.filter(r => r.status === 'half-day').length
     };
     setStats(stats);
+  };
+
+  const fetchEmployeeDetails = async (employeeId) => {
+    setEmployeeModal({ isOpen: true, data: null, loading: true });
+    try {
+      const params = {
+        startDate: filters.startDate,
+        endDate: filters.endDate
+      };
+
+      const [employeeRes, attendanceRes] = await Promise.all([
+        axios.get(`/api/employees/${employeeId}`),
+        axios.get('/api/attendance', { 
+          params: { ...params, employee: employeeId, limit: 30, sortBy: 'date', sortOrder: 'desc' }
+        })
+      ]);
+
+      const employee = employeeRes.data.data;
+      const attendanceRecords = (attendanceRes.data.data || []).filter(record => {
+        return record && record.date && !isNaN(new Date(record.date).getTime());
+      });
+
+      // Calculate detailed metrics
+      const metrics = {
+        totalRecords: attendanceRecords.length,
+        presentCount: attendanceRecords.filter(a => a.status === 'present').length,
+        lateCount: attendanceRecords.filter(a => a.status === 'late').length,
+        absentCount: attendanceRecords.filter(a => a.status === 'absent').length,
+        totalWorkHours: attendanceRecords.reduce((sum, a) => sum + (a.workHours || 0), 0),
+        totalOvertime: attendanceRecords.reduce((sum, a) => sum + (a.overtime || 0), 0),
+        avgWorkHours: 0,
+        avgLateMinutes: 0,
+        recentAttendance: attendanceRecords.slice(0, 10)
+      };
+
+      metrics.avgWorkHours = metrics.totalRecords > 0 
+        ? (metrics.totalWorkHours / metrics.totalRecords).toFixed(2) 
+        : 0;
+
+      const lateRecords = attendanceRecords.filter(a => a.lateMinutes > 0);
+      metrics.avgLateMinutes = lateRecords.length > 0
+        ? (lateRecords.reduce((sum, a) => sum + a.lateMinutes, 0) / lateRecords.length).toFixed(0)
+        : 0;
+
+      setEmployeeModal({ isOpen: true, data: { employee, metrics }, loading: false });
+    } catch (error) {
+      console.error('Failed to fetch employee details:', error);
+      toast.error('Failed to load employee details. Please try again.');
+      setEmployeeModal({ isOpen: false, data: null, loading: false });
+    }
+  };
+
+  const formatDateForTable = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
+      return format(date, 'MMM dd, yyyy HH:mm');
+    } catch (error) {
+      return '-';
+    }
   };
 
   const exportToCSV = () => {
@@ -356,7 +424,11 @@ const Attendance = () => {
                       <tr key={record._id} className="hover:bg-gray-50 transition-colors">
                         <td className="py-4 px-6 text-sm text-gray-900">{format(new Date(record.date), 'MMM dd, yyyy')}</td>
                         <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
+                          <div 
+                            className="flex items-center gap-3 cursor-pointer hover:bg-blue-50 p-2 rounded-lg transition-colors"
+                            onClick={() => record.employee?._id && fetchEmployeeDetails(record.employee._id)}
+                            title="Click to view employee details"
+                          >
                             {record.employee?.profileImage ? (
                               <img
                                 src={formatImageUrl(record.employee.profileImage)}
@@ -480,7 +552,11 @@ const Attendance = () => {
                 attendance.map((record) => (
                   <div key={record._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
+                      <div 
+                        className="flex items-center gap-3 cursor-pointer hover:bg-blue-50 p-2 rounded-lg transition-colors flex-1"
+                        onClick={() => record.employee?._id && fetchEmployeeDetails(record.employee._id)}
+                        title="Click to view employee details"
+                      >
                         {record.employee?.profileImage ? (
                           <img
                             src={formatImageUrl(record.employee.profileImage)}
@@ -596,6 +672,178 @@ const Attendance = () => {
           </>
         )}
       </div>
+
+      {/* Employee Details Modal */}
+      {employeeModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <Users className="w-6 h-6 text-blue-600" />
+                Employee Attendance Details
+              </h2>
+              <button
+                onClick={() => setEmployeeModal({ isOpen: false, data: null, loading: false })}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <XCircle className="w-6 h-6 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {employeeModal.loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+              ) : employeeModal.data ? (
+                <>
+                  {/* Employee Info */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 mb-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                          {employeeModal.data.employee.firstName} {employeeModal.data.employee.lastName}
+                        </h3>
+                        <div className="space-y-1 text-gray-600">
+                          <p className="flex items-center gap-2">
+                            <Briefcase className="w-4 h-4" />
+                            <span className="font-medium">ID:</span> {employeeModal.data.employee.employeeId}
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4" />
+                            <span className="font-medium">Department:</span> {employeeModal.data.employee.department}
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4" />
+                            <span className="font-medium">Facility:</span> {employeeModal.data.employee.facility?.name}
+                          </p>
+                          {employeeModal.data.employee.email && (
+                            <p className="flex items-center gap-2">
+                              <Mail className="w-4 h-4" />
+                              <span className="font-medium">Email:</span> {employeeModal.data.employee.email}
+                            </p>
+                          )}
+                          {employeeModal.data.employee.phone && (
+                            <p className="flex items-center gap-2">
+                              <Phone className="w-4 h-4" />
+                              <span className="font-medium">Phone:</span> {employeeModal.data.employee.phone}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                          employeeModal.data.employee.status === 'active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {employeeModal.data.employee.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Performance Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-green-50 rounded-xl p-4 text-center">
+                      <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Present</p>
+                      <p className="text-2xl font-bold text-green-600">{employeeModal.data.metrics.presentCount}</p>
+                    </div>
+                    <div className="bg-orange-50 rounded-xl p-4 text-center">
+                      <Clock className="w-8 h-8 text-orange-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Late</p>
+                      <p className="text-2xl font-bold text-orange-600">{employeeModal.data.metrics.lateCount}</p>
+                    </div>
+                    <div className="bg-red-50 rounded-xl p-4 text-center">
+                      <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Absent</p>
+                      <p className="text-2xl font-bold text-red-600">{employeeModal.data.metrics.absentCount}</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-xl p-4 text-center">
+                      <Activity className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Total Records</p>
+                      <p className="text-2xl font-bold text-blue-600">{employeeModal.data.metrics.totalRecords}</p>
+                    </div>
+                  </div>
+
+                  {/* Work Hours Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-purple-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-600 mb-1">Total Work Hours</p>
+                      <p className="text-2xl font-bold text-purple-600">{employeeModal.data.metrics.totalWorkHours.toFixed(1)} hrs</p>
+                    </div>
+                    <div className="bg-indigo-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-600 mb-1">Avg Work Hours/Day</p>
+                      <p className="text-2xl font-bold text-indigo-600">{employeeModal.data.metrics.avgWorkHours} hrs</p>
+                    </div>
+                    <div className="bg-orange-50 rounded-xl p-4">
+                      <p className="text-sm text-gray-600 mb-1">Avg Late Minutes</p>
+                      <p className="text-2xl font-bold text-orange-600">{employeeModal.data.metrics.avgLateMinutes} min</p>
+                    </div>
+                  </div>
+
+                  {/* Recent Attendance */}
+                  <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-blue-600" />
+                      Recent Attendance Records (Last 10)
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">Date</th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">Status</th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">Check In</th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">Check Out</th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">Work Hours</th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">Overtime</th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-600 uppercase">Late (min)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {(employeeModal.data?.metrics?.recentAttendance || []).map(record => (
+                            <tr key={record._id} className="hover:bg-gray-50">
+                              <td className="py-3 px-4 font-medium text-gray-900">{formatDateForTable(record.date)?.split(' ')[0]}</td>
+                              <td className="py-3 px-4">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  record.status === 'present' ? 'bg-green-100 text-green-800' :
+                                  record.status === 'late' ? 'bg-orange-100 text-orange-800' :
+                                  record.status === 'absent' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {record.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-gray-600">{formatTime(record.checkIn?.time)}</td>
+                              <td className="py-3 px-4 text-gray-600">{formatTime(record.checkOut?.time)}</td>
+                              <td className="py-3 px-4 font-semibold text-gray-900">{record.workHours?.toFixed(2) || 0} hrs</td>
+                              <td className="py-3 px-4 text-purple-600">{record.overtime?.toFixed(2) || 0} hrs</td>
+                              <td className={`py-3 px-4 ${record.lateMinutes > 0 ? 'text-orange-600 font-semibold' : 'text-gray-400'}`}>
+                                {record.lateMinutes || 0}
+                              </td>
+                            </tr>
+                          ))}
+                          {(employeeModal.data?.metrics?.recentAttendance || []).length === 0 && (
+                            <tr>
+                              <td colSpan="7" className="text-center text-gray-500 py-8">
+                                No attendance records found for this period
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-center text-gray-500 py-8">No data available</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

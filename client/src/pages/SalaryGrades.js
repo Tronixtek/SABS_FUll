@@ -15,6 +15,8 @@ const SalaryGrades = () => {
     baseSalary: '',
     minSalary: '',
     maxSalary: '',
+    taxRate: 10,
+    pensionRate: 0,
     description: '',
     benefits: [],
     isActive: true
@@ -73,6 +75,8 @@ const SalaryGrades = () => {
       baseSalary: grade.baseSalary,
       minSalary: grade.minSalary || '',
       maxSalary: grade.maxSalary || '',
+      taxRate: grade.taxRate !== undefined ? grade.taxRate : 10,
+      pensionRate: grade.pensionRate !== undefined ? grade.pensionRate : 0,
       description: grade.description || '',
       benefits: grade.benefits || [],
       isActive: grade.isActive
@@ -100,6 +104,8 @@ const SalaryGrades = () => {
       baseSalary: '',
       minSalary: '',
       maxSalary: '',
+      taxRate: 10,
+      pensionRate: 0,
       description: '',
       benefits: [],
       isActive: true
@@ -381,6 +387,36 @@ const SalaryGrades = () => {
                     step="1000"
                     placeholder="120000"
                   />
+                </div>
+
+                <div>
+                  <label className="label">Tax Rate (%)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={formData.taxRate}
+                    onChange={(e) => setFormData({ ...formData, taxRate: e.target.value })}
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="10"
+                  />
+                  <small className="text-xs text-gray-500">Tax percentage for this grade</small>
+                </div>
+
+                <div>
+                  <label className="label">Pension Rate (%)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={formData.pensionRate}
+                    onChange={(e) => setFormData({ ...formData, pensionRate: e.target.value })}
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    placeholder="0"
+                  />
+                  <small className="text-xs text-gray-500">Pension contribution percentage</small>
                 </div>
 
                 <div>
