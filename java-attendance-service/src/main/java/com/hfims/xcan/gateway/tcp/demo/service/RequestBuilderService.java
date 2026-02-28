@@ -163,11 +163,11 @@ public class RequestBuilderService {
         }
         
         try {
-            // Try to set page size (get all records)
+            // Try to set page size (get all records - using very high limit)
             java.lang.reflect.Field sizeField = personFindListReqClass.getDeclaredField("size");
             sizeField.setAccessible(true);
-            sizeField.set(personFindListReq, 100); // Get up to 100 records
-            System.out.println("DEBUG - Set size to 100");
+            sizeField.set(personFindListReq, 9999); // Get up to 9999 records
+            System.out.println("DEBUG - Set size to 9999");
         } catch (NoSuchFieldException e) {
             System.out.println("DEBUG - No size field found in PersonFindListReq");
         }
@@ -186,8 +186,8 @@ public class RequestBuilderService {
             // Try to set pageSize (alternative to size)
             java.lang.reflect.Field pageSizeField = personFindListReqClass.getDeclaredField("pageSize");
             pageSizeField.setAccessible(true);
-            pageSizeField.set(personFindListReq, 100);
-            System.out.println("DEBUG - Set pageSize to 100");
+            pageSizeField.set(personFindListReq, 9999);
+            System.out.println("DEBUG - Set pageSize to 9999");
         } catch (NoSuchFieldException e) {
             System.out.println("DEBUG - No pageSize field found in PersonFindListReq");
         }

@@ -275,6 +275,66 @@ const Employees = () => {
       setFetchingFromDevice(false);
     }
   };
+
+  // Export device persons to PDF
+  const handleExportDevicePersonsToPDF = () => {
+    if (devicePersons.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+
+    try {
+      const selectedFacility = facilities.find(f => f._id === selectedFacilityForDevice);
+      const facilityName = selectedFacility ? selectedFacility.name : 'Device';
+
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(18);
+      doc.text(`Device Registry - ${facilityName}`, 14, 20);
+      
+      // Add metadata
+      doc.setFontSize(10);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+      doc.text(`Total Persons: ${devicePersons.length}`, 14, 34);
+      doc.text(`Persons with Photos: ${devicePersons.filter(p => p.hasPhoto).length}`, 14, 40);
+      
+      // Prepare table data
+      const tableData = devicePersons.map((person, index) => [
+        index + 1,
+        person.employeeId || 'N/A',
+        person.name || 'Unknown',
+        person.department || '-',
+        person.hasPhoto ? 'Yes' : 'No'
+      ]);
+
+      // Add table
+      doc.autoTable({
+        startY: 48,
+        head: [['#', 'Employee ID', 'Name', 'Department', 'Photo']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [22, 163, 74], // Green color
+          textColor: 255,
+          fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        margin: { top: 48 }
+      });
+
+      // Save the PDF
+      const fileName = `device-registry-${facilityName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      
+      toast.success('PDF exported successfully');
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error('Failed to export PDF');
+    }
+  };
   
   const handleAddEmployee = () => {
     setSelectedEmployee(null);
@@ -1086,12 +1146,23 @@ const Employees = () => {
               {devicePersons.length > 0 ? (
                 <div>
                   <div className="mb-4 flex justify-between items-center">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Found {devicePersons.length} Person(s)
-                    </h3>
-                    <span className="text-sm text-gray-600">
-                      {devicePersons.filter(p => p.hasPhoto).length} with photos
-                    </span>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        Found {devicePersons.length} Person(s)
+                      </h3>
+                      <span className="text-sm text-gray-600">
+                        {devicePersons.filter(p => p.hasPhoto).length} with photos
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleExportDevicePersonsToPDF}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center gap-2 text-sm"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Export to PDF
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
