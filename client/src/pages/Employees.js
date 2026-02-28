@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { PlusIcon, PencilIcon, TrashIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import EmployeeModalWithJavaIntegration from '../components/EmployeeModalWithJavaIntegration';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
