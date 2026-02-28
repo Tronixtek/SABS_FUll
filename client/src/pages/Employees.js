@@ -248,6 +248,8 @@ const Employees = () => {
       const response = await axios.post(`${API_URL}/api/employees/device/get-all-persons`, {
         deviceKey: deviceKey,
         secret: deviceSecret
+      }, {
+        timeout: 300000 // 5 minute timeout for fetching with photos
       });
 
       toast.dismiss(loadingToast);

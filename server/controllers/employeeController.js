@@ -1745,7 +1745,7 @@ exports.getAllPersonsFromDevice = async (req, res) => {
         deviceKey,
         secret
       }, {
-        timeout: 60000, // 60 second timeout for large lists
+        timeout: 300000, // 5 minute timeout for large lists with photos
         headers: {
           'Content-Type': 'application/json'
         }
