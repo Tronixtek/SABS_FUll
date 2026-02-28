@@ -88,10 +88,8 @@ const Facilities = () => {
       toast.dismiss(loadingToast);
       
       if (response.data.success) {
-        const connection = response.data.data?.connection;
         toast.success(
-          `✅ ${connection?.status || 'Device connected successfully'}\n` +
-          `Gateway: ${connection?.gatewayHost}:${connection?.gatewayPort}`,
+          '✅ Device is connected to gateway',
           { duration: 5000 }
         );
       } else {
