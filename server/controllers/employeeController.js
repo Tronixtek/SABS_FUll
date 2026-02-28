@@ -1852,9 +1852,9 @@ exports.getPhotosForDevicePersons = async (req, res) => {
 
     console.log(`\n📸 Fetching photos for ${employeeIds.length} device persons from MongoDB`);
 
-    // Find employees by their employeeId field and facility
+    // Find employees by their XO5 person SN (device's sn field is stored as biometricData.xo5PersonSn)
     const query = {
-      employeeId: { $in: employeeIds },
+      'biometricData.xo5PersonSn': { $in: employeeIds },
       isDeleted: false
     };
 
@@ -1863,17 +1863,18 @@ exports.getPhotosForDevicePersons = async (req, res) => {
     }
 
     const employees = await Employee.find(query)
-      .select('employeeId staffId firstName lastName profileImage')
+      .select('employeeId staffId firstName lastName profileImage biometricData.xo5PersonSn')
       .lean();
 
     console.log(`✅ Found ${employees.length} employees in MongoDB`);
 
-    // Create a map of employeeId to photo
+    // Create a map of device SN (xo5PersonSn) to photo
     const photoMap = {};
     employees.forEach(emp => {
-      if (emp.profileImage) {
-        photoMap[emp.employeeId] = {
-          employeeId: emp.employeeId,
+      if (emp.profileImage && emp.biometricData?.xo5PersonSn) {
+        const deviceSn = emp.biometricData.xo5PersonSn;
+        photoMap[deviceSn] = {
+          employeeId: deviceSn,  // Use device SN as the key for matching
           staffId: emp.staffId,
           name: `${emp.firstName} ${emp.lastName}`,
           photo: emp.profileImage
