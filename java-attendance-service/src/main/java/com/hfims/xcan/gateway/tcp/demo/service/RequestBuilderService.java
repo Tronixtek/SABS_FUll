@@ -146,55 +146,36 @@ public class RequestBuilderService {
      * Build PersonFindListReq object for getting list of persons
      */
     public Object buildPersonFindListReq() throws Exception {
+        return buildPersonFindListReq(0, 1000); // Default: start at 0, max length
+    }
+
+    /**
+     * Build PersonFindListReq object with specific index and length
+     */
+    public Object buildPersonFindListReq(int index, int length) throws Exception {
         Class<?> personFindListReqClass = Class.forName("com.hfims.xcan.gateway.netty.client.req.PersonFindListReq");
         Object personFindListReq = personFindListReqClass.getDeclaredConstructor().newInstance();
         
-        System.out.println("DEBUG - Created PersonFindListReq: " + personFindListReq.getClass().getName());
+        System.out.println("DEBUG - Created PersonFindListReq with index=" + index + ", length=" + length);
         
-        // List all available fields for debugging
-        System.out.println("=== Available fields in PersonFindListReq ===");
-        java.lang.reflect.Field[] allFields = personFindListReqClass.getDeclaredFields();
-        for (java.lang.reflect.Field field : allFields) {
-            System.out.println("  Field: " + field.getName() + " (Type: " + field.getType().getSimpleName() + ")");
-        }
-        System.out.println("===========================================");
-        
-        // Try all possible pagination-related field names
-        String[] pageSizeFields = {"size", "pageSize", "limit", "count", "maxCount", "max", "length"};
-        String[] pageNumFields = {"page", "pageNum", "pageNo", "pageNumber", "currentPage"};
-        
-        // Set page size to 9999
-        boolean pageSizeSet = false;
-        for (String fieldName : pageSizeFields) {
-            try {
-                java.lang.reflect.Field field = personFindListReqClass.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                field.set(personFindListReq, 9999);
-                System.out.println("✅ SUCCESS - Set " + fieldName + " to 9999");
-                pageSizeSet = true;
-            } catch (NoSuchFieldException e) {
-                // Field doesn't exist, try next
-            }
-        }
-        if (!pageSizeSet) {
-            System.out.println("⚠️ WARNING - Could not set page size! No matching fields found.");
+        // Set index (starting position)
+        try {
+            java.lang.reflect.Field indexField = personFindListReqClass.getDeclaredField("index");
+            indexField.setAccessible(true);
+            indexField.set(personFindListReq, index);
+            System.out.println("✅ Set index to " + index);
+        } catch (NoSuchFieldException e) {
+            System.out.println("⚠️ No index field found");
         }
         
-        // Set page number to 1
-        boolean pageNumSet = false;
-        for (String fieldName : pageNumFields) {
-            try {
-                java.lang.reflect.Field field = personFindListReqClass.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                field.set(personFindListReq, 1);
-                System.out.println("✅ SUCCESS - Set " + fieldName + " to 1");
-                pageNumSet = true;
-            } catch (NoSuchFieldException e) {
-                // Field doesn't exist, try next
-            }
-        }
-        if (!pageNumSet) {
-            System.out.println("⚠️ WARNING - Could not set page number! No matching fields found.");
+        // Set length (page size) - max is 1000
+        try {
+            java.lang.reflect.Field lengthField = personFindListReqClass.getDeclaredField("length");
+            lengthField.setAccessible(true);
+            lengthField.set(personFindListReq, Math.min(length, 1000)); // Enforce max of 1000
+            System.out.println("✅ Set length to " + Math.min(length, 1000));
+        } catch (NoSuchFieldException e) {
+            System.out.println("⚠️ No length field found");
         }
         
         return personFindListReq;
