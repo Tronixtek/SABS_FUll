@@ -283,6 +283,8 @@ const Employees = () => {
       return;
     }
 
+    const loadingToast = toast.loading('Generating PDF...');
+
     try {
       const selectedFacility = facilities.find(f => f._id === selectedFacilityForDevice);
       const facilityName = selectedFacility ? selectedFacility.name : 'Device';
@@ -329,10 +331,11 @@ const Employees = () => {
       const fileName = `device-registry-${facilityName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(fileName);
       
-      toast.success('PDF exported successfully');
+      toast.success('PDF exported successfully', { id: loadingToast });
     } catch (error) {
       console.error('PDF export error:', error);
-      toast.error('Failed to export PDF');
+      console.error('Error details:', error.message, error.stack);
+      toast.error(`Failed to export PDF: ${error.message || 'Unknown error'}`, { id: loadingToast });
     }
   };
   

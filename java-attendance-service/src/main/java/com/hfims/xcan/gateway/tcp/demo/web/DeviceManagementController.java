@@ -634,7 +634,12 @@ public class DeviceManagementController extends BaseController {
                                                     if (photoData != null && !String.valueOf(photoData).isEmpty()) {
                                                         String photoStr = String.valueOf(photoData);
                                                         if (photoStr.length() > 100) { // Valid base64 should be longer
-                                                            person.put("photo", photoData);
+                                                            // Format as data URL if not already formatted
+                                                            String formattedPhoto = photoStr;
+                                                            if (!photoStr.startsWith("data:image")) {
+                                                                formattedPhoto = "data:image/jpeg;base64," + photoStr;
+                                                            }
+                                                            person.put("photo", formattedPhoto);
                                                             person.put("hasPhoto", true);
                                                             System.out.println("   📸 Photo found in field: " + field);
                                                             System.out.println("   📸 Photo length: " + photoStr.length() + " chars");
@@ -676,7 +681,12 @@ public class DeviceManagementController extends BaseController {
                                                         if (photoData != null && !String.valueOf(photoData).isEmpty()) {
                                                             String photoStr = String.valueOf(photoData);
                                                             if (photoStr.length() > 100) {
-                                                                person.put("photo", photoData);
+                                                                // Format as data URL if not already formatted
+                                                                String formattedPhoto = photoStr;
+                                                                if (!photoStr.startsWith("data:image")) {
+                                                                    formattedPhoto = "data:image/jpeg;base64," + photoStr;
+                                                                }
+                                                                person.put("photo", formattedPhoto);
                                                                 person.put("hasPhoto", true);
                                                                 System.out.println("   📸 Photo found in field: " + field);
                                                                 System.out.println("   📸 Photo length: " + photoStr.length() + " chars");
