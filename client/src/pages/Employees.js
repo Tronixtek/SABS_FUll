@@ -290,41 +290,90 @@ const Employees = () => {
       const facilityName = selectedFacility ? selectedFacility.name : 'Device';
 
       const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const cardWidth = 60;
+      const cardHeight = 70;
+      const spacing = 5;
+      const cardsPerRow = 3;
+      const photoSize = 40;
       
       // Add title
       doc.setFontSize(18);
-      doc.text(`Device Registry - ${facilityName}`, 14, 20);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Device Registry - ${facilityName}`, pageWidth / 2, 20, { align: 'center' });
       
       // Add metadata
       doc.setFontSize(10);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
-      doc.text(`Total Persons: ${devicePersons.length}`, 14, 34);
-      doc.text(`Persons with Photos: ${devicePersons.filter(p => p.hasPhoto).length}`, 14, 40);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 27, { align: 'center' });
+      doc.text(`Total: ${devicePersons.length} | With Photos: ${devicePersons.filter(p => p.hasPhoto).length}`, pageWidth / 2, 32, { align: 'center' });
       
-      // Prepare table data
-      const tableData = devicePersons.map((person, index) => [
-        index + 1,
-        person.employeeId || 'N/A',
-        person.name || 'Unknown',
-        person.department || '-',
-        person.hasPhoto ? 'Yes' : 'No'
-      ]);
+      let yPos = 40;
+      let xPos = margin;
+      let cardCount = 0;
 
-      // Add table
-      autoTable(doc, {
-        startY: 48,
-        head: [['#', 'Employee ID', 'Name', 'Department', 'Photo']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: {
-          fillColor: [22, 163, 74], // Green color
-          textColor: 255,
-          fontStyle: 'bold'
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245]
-        },
-        margin: { top: 48 }
+      devicePersons.forEach((person, index) => {
+        // Calculate position
+        const col = cardCount % cardsPerRow;
+        const row = Math.floor(cardCount / cardsPerRow);
+        
+        xPos = margin + col * (cardWidth + spacing);
+        yPos = 40 + row * (cardHeight + spacing);
+        
+        // Check if we need a new page
+        if (yPos + cardHeight > pageHeight - margin) {
+          doc.addPage();
+          yPos = margin;
+          cardCount = 0;
+          xPos = margin;
+        }
+        
+        // Draw card border
+        doc.setDrawColor(200);
+        doc.setLineWidth(0.5);
+        doc.rect(xPos, yPos, cardWidth, cardHeight);
+        
+        // Add photo
+        const photoX = xPos + (cardWidth - photoSize) / 2;
+        const photoY = yPos + 5;
+        
+        if (person.photo && person.hasPhoto) {
+          try {
+            doc.addImage(person.photo, 'JPEG', photoX, photoY, photoSize, photoSize);
+          } catch (err) {
+            // If photo fails, draw placeholder
+            doc.setFillColor(240, 240, 240);
+            doc.rect(photoX, photoY, photoSize, photoSize, 'F');
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text('No Photo', photoX + photoSize / 2, photoY + photoSize / 2, { align: 'center' });
+          }
+        } else {
+          // Draw placeholder for no photo
+          doc.setFillColor(240, 240, 240);
+          doc.rect(photoX, photoY, photoSize, photoSize, 'F');
+          doc.setFontSize(8);
+          doc.setTextColor(150);
+          doc.text('No Photo', photoX + photoSize / 2, photoY + photoSize / 2, { align: 'center' });
+        }
+        
+        // Add name
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0);
+        const name = person.name || 'Unknown';
+        const nameLines = doc.splitTextToSize(name, cardWidth - 4);
+        doc.text(nameLines, xPos + cardWidth / 2, photoY + photoSize + 5, { align: 'center', maxWidth: cardWidth - 4 });
+        
+        // Add employee ID
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100);
+        doc.text(`ID: ${person.employeeId || 'N/A'}`, xPos + cardWidth / 2, photoY + photoSize + 12, { align: 'center' });
+        
+        cardCount++;
       });
 
       // Save the PDF
