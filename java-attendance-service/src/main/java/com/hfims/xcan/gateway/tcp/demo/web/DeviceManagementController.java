@@ -605,7 +605,6 @@ public class DeviceManagementController extends BaseController {
                                     System.out.println("   📞 Calling faceFind for employee: " + employeeSn);
                                     Object faceFindReq = requestBuilderService.buildFaceFindReq(employeeSn);
                                     
-                                    Class<?> hostInfoClass = Class.forName("com.hfims.xcan.gateway.netty.client.dto.HostInfoDto");
                                     Method faceFindMethod = HfDeviceClient.class.getMethod("faceFind", 
                                         hostInfoClass, String.class, String.class, faceFindReq.getClass());
                                     
