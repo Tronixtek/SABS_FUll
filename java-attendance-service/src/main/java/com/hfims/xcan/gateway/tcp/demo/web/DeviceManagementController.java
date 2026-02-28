@@ -681,12 +681,87 @@ public class DeviceManagementController extends BaseController {
                             }
                             System.out.println("✅ Completed fetching " + persons.stream().filter(p -> (Boolean) p.getOrDefault("hasPhoto", false)).count() + " photos");
                         } else {
-                            // No photos requested - just return basic person data
-                            System.out.println("\n📋 Returning basic person list without photos (fast mode)");
+                            // No photos requested - but check which persons have photos without fetching actual photo data
+                            System.out.println("\n📋 Checking photo availability without fetching photo data (optimized mode)");
+                            
+                            int checkCount = 0;
                             for (Map<String, Object> basicPerson : basicPersonList) {
                                 Map<String, Object> person = extractPersonData(basicPerson);
+                                
+                                // Get employee ID for face lookup
+                                Object snObj = basicPerson.get("sn");
+                                if (snObj != null) {
+                                    String employeeSn = String.valueOf(snObj);
+                                    
+                                    checkCount++;
+                                    if (checkCount % 50 == 0) {
+                                        System.out.println("📊 Progress: " + checkCount + "/" + basicPersonList.size() + " persons checked");
+                                    }
+                                    
+                                    // Try to check if face exists (without retrieving actual photo)
+                                    try {
+                                        Object faceFindReq = requestBuilderService.buildFaceFindReq(employeeSn);
+                                        
+                                        Method faceFindMethod = HfDeviceClient.class.getMethod("faceFind", 
+                                            hostInfoClass, String.class, String.class, faceFindReq.getClass());
+                                        
+                                        HfDeviceResp faceResponse = (HfDeviceResp) faceFindMethod.invoke(null, hostInfo, deviceKey, secret, faceFindReq);
+                                    
+                                        if (faceResponse != null && "000".equals(faceResponse.getCode())) {
+                                            Object faceData = faceResponse.getData();
+                                            
+                                            if (faceData != null) {
+                                                // Check if photo exists without extracting it
+                                                boolean hasPhoto = false;
+                                                
+                                                if (faceData instanceof Map) {
+                                                    @SuppressWarnings("unchecked")
+                                                    Map<String, Object> faceMap = (Map<String, Object>) faceData;
+                                                    
+                                                    String[] photoFields = {"imgBase64", "image", "img", "base64", "photo", "faceImg"};
+                                                    for (String field : photoFields) {
+                                                        Object photoData = faceMap.get(field);
+                                                        if (photoData != null && !String.valueOf(photoData).isEmpty()) {
+                                                            String photoStr = String.valueOf(photoData);
+                                                            if (photoStr.length() > 100) {
+                                                                hasPhoto = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                } else if (faceData instanceof List) {
+                                                    @SuppressWarnings("unchecked")
+                                                    List<Object> faceList = (List<Object>) faceData;
+                                                    
+                                                    if (!faceList.isEmpty() && faceList.get(0) instanceof Map) {
+                                                        @SuppressWarnings("unchecked")
+                                                        Map<String, Object> faceMap = (Map<String, Object>) faceList.get(0);
+                                                        
+                                                        String[] photoFields = {"imgBase64", "image", "img", "base64", "photo", "faceImg"};
+                                                        for (String field : photoFields) {
+                                                            Object photoData = faceMap.get(field);
+                                                            if (photoData != null && !String.valueOf(photoData).isEmpty()) {
+                                                                String photoStr = String.valueOf(photoData);
+                                                                if (photoStr.length() > 100) {
+                                                                    hasPhoto = true;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                person.put("hasPhoto", hasPhoto);
+                                            }
+                                        }
+                                    } catch (Exception faceEx) {
+                                        // Silent fail for individual photo check
+                                    }
+                                }
+                                
                                 persons.add(person);
                             }
+                            System.out.println("✅ Completed checking " + persons.stream().filter(p -> (Boolean) p.getOrDefault("hasPhoto", false)).count() + " persons with photos");
                         }
                     } else {
                         System.out.println("⚠️ Response data is null");
