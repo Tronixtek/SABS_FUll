@@ -276,6 +276,136 @@ exports.syncFacility = async (req, res) => {
   }
 };
 
+// @desc    Test device connection for a facility
+// @route   POST /api/facilities/:id/test-connection
+// @access  Private
+exports.testFacilityConnection = async (req, res) => {
+  try {
+    console.log('\n========================================');
+    console.log('🔌 TEST FACILITY CONNECTION');
+    console.log('========================================\n');
+
+    const facility = await Facility.findById(req.params.id);
+    
+    if (!facility) {
+      return res.status(404).json({
+        success: false,
+        message: 'Facility not found'
+      });
+    }
+
+    console.log(`📍 Facility: ${facility.name} (${facility.code})`);
+    console.log(`📡 Integration Type: ${facility.configuration?.integrationType}`);
+
+    // Check if facility has smart device integration
+    if (facility.configuration?.integrationType !== 'java-xo5') {
+      return res.status(400).json({
+        success: false,
+        message: 'Facility does not have Smart Device integration enabled'
+      });
+    }
+
+    // Use facility code as device key
+    const deviceKey = facility.code?.toLowerCase();
+    const deviceSecret = facility.configuration?.deviceSecret || '123456';
+
+    if (!deviceKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Facility code is missing'
+      });
+    }
+
+    console.log(`🔑 Device Key: ${deviceKey}`);
+    console.log(`🔐 Secret: ${deviceSecret.substring(0, 4)}***`);
+
+    // Call Java service to test connection
+    const javaServiceUrl = process.env.JAVA_SERVICE_URL || 'http://localhost:8081';
+    const endpoint = `${javaServiceUrl}/api/device/test-connection`;
+
+    console.log(`\n📞 Calling Java service: ${endpoint}`);
+
+    const axios = require('axios');
+    const response = await axios.post(endpoint, {
+      deviceKey,
+      secret: deviceSecret
+    }, {
+      timeout: 15000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log(`\n✅ Java service response received`);
+    console.log(`   Status: ${response.status}`);
+    console.log(`   Success: ${response.data?.success}`);
+
+    if (response.data?.success) {
+      const result = response.data.data || {};
+      
+      console.log(`\n✅ Device Connection Test Result:`);
+      console.log(`   Connected: ${result.connected}`);
+      console.log(`   Gateway Host: ${result.gatewayHost}`);
+      console.log(`   Gateway Port: ${result.gatewayPort}`);
+      console.log(`   Status: ${result.status}`);
+
+      return res.json({
+        success: true,
+        message: 'Device connected successfully',
+        data: {
+          facility: {
+            id: facility._id,
+            name: facility.name,
+            code: facility.code
+          },
+          connection: {
+            connected: result.connected,
+            gatewayHost: result.gatewayHost,
+            gatewayPort: result.gatewayPort,
+            status: result.status,
+            timestamp: result.timestamp
+          }
+        }
+      });
+
+    } else {
+      console.error(`\n❌ Connection test failed: ${response.data?.message}`);
+      
+      return res.status(400).json({
+        success: false,
+        message: response.data?.message || 'Device connection test failed',
+        data: response.data?.data
+      });
+    }
+
+  } catch (error) {
+    console.error(`\n❌ Connection test error:`, error.message);
+    
+    if (error.response?.status === 503) {
+      return res.status(503).json({
+        success: false,
+        message: 'Java device service is unavailable'
+      });
+    } else if (error.response?.data?.message) {
+      return res.status(400).json({
+        success: false,
+        message: error.response.data.message,
+        data: error.response.data.data
+      });
+    } else if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        success: false,
+        message: 'Cannot connect to device service'
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: 'Connection test failed: ' + error.message
+      });
+    }
+  }
+};
+
 // @desc    Get facility statistics
 // @route   GET /api/facilities/:id/stats
 // @access  Private

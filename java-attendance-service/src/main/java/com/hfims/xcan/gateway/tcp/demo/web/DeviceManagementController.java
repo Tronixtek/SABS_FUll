@@ -29,6 +29,70 @@ public class DeviceManagementController extends BaseController {
     private DeviceMethodInspector deviceMethodInspector;
 
     /**
+     * Test connection to device gateway
+     */
+    @PostMapping("/test-connection")
+    public ApiResponse<Map<String, Object>> testConnection(@RequestBody Map<String, Object> request) {
+        try {
+            System.out.println("=== TEST DEVICE CONNECTION REQUEST ===");
+            
+            String deviceKey = (String) request.get("deviceKey");
+            String secret = (String) request.get("secret");
+            
+            // Validate device credentials
+            validateCommon(deviceKey, secret);
+            
+            // Get host info for device connection
+            HostInfoDto hostInfo = getHostInfo();
+            System.out.println("Gateway Host: " + hostInfo.getHost() + ":" + hostInfo.getPort());
+            System.out.println("Device Key: " + deviceKey);
+            
+            // Test connection using deviceGet method
+            HfDeviceResp response = HfDeviceClient.deviceGet(hostInfo, deviceKey, secret);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("deviceKey", deviceKey);
+            result.put("gatewayHost", hostInfo.getHost());
+            result.put("gatewayPort", hostInfo.getPort());
+            result.put("timestamp", new Date());
+            
+            if (response != null && "000".equals(response.getCode())) {
+                result.put("connected", true);
+                result.put("status", "Device is connected to gateway");
+                result.put("responseCode", response.getCode());
+                result.put("responseMessage", response.getMsg());
+                result.put("deviceData", response.getData());
+                
+                System.out.println("✅ Device connection successful");
+                return ApiResponse.success("Device is connected successfully", result);
+                
+            } else {
+                String errorMsg = response != null ? response.getMsg() : "No response from device";
+                result.put("connected", false);
+                result.put("status", "Device is not connected to gateway");
+                result.put("error", errorMsg);
+                
+                System.err.println("❌ Device connection failed: " + errorMsg);
+                return ApiResponse.error("Device connection failed: " + errorMsg, result);
+            }
+            
+        } catch (CgiErrorException e) {
+            System.err.println("CGI Error in test connection: " + e.getMessage());
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("connected", false);
+            errorResult.put("error", e.getMessage());
+            return ApiResponse.error("Device validation error: " + e.getMessage(), errorResult);
+        } catch (Exception e) {
+            System.err.println("Error in test connection: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("connected", false);
+            errorResult.put("error", e.getMessage());
+            return ApiResponse.error("Connection error: " + e.getMessage(), errorResult);
+        }
+    }
+
+    /**
      * Get device information and capabilities
      */
     @PostMapping("/info")

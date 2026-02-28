@@ -7,6 +7,7 @@ const {
   updateFacility,
   deleteFacility,
   syncFacility,
+  testFacilityConnection,
   getFacilityStats
 } = require('../controllers/facilityController');
 const { protect, checkPermission } = require('../middleware/auth');
@@ -24,5 +25,7 @@ router.put('/:id', updateFacility);
 router.delete('/:id', checkPermission('manage_facilities'), deleteFacility);
 // Allow sync for facility managers
 router.post('/:id/sync', syncFacility);
+// Test device connection
+router.post('/:id/test-connection', testFacilityConnection);
 
 module.exports = router;
