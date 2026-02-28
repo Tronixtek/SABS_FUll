@@ -255,7 +255,7 @@ const Employees = () => {
         secret: deviceSecret,
         includePhotos: includePhotos
       }, {
-        timeout: 300000 // 5 min timeout (checking hasPhoto status takes time)
+        timeout: 600000 // 10 min timeout (checking hasPhoto status takes time)
       });
 
       toast.dismiss(loadingToast);
