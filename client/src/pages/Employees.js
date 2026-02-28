@@ -1043,10 +1043,10 @@ const Employees = () => {
                   >
                     <option value="">-- Select Facility --</option>
                     {facilities
-                      .filter(f => f.configuration?.integrationType === 'java-xo5' && f.configuration?.deviceKey)
+                      .filter(f => f.configuration?.integrationType === 'java-xo5')
                       .map(facility => (
                         <option key={facility._id} value={facility._id}>
-                          {facility.name} {facility.configuration?.deviceKey ? `(${facility.configuration.deviceKey.substring(0, 8)}...)` : ''}
+                          {facility.name} ({facility.code})
                         </option>
                       ))
                     }
@@ -1075,9 +1075,9 @@ const Employees = () => {
                   </button>
                 </div>
                 
-                {facilities.filter(f => f.configuration?.integrationType === 'java-xo5' && f.configuration?.deviceKey).length === 0 && (
+                {facilities.filter(f => f.configuration?.integrationType === 'java-xo5').length === 0 && (
                   <p className="mt-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                    ℹ️ No facilities with smart device configuration found. Please configure a facility with integration type "Smart Device (Full Management)" and device credentials.
+                    ℹ️ No facilities with smart device configuration found. Please configure a facility with integration type "Smart Device (Full Management)".
                   </p>
                 )}
               </div>
