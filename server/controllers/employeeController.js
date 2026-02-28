@@ -1832,3 +1832,71 @@ exports.getAllPersonsFromDevice = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get photos for device persons from MongoDB
+ * @desc    Fetch photos from MongoDB for employees registered on device
+ * @route   POST /api/employees/device/get-photos
+ * @access  Private
+ */
+exports.getPhotosForDevicePersons = async (req, res) => {
+  try {
+    const { employeeIds, facilityId } = req.body;
+
+    if (!employeeIds || !Array.isArray(employeeIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Employee IDs array is required'
+      });
+    }
+
+    console.log(`\n📸 Fetching photos for ${employeeIds.length} device persons from MongoDB`);
+
+    // Find employees by their employeeId field and facility
+    const query = {
+      employeeId: { $in: employeeIds },
+      isDeleted: false
+    };
+
+    if (facilityId) {
+      query.facility = facilityId;
+    }
+
+    const employees = await Employee.find(query)
+      .select('employeeId staffId firstName lastName profileImage')
+      .lean();
+
+    console.log(`✅ Found ${employees.length} employees in MongoDB`);
+
+    // Create a map of employeeId to photo
+    const photoMap = {};
+    employees.forEach(emp => {
+      if (emp.profileImage) {
+        photoMap[emp.employeeId] = {
+          employeeId: emp.employeeId,
+          staffId: emp.staffId,
+          name: `${emp.firstName} ${emp.lastName}`,
+          photo: emp.profileImage
+        };
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Retrieved photos for ${Object.keys(photoMap).length} employees`,
+      data: {
+        photoMap,
+        totalRequested: employeeIds.length,
+        totalFound: Object.keys(photoMap).length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching photos from MongoDB:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch photos from database',
+      error: error.message
+    });
+  }
+};

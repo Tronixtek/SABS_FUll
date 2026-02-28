@@ -284,18 +284,41 @@ const Employees = () => {
     }
   };
 
-  // Export device persons to PDF
-  const handleExportDevicePersonsToPDF = () => {
+  // Export device persons to PDF (fetch photos from MongoDB)
+  const handleExportDevicePersonsToPDF = async () => {
     if (devicePersons.length === 0) {
       toast.error('No data to export');
       return;
     }
 
-    const loadingToast = toast.loading('Generating PDF...');
+    const loadingToast = toast.loading('Fetching photos from database and generating PDF...');
 
     try {
       const selectedFacility = facilities.find(f => f._id === selectedFacilityForDevice);
       const facilityName = selectedFacility ? selectedFacility.name : 'Device';
+
+      // Fetch photos from MongoDB for persons with hasPhoto=true
+      const employeeIds = devicePersons
+        .filter(p => p.hasPhoto)
+        .map(p => p.employeeId);
+
+      let photoMap = {};
+      
+      if (employeeIds.length > 0) {
+        toast.loading('Fetching photos from database...', { id: loadingToast });
+        
+        const photoResponse = await axios.post(`${API_URL}/api/employees/device/get-photos`, {
+          employeeIds,
+          facilityId: selectedFacilityForDevice
+        });
+
+        if (photoResponse.data.success) {
+          photoMap = photoResponse.data.data.photoMap;
+          console.log(`✅ Fetched ${Object.keys(photoMap).length} photos from MongoDB`);
+        }
+      }
+
+      toast.loading('Generating PDF...', { id: loadingToast });
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -316,7 +339,7 @@ const Employees = () => {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 27, { align: 'center' });
-      doc.text(`Total: ${devicePersons.length} | With Photos: ${devicePersons.filter(p => p.hasPhoto).length}`, pageWidth / 2, 32, { align: 'center' });
+      doc.text(`Total: ${devicePersons.length} | With Photos: ${Object.keys(photoMap).length}`, pageWidth / 2, 32, { align: 'center' });
       
       let yPos = 40;
       let xPos = margin;
@@ -347,9 +370,12 @@ const Employees = () => {
         const photoX = xPos + (cardWidth - photoSize) / 2;
         const photoY = yPos + 5;
         
-        if (person.photo && person.hasPhoto) {
+        // Get photo from MongoDB photoMap
+        const photoData = photoMap[person.employeeId];
+        
+        if (photoData && photoData.photo) {
           try {
-            doc.addImage(person.photo, 'JPEG', photoX, photoY, photoSize, photoSize);
+            doc.addImage(photoData.photo, 'JPEG', photoX, photoY, photoSize, photoSize);
           } catch (err) {
             // If photo fails, draw placeholder
             doc.setFillColor(240, 240, 240);
@@ -1205,8 +1231,11 @@ const Employees = () => {
                       disabled={fetchingFromDevice}
                       className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 disabled:opacity-50"
                     />
-                    <span>Include photos (slower, takes several minutes for large registries)</span>
+                    <span>Fetch photos from device (slower, use only if photos not in database)</span>
                   </label>
+                  <p className="ml-6 mt-1 text-xs text-gray-500">
+                    💡 Tip: Leave unchecked for fast loading. Photos will be fetched from database when exporting to PDF.
+                  </p>
                 </div>
                 
                 {facilities.filter(f => f.configuration?.integrationType === 'java-xo5').length === 0 && (
