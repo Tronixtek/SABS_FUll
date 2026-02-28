@@ -646,6 +646,9 @@ public class DeviceManagementController extends BaseController {
     private Map<String, Object> extractPersonData(Map<String, Object> personData) {
         Map<String, Object> person = new HashMap<>();
         
+        // Debug: Log all available fields
+        System.out.println("📋 Person Data Keys: " + personData.keySet());
+        
         // Extract basic fields
         Object snObj = personData.get("sn");
         person.put("employeeId", snObj != null ? String.valueOf(snObj) : null);
@@ -654,22 +657,29 @@ public class DeviceManagementController extends BaseController {
         Object nameObj = personData.get("name");
         person.put("name", nameObj != null ? String.valueOf(nameObj) : null);
         
-        // Extract photo/face data
+        // Try multiple possible photo field locations
+        boolean photoFound = false;
+        Object photoData = null;
+        
+        // 1. Check for "face" field (nested object or array)
         Object faceObj = personData.get("face");
         if (faceObj instanceof Map) {
             @SuppressWarnings("unchecked")
             Map<String, Object> faceData = (Map<String, Object>) faceObj;
+            System.out.println("   Face data keys: " + faceData.keySet());
             
-            // Get face image (base64)
-            Object imageObj = faceData.get("image");
-            if (imageObj != null) {
-                person.put("photo", imageObj); // Base64 image string
-                person.put("hasPhoto", true);
-            } else {
-                person.put("hasPhoto", false);
+            // Try different image field names
+            String[] imageFieldNames = {"image", "imgBase64", "img", "faceImage", "photo", "base64"};
+            for (String fieldName : imageFieldNames) {
+                Object imageObj = faceData.get(fieldName);
+                if (imageObj != null && !String.valueOf(imageObj).isEmpty()) {
+                    photoData = imageObj;
+                    photoFound = true;
+                    System.out.println("   ✅ Photo found in face." + fieldName);
+                    break;
+                }
             }
             
-            // Get other face data
             person.put("faceData", faceData);
         } else if (faceObj instanceof List) {
             @SuppressWarnings("unchecked")
@@ -677,18 +687,63 @@ public class DeviceManagementController extends BaseController {
             if (!faceList.isEmpty() && faceList.get(0) instanceof Map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> faceData = (Map<String, Object>) faceList.get(0);
+                System.out.println("   Face list data keys: " + faceData.keySet());
                 
-                Object imageObj = faceData.get("image");
-                if (imageObj != null) {
-                    person.put("photo", imageObj);
-                    person.put("hasPhoto", true);
-                } else {
-                    person.put("hasPhoto", false);
+                // Try different image field names
+                String[] imageFieldNames = {"image", "imgBase64", "img", "faceImage", "photo", "base64"};
+                for (String fieldName : imageFieldNames) {
+                    Object imageObj = faceData.get(fieldName);
+                    if (imageObj != null && !String.valueOf(imageObj).isEmpty()) {
+                        photoData = imageObj;
+                        photoFound = true;
+                        System.out.println("   ✅ Photo found in face[0]." + fieldName);
+                        break;
+                    }
                 }
+                
                 person.put("faceData", faceData);
             }
+        }
+        
+        // 2. If no photo in "face", check direct fields on person
+        if (!photoFound) {
+            String[] directImageFields = {"image", "imgBase64", "img", "faceImage", "photo", "base64", "faces"};
+            for (String fieldName : directImageFields) {
+                Object imageObj = personData.get(fieldName);
+                if (imageObj != null) {
+                    // Check if it's a string with actual content
+                    if (imageObj instanceof String && !((String) imageObj).isEmpty()) {
+                        photoData = imageObj;
+                        photoFound = true;
+                        System.out.println("   ✅ Photo found in person." + fieldName);
+                        break;
+                    }
+                    // Check if it's a nested object
+                    else if (imageObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> imgMap = (Map<String, Object>) imageObj;
+                        if (imgMap.containsKey("image")) {
+                            photoData = imgMap.get("image");
+                            photoFound = true;
+                            System.out.println("   ✅ Photo found in person." + fieldName + ".image");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Set photo data if found
+        if (photoFound && photoData != null) {
+            person.put("photo", photoData);
+            person.put("hasPhoto", true);
+            // Log first 50 chars of photo data to verify it's valid
+            String photoStr = String.valueOf(photoData);
+            System.out.println("   📸 Photo data length: " + photoStr.length() + " chars");
+            System.out.println("   📸 Photo preview: " + photoStr.substring(0, Math.min(50, photoStr.length())) + "...");
         } else {
             person.put("hasPhoto", false);
+            System.out.println("   ❌ No photo found for person: " + nameObj);
         }
         
         // Extract other available fields
