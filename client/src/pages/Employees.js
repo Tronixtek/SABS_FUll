@@ -232,12 +232,12 @@ const Employees = () => {
       return;
     }
 
-    // Check if facility has device configuration
-    const deviceKey = selectedFacility.configuration?.deviceKey;
-    const deviceSecret = selectedFacility.configuration?.deviceSecret;
+    // Use facility code as device key, secret defaults to 123456
+    const deviceKey = selectedFacility.code?.toLowerCase();
+    const deviceSecret = selectedFacility.configuration?.deviceSecret || '123456';
 
     if (!deviceKey) {
-      toast.error('Selected facility does not have device credentials configured');
+      toast.error('Facility code is missing');
       return;
     }
 
@@ -247,7 +247,7 @@ const Employees = () => {
     try {
       const response = await axios.post(`${API_URL}/api/employees/device/get-all-persons`, {
         deviceKey: deviceKey,
-        secret: deviceSecret || '123456'
+        secret: deviceSecret
       });
 
       toast.dismiss(loadingToast);
