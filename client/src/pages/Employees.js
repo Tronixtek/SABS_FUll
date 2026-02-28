@@ -311,7 +311,7 @@ const Employees = () => {
       ]);
 
       // Add table
-      doc.autoTable({
+      autoTable(doc, {
         startY: 48,
         head: [['#', 'Employee ID', 'Name', 'Department', 'Photo']],
         body: tableData,
