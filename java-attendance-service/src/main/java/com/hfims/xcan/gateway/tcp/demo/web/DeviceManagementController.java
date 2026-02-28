@@ -514,6 +514,10 @@ public class DeviceManagementController extends BaseController {
             
             String deviceKey = (String) request.get("deviceKey");
             String secret = (String) request.get("secret");
+            Boolean includePhotos = request.containsKey("includePhotos") ? 
+                (Boolean) request.get("includePhotos") : false;
+            
+            System.out.println("📸 Include Photos: " + includePhotos);
             
             // Validate device credentials
             validateCommon(deviceKey, secret);
@@ -587,146 +591,102 @@ public class DeviceManagementController extends BaseController {
                             }
                         }
                         
-                        // Now fetch face data for each person
-                        System.out.println("\n🔍 Fetching face data for " + basicPersonList.size() + " persons...");
-                        
-                        for (Map<String, Object> basicPerson : basicPersonList) {
-                            Map<String, Object> person = extractPersonData(basicPerson);
+                        // Now fetch face data for each person (if requested)
+                        if (includePhotos && basicPersonList.size() > 0) {
+                            System.out.println("\n🔍 Fetching face data for " + basicPersonList.size() + " persons...");
+                            System.out.println("⚠️  This may take several minutes for large lists...");
                             
-                            // Get employee ID for face lookup
-                            Object snObj = basicPerson.get("sn");
-                            if (snObj != null) {
-                                String employeeSn = String.valueOf(snObj);
+                            int photoCount = 0;
+                            for (Map<String, Object> basicPerson : basicPersonList) {
+                                Map<String, Object> person = extractPersonData(basicPerson);
                                 
-                                System.out.println("\n👤 Processing person: " + person.get("name") + " (SN: " + employeeSn + ")");
-                                
-                                // Try to get face data for this person
-                                try {
-                                    System.out.println("   📞 Calling faceFind for employee: " + employeeSn);
-                                    Object faceFindReq = requestBuilderService.buildFaceFindReq(employeeSn);
+                                // Get employee ID for face lookup
+                                Object snObj = basicPerson.get("sn");
+                                if (snObj != null) {
+                                    String employeeSn = String.valueOf(snObj);
                                     
-                                    Method faceFindMethod = HfDeviceClient.class.getMethod("faceFind", 
-                                        hostInfoClass, String.class, String.class, faceFindReq.getClass());
+                                    photoCount++;
+                                    if (photoCount % 50 == 0) {
+                                        System.out.println("📊 Progress: " + photoCount + "/" + basicPersonList.size() + " persons processed");
+                                    }
                                     
-                                    HfDeviceResp faceResponse = (HfDeviceResp) faceFindMethod.invoke(null, hostInfo, deviceKey, secret, faceFindReq);
-                                    
-                                    System.out.println("   📡 faceFind response - Code: " + (faceResponse != null ? faceResponse.getCode() : "null"));
-                                    System.out.println("   📡 faceFind response - Msg: " + (faceResponse != null ? faceResponse.getMsg() : "null"));
-                                    
-                                    if (faceResponse != null && "000".equals(faceResponse.getCode())) {
-                                        Object faceData = faceResponse.getData();
-                                        System.out.println("   📊 Face data type: " + (faceData != null ? faceData.getClass().getName() : "null"));
+                                    // Try to get face data for this person
+                                    try {
+                                        Object faceFindReq = requestBuilderService.buildFaceFindReq(employeeSn);
                                         
-                                        if (faceData != null) {
-                                            System.out.println("   ✅ Found face data for: " + person.get("name"));
+                                        Method faceFindMethod = HfDeviceClient.class.getMethod("faceFind", 
+                                            hostInfoClass, String.class, String.class, faceFindReq.getClass());
+                                        
+                                        HfDeviceResp faceResponse = (HfDeviceResp) faceFindMethod.invoke(null, hostInfo, deviceKey, secret, faceFindReq);
+                                    
+                                        if (faceResponse != null && "000".equals(faceResponse.getCode())) {
+                                            Object faceData = faceResponse.getData();
                                             
-                                            // Extract photo from face response
-                                            if (faceData instanceof Map) {
-                                                @SuppressWarnings("unchecked")
-                                                Map<String, Object> faceMap = (Map<String, Object>) faceData;
-                                                System.out.println("   📋 Face map keys: " + faceMap.keySet());
-                                                
-                                                // Try multiple photo field names
-                                                String[] photoFields = {"imgBase64", "image", "img", "base64", "photo", "faceImg"};
-                                                boolean photoFound = false;
-                                                for (String field : photoFields) {
-                                                    Object photoData = faceMap.get(field);
-                                                    if (photoData != null && !String.valueOf(photoData).isEmpty()) {
-                                                        String photoStr = String.valueOf(photoData);
-                                                        if (photoStr.length() > 100) { // Valid base64 should be longer
-                                                            // Format as data URL if not already formatted
-                                                            String formattedPhoto = photoStr;
-                                                            if (!photoStr.startsWith("data:image")) {
-                                                                formattedPhoto = "data:image/jpeg;base64," + photoStr;
-                                                            }
-                                                            person.put("photo", formattedPhoto);
-                                                            person.put("hasPhoto", true);
-                                                            System.out.println("   📸 Photo found in field: " + field);
-                                                            System.out.println("   📸 Photo length: " + photoStr.length() + " chars");
-                                                            System.out.println("   📸 Photo preview: " + photoStr.substring(0, Math.min(50, photoStr.length())) + "...");
-                                                            photoFound = true;
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                if (!photoFound) {
-                                                    System.out.println("   ⚠️ Face data found but no photo field contains valid data");
-                                                    System.out.println("   📋 Available fields and their types:");
-                                                    for (Map.Entry<String, Object> entry : faceMap.entrySet()) {
-                                                        Object value = entry.getValue();
-                                                        String valueInfo = value != null ? 
-                                                            (value.getClass().getSimpleName() + " - length: " + String.valueOf(value).length()) : 
-                                                            "null";
-                                                        System.out.println("      - " + entry.getKey() + ": " + valueInfo);
-                                                    }
-                                                }
-                                                
-                                                // Also add the full face data
-                                                person.put("faceData", faceMap);
-                                            } else if (faceData instanceof List) {
-                                                @SuppressWarnings("unchecked")
-                                                List<Object> faceList = (List<Object>) faceData;
-                                                System.out.println("   📊 Face list size: " + faceList.size());
-                                                
-                                                if (!faceList.isEmpty() && faceList.get(0) instanceof Map) {
+                                            if (faceData != null) {
+                                                // Extract photo from face response
+                                                if (faceData instanceof Map) {
                                                     @SuppressWarnings("unchecked")
-                                                    Map<String, Object> faceMap = (Map<String, Object>) faceList.get(0);
-                                                    System.out.println("   📋 Face map keys: " + faceMap.keySet());
+                                                    Map<String, Object> faceMap = (Map<String, Object>) faceData;
                                                     
                                                     String[] photoFields = {"imgBase64", "image", "img", "base64", "photo", "faceImg"};
-                                                    boolean photoFound = false;
                                                     for (String field : photoFields) {
                                                         Object photoData = faceMap.get(field);
                                                         if (photoData != null && !String.valueOf(photoData).isEmpty()) {
                                                             String photoStr = String.valueOf(photoData);
                                                             if (photoStr.length() > 100) {
-                                                                // Format as data URL if not already formatted
                                                                 String formattedPhoto = photoStr;
                                                                 if (!photoStr.startsWith("data:image")) {
                                                                     formattedPhoto = "data:image/jpeg;base64," + photoStr;
                                                                 }
                                                                 person.put("photo", formattedPhoto);
                                                                 person.put("hasPhoto", true);
-                                                                System.out.println("   📸 Photo found in field: " + field);
-                                                                System.out.println("   📸 Photo length: " + photoStr.length() + " chars");
-                                                                photoFound = true;
                                                                 break;
                                                             }
                                                         }
                                                     }
+                                                } else if (faceData instanceof List) {
+                                                    @SuppressWarnings("unchecked")
+                                                    List<Object> faceList = (List<Object>) faceData;
                                                     
-                                                    if (!photoFound) {
-                                                        System.out.println("   ⚠️ Face list found but no photo field contains valid data");
-                                                        System.out.println("   📋 Available fields in first item:");
-                                                        for (Map.Entry<String, Object> entry : faceMap.entrySet()) {
-                                                            Object value = entry.getValue();
-                                                            String valueInfo = value != null ? 
-                                                                (value.getClass().getSimpleName() + " - length: " + String.valueOf(value).length()) : 
-                                                                "null";
-                                                            System.out.println("      - " + entry.getKey() + ": " + valueInfo);
+                                                    if (!faceList.isEmpty() && faceList.get(0) instanceof Map) {
+                                                        @SuppressWarnings("unchecked")
+                                                        Map<String, Object> faceMap = (Map<String, Object>) faceList.get(0);
+                                                        
+                                                        String[] photoFields = {"imgBase64", "image", "img", "base64", "photo", "faceImg"};
+                                                        for (String field : photoFields) {
+                                                            Object photoData = faceMap.get(field);
+                                                            if (photoData != null && !String.valueOf(photoData).isEmpty()) {
+                                                                String photoStr = String.valueOf(photoData);
+                                                                if (photoStr.length() > 100) {
+                                                                    String formattedPhoto = photoStr;
+                                                                    if (!photoStr.startsWith("data:image")) {
+                                                                        formattedPhoto = "data:image/jpeg;base64," + photoStr;
+                                                                    }
+                                                                    person.put("photo", formattedPhoto);
+                                                                    person.put("hasPhoto", true);
+                                                                    break;
+                                                                }
+                                                            }
                                                         }
                                                     }
-                                                    
-                                                    person.put("faceData", faceMap);
                                                 }
-                                            } else {
-                                                System.out.println("   ⚠️ Face data is neither Map nor List: " + faceData.getClass().getName());
                                             }
-                                        } else {
-                                            System.out.println("   ⚠️ Face response data is null");
                                         }
-                                    } else {
-                                        String errorMsg = faceResponse != null ? faceResponse.getMsg() : "No response";
-                                        System.out.println("   ⚠️ No face data for: " + person.get("name") + " - " + errorMsg);
+                                    } catch (Exception faceEx) {
+                                        // Silent fail for individual photo fetch
                                     }
-                                } catch (Exception faceEx) {
-                                    System.err.println("   ❌ Error fetching face for " + person.get("name") + ": " + faceEx.getMessage());
-                                    faceEx.printStackTrace();
                                 }
+                                
+                                persons.add(person);
                             }
-                            
-                            persons.add(person);
+                            System.out.println("✅ Completed fetching " + persons.stream().filter(p -> (Boolean) p.getOrDefault("hasPhoto", false)).count() + " photos");
+                        } else {
+                            // No photos requested - just return basic person data
+                            System.out.println("\n📋 Returning basic person list without photos (fast mode)");
+                            for (Map<String, Object> basicPerson : basicPersonList) {
+                                Map<String, Object> person = extractPersonData(basicPerson);
+                                persons.add(person);
+                            }
                         }
                     } else {
                         System.out.println("⚠️ Response data is null");

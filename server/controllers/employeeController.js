@@ -1721,7 +1721,7 @@ exports.getAllPersonsFromDevice = async (req, res) => {
     console.log('🔍 FETCH ALL PERSONS FROM DEVICE');
     console.log('========================================\n');
 
-    const { deviceKey, secret } = req.body;
+    const { deviceKey, secret, includePhotos = false } = req.body;
 
     // Validate required fields
     if (!deviceKey || !secret) {
@@ -1733,6 +1733,7 @@ exports.getAllPersonsFromDevice = async (req, res) => {
 
     console.log(`📡 Device Key: ${deviceKey}`);
     console.log(`🔐 Secret: ${secret.substring(0, 4)}***`);
+    console.log(`📸 Include Photos: ${includePhotos}`);
 
     // Call Java service to get all persons from device
     const javaServiceUrl = process.env.JAVA_SERVICE_URL || 'http://localhost:8081';
@@ -1743,9 +1744,10 @@ exports.getAllPersonsFromDevice = async (req, res) => {
     try {
       const response = await axios.post(endpoint, {
         deviceKey,
-        secret
+        secret,
+        includePhotos
       }, {
-        timeout: 300000, // 5 minute timeout for large lists with photos
+        timeout: includePhotos ? 300000 : 60000, // 5 min for photos, 1 min for basic list
         headers: {
           'Content-Type': 'application/json'
         }

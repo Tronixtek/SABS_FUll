@@ -28,6 +28,7 @@ const Employees = () => {
   const [devicePersons, setDevicePersons] = useState([]);
   const [fetchingFromDevice, setFetchingFromDevice] = useState(false);
   const [selectedFacilityForDevice, setSelectedFacilityForDevice] = useState('');
+  const [includePhotos, setIncludePhotos] = useState(false);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -242,14 +243,19 @@ const Employees = () => {
     }
 
     setFetchingFromDevice(true);
-    const loadingToast = toast.loading('Fetching registered persons from device...');
+    const loadingToast = toast.loading(
+      includePhotos 
+        ? 'Fetching registered persons with photos from device... This may take several minutes for large registries.' 
+        : 'Fetching registered persons from device...'
+    );
 
     try {
       const response = await axios.post(`${API_URL}/api/employees/device/get-all-persons`, {
         deviceKey: deviceKey,
-        secret: deviceSecret
+        secret: deviceSecret,
+        includePhotos: includePhotos
       }, {
-        timeout: 300000 // 5 minute timeout for fetching with photos
+        timeout: includePhotos ? 300000 : 60000 // 5 min for photos, 1 min for basic list
       });
 
       toast.dismiss(loadingToast);
@@ -1187,6 +1193,20 @@ const Employees = () => {
                       </>
                     )}
                   </button>
+                </div>
+                
+                {/* Include Photos Checkbox */}
+                <div className="mt-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includePhotos}
+                      onChange={(e) => setIncludePhotos(e.target.checked)}
+                      disabled={fetchingFromDevice}
+                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 disabled:opacity-50"
+                    />
+                    <span>Include photos (slower, takes several minutes for large registries)</span>
+                  </label>
                 </div>
                 
                 {facilities.filter(f => f.configuration?.integrationType === 'java-xo5').length === 0 && (
