@@ -196,6 +196,35 @@ public class RequestBuilderService {
     }
 
     /**
+     * Build FaceFindReq object for getting face data of a person
+     */
+    public Object buildFaceFindReq(String employeeSn) throws Exception {
+        Class<?> faceFindReqClass = Class.forName("com.hfims.xcan.gateway.netty.client.req.FaceFindReq");
+        Object faceFindReq = faceFindReqClass.getDeclaredConstructor().newInstance();
+        
+        System.out.println("DEBUG - Created FaceFindReq for employee: " + employeeSn);
+        
+        // Set personSn field
+        try {
+            java.lang.reflect.Field personSnField = faceFindReqClass.getDeclaredField("personSn");
+            personSnField.setAccessible(true);
+            personSnField.set(faceFindReq, employeeSn);
+            System.out.println("DEBUG - Set personSn to: " + employeeSn);
+        } catch (NoSuchFieldException e) {
+            // Try alternative field name
+            try {
+                Method setPersonSnMethod = faceFindReqClass.getMethod("setPersonSn", String.class);
+                setPersonSnMethod.invoke(faceFindReq, employeeSn);
+                System.out.println("DEBUG - Set personSn via setter to: " + employeeSn);
+            } catch (Exception ex) {
+                System.out.println("DEBUG - Could not set personSn field");
+            }
+        }
+        
+        return faceFindReq;
+    }
+
+    /**
      * Helper method to set values using reflection with type conversion
      */
     private boolean setMethodValue(Object target, Map<String, Method> methodMap, 
