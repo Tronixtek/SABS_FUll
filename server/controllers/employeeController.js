@@ -1747,7 +1747,7 @@ exports.getAllPersonsFromDevice = async (req, res) => {
         secret,
         includePhotos
       }, {
-        timeout: includePhotos ? 300000 : 60000, // 5 min for photos, 1 min for basic list
+        timeout: 300000, // 5 min timeout (still need to check hasPhoto status even without photos)
         headers: {
           'Content-Type': 'application/json'
         }

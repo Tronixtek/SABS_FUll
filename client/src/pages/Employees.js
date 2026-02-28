@@ -246,7 +246,7 @@ const Employees = () => {
     const loadingToast = toast.loading(
       includePhotos 
         ? 'Fetching registered persons with photos from device... This may take several minutes for large registries.' 
-        : 'Fetching registered persons from device...'
+        : 'Fetching registered persons list... Checking photo availability for each person...'
     );
 
     try {
@@ -255,7 +255,7 @@ const Employees = () => {
         secret: deviceSecret,
         includePhotos: includePhotos
       }, {
-        timeout: includePhotos ? 300000 : 60000 // 5 min for photos, 1 min for basic list
+        timeout: 300000 // 5 min timeout (checking hasPhoto status takes time)
       });
 
       toast.dismiss(loadingToast);
