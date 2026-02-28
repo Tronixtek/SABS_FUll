@@ -151,45 +151,50 @@ public class RequestBuilderService {
         
         System.out.println("DEBUG - Created PersonFindListReq: " + personFindListReq.getClass().getName());
         
-        // PersonFindListReq might have pagination parameters
-        try {
-            // Try to set page number (usually starts from 1)
-            java.lang.reflect.Field pageField = personFindListReqClass.getDeclaredField("page");
-            pageField.setAccessible(true);
-            pageField.set(personFindListReq, 1);
-            System.out.println("DEBUG - Set page to 1");
-        } catch (NoSuchFieldException e) {
-            System.out.println("DEBUG - No page field found in PersonFindListReq");
+        // List all available fields for debugging
+        System.out.println("=== Available fields in PersonFindListReq ===");
+        java.lang.reflect.Field[] allFields = personFindListReqClass.getDeclaredFields();
+        for (java.lang.reflect.Field field : allFields) {
+            System.out.println("  Field: " + field.getName() + " (Type: " + field.getType().getSimpleName() + ")");
+        }
+        System.out.println("===========================================");
+        
+        // Try all possible pagination-related field names
+        String[] pageSizeFields = {"size", "pageSize", "limit", "count", "maxCount", "max", "length"};
+        String[] pageNumFields = {"page", "pageNum", "pageNo", "pageNumber", "currentPage"};
+        
+        // Set page size to 9999
+        boolean pageSizeSet = false;
+        for (String fieldName : pageSizeFields) {
+            try {
+                java.lang.reflect.Field field = personFindListReqClass.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                field.set(personFindListReq, 9999);
+                System.out.println("✅ SUCCESS - Set " + fieldName + " to 9999");
+                pageSizeSet = true;
+            } catch (NoSuchFieldException e) {
+                // Field doesn't exist, try next
+            }
+        }
+        if (!pageSizeSet) {
+            System.out.println("⚠️ WARNING - Could not set page size! No matching fields found.");
         }
         
-        try {
-            // Try to set page size (get all records - using very high limit)
-            java.lang.reflect.Field sizeField = personFindListReqClass.getDeclaredField("size");
-            sizeField.setAccessible(true);
-            sizeField.set(personFindListReq, 9999); // Get up to 9999 records
-            System.out.println("DEBUG - Set size to 9999");
-        } catch (NoSuchFieldException e) {
-            System.out.println("DEBUG - No size field found in PersonFindListReq");
+        // Set page number to 1
+        boolean pageNumSet = false;
+        for (String fieldName : pageNumFields) {
+            try {
+                java.lang.reflect.Field field = personFindListReqClass.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                field.set(personFindListReq, 1);
+                System.out.println("✅ SUCCESS - Set " + fieldName + " to 1");
+                pageNumSet = true;
+            } catch (NoSuchFieldException e) {
+                // Field doesn't exist, try next
+            }
         }
-        
-        try {
-            // Try to set pageNum (alternative to page)
-            java.lang.reflect.Field pageNumField = personFindListReqClass.getDeclaredField("pageNum");
-            pageNumField.setAccessible(true);
-            pageNumField.set(personFindListReq, 1);
-            System.out.println("DEBUG - Set pageNum to 1");
-        } catch (NoSuchFieldException e) {
-            System.out.println("DEBUG - No pageNum field found in PersonFindListReq");
-        }
-        
-        try {
-            // Try to set pageSize (alternative to size)
-            java.lang.reflect.Field pageSizeField = personFindListReqClass.getDeclaredField("pageSize");
-            pageSizeField.setAccessible(true);
-            pageSizeField.set(personFindListReq, 9999);
-            System.out.println("DEBUG - Set pageSize to 9999");
-        } catch (NoSuchFieldException e) {
-            System.out.println("DEBUG - No pageSize field found in PersonFindListReq");
+        if (!pageNumSet) {
+            System.out.println("⚠️ WARNING - Could not set page number! No matching fields found.");
         }
         
         return personFindListReq;
