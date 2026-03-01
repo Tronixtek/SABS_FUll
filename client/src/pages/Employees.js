@@ -312,6 +312,8 @@ const Employees = () => {
         const photoResponse = await axios.post(`${API_URL}/api/employees/device/get-photos`, {
           employeeIds,
           facilityId: selectedFacilityForDevice
+        }, {
+          timeout: 900000 // 15 minutes timeout for large photo fetches
         });
 
         if (photoResponse.data.success) {
