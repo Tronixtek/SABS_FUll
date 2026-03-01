@@ -242,8 +242,8 @@ public class EmployeeController extends BaseController {
     private final AtomicInteger processedRequests = new AtomicInteger(0);
     private final AtomicInteger failedRequests = new AtomicInteger(0);
     
-    // Maximum wait time for device operation (10 minutes for large operations)
-    private static final long DEVICE_OPERATION_TIMEOUT = 600000;
+    // Maximum wait time for device operation (15 minutes for large operations)
+    private static final long DEVICE_OPERATION_TIMEOUT = 900000;
     
     @PreDestroy
     public void shutdown() {

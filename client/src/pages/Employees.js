@@ -255,7 +255,7 @@ const Employees = () => {
         secret: deviceSecret,
         includePhotos: includePhotos
       }, {
-        timeout: 600000 // 10 min timeout (checking hasPhoto status takes time)
+        timeout: 900000 // 15 min timeout (checking hasPhoto status takes time)
       });
 
       toast.dismiss(loadingToast);
@@ -273,7 +273,7 @@ const Employees = () => {
       console.error('Device fetch error:', error);
       
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        toast.error(`Request timed out. Device has ${devicePersons.length || 'many'} persons - this operation may take up to 10 minutes. Please wait and try again.`);
+        toast.error(`Request timed out after 15 minutes. Device has many persons - this may require more time. The Java service may still be processing. Please check logs or try again later.`);
       } else if (error.response?.status === 503) {
         toast.error('Java device service is unavailable. Please ensure it is running.');
       } else if (error.response?.data?.message) {
