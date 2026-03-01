@@ -38,17 +38,21 @@ const revertManagersToAdmins = async () => {
     const adminPermissions = [
       'view_attendance',
       'edit_attendance',
+      'delete_attendance',
       'manage_employees',
       'manage_shifts',
       'manage_facilities',
+      'edit_facilities',
       'manage_users',
       'view_reports',
       'export_data',
       'system_settings',
       'enroll_users',
-      'manage_leave',
+      'manage_devices',
+      'view_leave_requests',
+      'submit_leave',
       'approve_leave',
-      'manage_payroll'
+      'manage_leave'
     ];
 
     // Update each user back to admin
