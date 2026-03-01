@@ -1873,18 +1873,55 @@ exports.getPhotosForDevicePersons = async (req, res) => {
     const foundSns = new Set();
     const employeesWithoutPhoto = [];
     
+    const fs = require('fs');
+    const path = require('path');
+    
     employees.forEach(emp => {
       const deviceSn = emp.biometricData?.xo5PersonSn;
       if (deviceSn) {
         foundSns.add(deviceSn);
         
         if (emp.profileImage) {
-          photoMap[deviceSn] = {
-            employeeId: deviceSn,  // Use device SN as the key for matching
-            staffId: emp.staffId,
-            name: `${emp.firstName} ${emp.lastName}`,
-            photo: emp.profileImage
-          };
+          let photoData = emp.profileImage;
+          
+          // Check if profileImage is a file path (updated photos) or base64 data (enrolled photos)
+          if (!photoData.startsWith('data:image') && (photoData.startsWith('/uploads/') || photoData.startsWith('uploads/'))) {
+            // It's a file path - read from disk and convert to base64
+            try {
+              let filePath = photoData;
+              if (filePath.startsWith('/')) {
+                filePath = filePath.substring(1); // Remove leading slash
+              }
+              const absolutePath = path.join(__dirname, '..', filePath);
+              
+              if (fs.existsSync(absolutePath)) {
+                const imageBuffer = fs.readFileSync(absolutePath);
+                photoData = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
+                console.log(`   ✅ Converted file path to base64 for ${emp.firstName} ${emp.lastName}`);
+              } else {
+                console.warn(`   ⚠️  Image file not found: ${absolutePath}`);
+                photoData = null;
+              }
+            } catch (readError) {
+              console.error(`   ❌ Failed to read image for ${emp.firstName} ${emp.lastName}:`, readError.message);
+              photoData = null;
+            }
+          }
+          
+          if (photoData) {
+            photoMap[deviceSn] = {
+              employeeId: deviceSn,  // Use device SN as the key for matching
+              staffId: emp.staffId,
+              name: `${emp.firstName} ${emp.lastName}`,
+              photo: photoData
+            };
+          } else {
+            employeesWithoutPhoto.push({
+              deviceSn,
+              staffId: emp.staffId,
+              name: `${emp.firstName} ${emp.lastName}`
+            });
+          }
         } else {
           employeesWithoutPhoto.push({
             deviceSn,
