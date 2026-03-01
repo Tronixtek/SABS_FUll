@@ -17,7 +17,7 @@ public abstract class BaseController {
     @Value("${device.port:10011}")
     private int devicePort;
     
-    @Value("${device.timeout:30000}")
+    @Value("${device.timeout:600000}")
     private int deviceTimeout;
     
     protected HostInfoDto hostInfo;  // Make it protected so subclasses can access it

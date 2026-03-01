@@ -272,7 +272,9 @@ const Employees = () => {
       toast.dismiss(loadingToast);
       console.error('Device fetch error:', error);
       
-      if (error.response?.status === 503) {
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error(`Request timed out. Device has ${devicePersons.length || 'many'} persons - this operation may take up to 10 minutes. Please wait and try again.`);
+      } else if (error.response?.status === 503) {
         toast.error('Java device service is unavailable. Please ensure it is running.');
       } else if (error.response?.data?.message) {
         toast.error(error.response.data.message);
