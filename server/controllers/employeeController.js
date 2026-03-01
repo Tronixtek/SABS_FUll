@@ -1870,25 +1870,72 @@ exports.getPhotosForDevicePersons = async (req, res) => {
 
     // Create a map of device SN (xo5PersonSn) to photo
     const photoMap = {};
+    const foundSns = new Set();
+    const employeesWithoutPhoto = [];
+    
     employees.forEach(emp => {
-      if (emp.profileImage && emp.biometricData?.xo5PersonSn) {
-        const deviceSn = emp.biometricData.xo5PersonSn;
-        photoMap[deviceSn] = {
-          employeeId: deviceSn,  // Use device SN as the key for matching
-          staffId: emp.staffId,
-          name: `${emp.firstName} ${emp.lastName}`,
-          photo: emp.profileImage
-        };
+      const deviceSn = emp.biometricData?.xo5PersonSn;
+      if (deviceSn) {
+        foundSns.add(deviceSn);
+        
+        if (emp.profileImage) {
+          photoMap[deviceSn] = {
+            employeeId: deviceSn,  // Use device SN as the key for matching
+            staffId: emp.staffId,
+            name: `${emp.firstName} ${emp.lastName}`,
+            photo: emp.profileImage
+          };
+        } else {
+          employeesWithoutPhoto.push({
+            deviceSn,
+            staffId: emp.staffId,
+            name: `${emp.firstName} ${emp.lastName}`
+          });
+        }
       }
     });
 
+    // Find which device persons were not found in MongoDB
+    const notFoundInDb = employeeIds.filter(id => !foundSns.has(id));
+    
+    console.log(`📊 Photo Fetch Summary:`);
+    console.log(`   Total requested: ${employeeIds.length}`);
+    console.log(`   Found in MongoDB: ${foundSns.size}`);
+    console.log(`   With photos: ${Object.keys(photoMap).length}`);
+    console.log(`   Without photos: ${employeesWithoutPhoto.length}`);
+    console.log(`   Not in database: ${notFoundInDb.length}`);
+    
+    if (employeesWithoutPhoto.length > 0) {
+      console.log(`\n⚠️  Employees in DB but no photo:`);
+      employeesWithoutPhoto.forEach(emp => {
+        console.log(`   - ${emp.name} (${emp.staffId}) [Device SN: ${emp.deviceSn}]`);
+      });
+    }
+    
+    if (notFoundInDb.length > 0) {
+      console.log(`\n⚠️  Device persons not enrolled in system (first 10):`, notFoundInDb.slice(0, 10));
+    }
+
     res.json({
       success: true,
-      message: `Retrieved photos for ${Object.keys(photoMap).length} employees`,
+      message: `Retrieved photos for ${Object.keys(photoMap).length} of ${employeeIds.length} device persons`,
       data: {
         photoMap,
         totalRequested: employeeIds.length,
-        totalFound: Object.keys(photoMap).length
+        totalFound: Object.keys(photoMap).length,
+        employeesWithoutPhoto: employeesWithoutPhoto.length,
+        notEnrolledInSystem: notFoundInDb.length,
+        details: {
+          employeesWithoutPhoto: employeesWithoutPhoto.map(emp => ({
+            name: emp.name,
+            staffId: emp.staffId,
+            reason: 'In database but no profile image uploaded'
+          })),
+          notEnrolledSample: notFoundInDb.slice(0, 10).map(sn => ({
+            deviceSn: sn,
+            reason: 'Person exists on device but not enrolled in web system'
+          }))
+        }
       }
     });
 

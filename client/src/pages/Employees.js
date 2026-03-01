@@ -317,8 +317,29 @@ const Employees = () => {
         });
 
         if (photoResponse.data.success) {
-          photoMap = photoResponse.data.data.photoMap;
-          console.log(`✅ Fetched ${Object.keys(photoMap).length} photos from MongoDB`);
+          const responseData = photoResponse.data.data;
+          photoMap = responseData.photoMap;
+          
+          console.log(`✅ Photo Fetch Results:`);
+          console.log(`   Total requested: ${responseData.totalRequested}`);
+          console.log(`   Photos found: ${responseData.totalFound}`);
+          console.log(`   Without photos: ${responseData.employeesWithoutPhoto || 0}`);
+          console.log(`   Not enrolled: ${responseData.notEnrolledInSystem || 0}`);
+          
+          // Show warning if some photos are missing
+          if (responseData.totalFound < responseData.totalRequested) {
+            const missingCount = responseData.totalRequested - responseData.totalFound;
+            console.warn(`⚠️  ${missingCount} photos missing from PDF`);
+            
+            if (responseData.details) {
+              if (responseData.details.employeesWithoutPhoto?.length > 0) {
+                console.log('   Employees without photos:', responseData.details.employeesWithoutPhoto);
+              }
+              if (responseData.details.notEnrolledSample?.length > 0) {
+                console.log('   Not enrolled in system:', responseData.details.notEnrolledSample);
+              }
+            }
+          }
         }
       }
 
@@ -418,7 +439,17 @@ const Employees = () => {
       const fileName = `device-registry-${facilityName.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
       doc.save(fileName);
       
-      toast.success('PDF exported successfully', { id: loadingToast });
+      const photosIncluded = Object.keys(photoMap).length;
+      const personsWithPhotos = devicePersons.filter(p => p.hasPhoto).length;
+      
+      if (photosIncluded === personsWithPhotos) {
+        toast.success(`PDF exported successfully with all ${photosIncluded} photos`, { id: loadingToast });
+      } else {
+        toast.success(
+          `PDF exported: ${photosIncluded} of ${personsWithPhotos} photos included. Check console for missing photo details.`, 
+          { id: loadingToast, duration: 6000 }
+        );
+      }
     } catch (error) {
       console.error('PDF export error:', error);
       console.error('Error details:', error.message, error.stack);
