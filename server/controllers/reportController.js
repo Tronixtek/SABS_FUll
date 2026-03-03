@@ -1084,7 +1084,7 @@ exports.generatePDFReport = async (req, res) => {
         }
         
         // Draw facility name header
-        doc.fontSize(12).fillColor('blue').text(`📍 ${facilityGroup.name}`, 50, yPosition);
+        doc.fontSize(12).fillColor('blue').text(`FACILITY: ${facilityGroup.name}`, 50, yPosition);
         yPosition += 20;
         
         // Draw table headers
@@ -1131,7 +1131,7 @@ exports.generatePDFReport = async (req, res) => {
             yPosition = 50;
             
             // Redraw facility name and table headers on new page
-            doc.fontSize(12).fillColor('blue').text(`📍 ${facilityGroup.name} (continued)`, 50, yPosition);
+            doc.fontSize(12).fillColor('blue').text(`FACILITY: ${facilityGroup.name} (continued)`, 50, yPosition);
             yPosition += 20;
             
             xPosition = 50;
