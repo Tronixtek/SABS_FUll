@@ -752,14 +752,23 @@ exports.generatePDFReport = async (req, res) => {
       // Calculate working days in the month (excluding weekends - approximation)
       const daysInMonth = moment(`${reportYear}-${reportMonth}-01`).daysInMonth();
       const workingDaysApprox = Math.floor(daysInMonth * (5/7)); // Approximate 5 working days per week
-      const standardHoursPerDay = 8; // Standard 8-hour workday
-      const expectedTotalHours = totalEmployees * workingDaysApprox * standardHoursPerDay;
+      
+      // Fetch all employees with their shift data to calculate expected hours
+      const employeesWithShifts = await Employee.find(employeeFilter)
+        .populate('shift', 'workingHours')
+        .lean();
+      
+      // Calculate expected hours based on each employee's shift working hours
+      const expectedTotalHours = employeesWithShifts.reduce((total, emp) => {
+        const shiftHours = emp.shift?.workingHours || 8; // Fallback to 8 hours if shift not defined
+        return total + (shiftHours * workingDaysApprox);
+      }, 0);
       
       reportData = {
         statistics,
         records: finalRecords,
         totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
-        expectedTotalHours: expectedTotalHours,
+        expectedTotalHours: Math.round(expectedTotalHours * 100) / 100,
         workingDays: workingDaysApprox
       };
       
