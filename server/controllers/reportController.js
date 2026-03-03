@@ -729,7 +729,11 @@ exports.generatePDFReport = async (req, res) => {
       const daysInMonth = moment(`${reportYear}-${reportMonth}-01`).daysInMonth();
       
       // Fetch all employees with their shift data to calculate expected working days
-      const employeeFilter = { status: 'active' };
+      // Include ALL employees who had attendance, not just active ones
+      const employeeIdsInRecords = finalRecords.map(r => r.employee._id);
+      const employeeFilter = { 
+        _id: { $in: employeeIdsInRecords }
+      };
       if (facility) employeeFilter.facility = facility;
       
       const employeesWithShifts = await Employee.find(employeeFilter)
@@ -761,6 +765,20 @@ exports.generatePDFReport = async (req, res) => {
         const attendedDays = record.attendance.present + record.attendance.excused;
         const actualAbsentDays = Math.max(0, expectedWorkingDays - attendedDays);
         
+        // Debug logging for first employee
+        if (finalRecords.indexOf(record) === 0) {
+          console.log(`📊 Absent Days Calculation (First Employee):`, {
+            employeeId: record.employee.employeeId,
+            name: `${record.employee.firstName} ${record.employee.lastName}`,
+            workingDaysPerWeek,
+            expectedWorkingDays,
+            presentDays: record.attendance.present,
+            excusedDays: record.attendance.excused,
+            attendedDays,
+            actualAbsentDays
+          });
+        }
+        
         // Update the record with corrected values
         record.attendance.totalDays = expectedWorkingDays;
         record.attendance.absent = actualAbsentDays;
@@ -774,46 +792,12 @@ exports.generatePDFReport = async (req, res) => {
         record.attendance.totalOvertime = Math.round(record.attendance.totalOvertime * 100) / 100;
       });
       
-      // Add employees who have no attendance records at all in the month
-      employeesWithShifts.forEach(emp => {
-        const employeeId = emp._id.toString();
-        if (!employeeSummary.has(employeeId)) {
-          // Calculate expected working days for this employee
-          let workingDaysPerWeek = 7;
-          if (emp.shift?.workingDays && emp.shift.workingDays.length > 0) {
-            workingDaysPerWeek = emp.shift.workingDays.length;
-          }
-          
-          const weeksInMonth = daysInMonth / 7;
-          const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInMonth);
-          
-          // Add employee with all days marked as absent
-          finalRecords.push({
-            employee: {
-              _id: emp._id,
-              employeeId: emp.employeeId,
-              firstName: emp.firstName,
-              lastName: emp.lastName,
-              department: emp.department,
-              designation: emp.designation
-            },
-            facility: emp.facility,
-            attendance: {
-              totalDays: expectedWorkingDays,
-              present: 0,
-              absent: expectedWorkingDays,
-              late: 0,
-              excused: 0,
-              totalWorkHours: 0,
-              totalOvertime: 0,
-              attendancePercentage: 0
-            }
-          });
-        }
-      });
-      
-      // Get total employees for the facility
-      const totalEmployees = await Employee.countDocuments(employeeFilter);
+      // Note: Employees with NO attendance records in the month are not included in PDF
+      // This is intentional - the PDF shows actual recorded attendance      
+      // Get total employees for the facility (active employees only for statistics)
+      const statsEmployeeFilter = { status: 'active' };
+      if (facility) statsEmployeeFilter.facility = facility;
+      const totalEmployees = await Employee.countDocuments(statsEmployeeFilter);
       
       // Calculate statistics based on summary type
       const statistics = calculateStatistics(aggregatedRecords, totalEmployees, summaryType);
