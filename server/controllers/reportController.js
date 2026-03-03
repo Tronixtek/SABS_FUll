@@ -907,10 +907,10 @@ exports.generatePDFReport = async (req, res) => {
       
       if (type === 'monthly') {
         tableHeaders = ['ID', 'Name', 'Dept', 'Present', 'Late', 'Absent', 'Hours', 'Attend%'];
-        columnWidths = [50, 100, 70, 45, 45, 45, 50, 50]; // Total: 455px
+        columnWidths = [45, 120, 65, 43, 43, 43, 48, 48]; // Total: 455px (wider name column)
       } else {
         tableHeaders = ['ID', 'Name', 'Dept', 'Check In', 'Check Out', 'Hours', 'Status'];
-        columnWidths = [50, 105, 70, 60, 60, 50, 50]; // Total: 445px (widened time columns for AM/PM)
+        columnWidths = [45, 120, 65, 60, 60, 45, 50]; // Total: 445px (wider name column)
       }
       
       let xPosition = 50;
@@ -939,8 +939,8 @@ exports.generatePDFReport = async (req, res) => {
           // Monthly report shows aggregate data
           rowData = [
             record.employee?.employeeId || '-',
-            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim().substring(0, 15) || '-',
-            record.employee?.department?.substring(0, 10) || '-',
+            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim() || '-',
+            record.employee?.department || '-',
             record.attendance?.present || '0',
             record.attendance?.late || '0',
             record.attendance?.absent || '0',
@@ -951,8 +951,8 @@ exports.generatePDFReport = async (req, res) => {
           // Daily/custom reports show daily data
           rowData = [
             record.employee?.employeeId || '-',
-            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim().substring(0, 15) || '-',
-            record.employee?.department?.substring(0, 10) || '-',
+            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim() || '-',
+            record.employee?.department || '-',
             record.checkIn?.time ? moment(record.checkIn.time).format('hh:mm A') : '-',
             record.checkOut?.time ? moment(record.checkOut.time).format('hh:mm A') : '-',
             record.workHours ? `${record.workHours.toFixed(1)}h` : '-',
