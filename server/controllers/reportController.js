@@ -251,7 +251,7 @@ const aggregateAttendanceRecords = (rawRecords) => {
 // @access  Private
 exports.getDailyReport = async (req, res) => {
   try {
-    const { date, facility } = req.query;
+    const { date, facility, summaryType = 'unique' } = req.query;
     const reportDate = date ? new Date(date) : new Date();
     
     const matchFilter = {
@@ -299,22 +299,14 @@ exports.getDailyReport = async (req, res) => {
       e => !attendedEmployeeIds.includes(e._id.toString())
     );
 
-    // Calculate statistics
-    const stats = {
-      totalEmployees: allEmployees.length,
-      present: attendanceRecords.filter(a => ['present', 'late', 'excused'].includes(a.status)).length,
-      absent: absentEmployees.length,
-      late: attendanceRecords.filter(a => a.status === 'late').length,
-      excused: attendanceRecords.filter(a => a.status === 'excused').length,
-      incomplete: attendanceRecords.filter(a => a.status === 'incomplete').length,
-      halfDay: attendanceRecords.filter(a => a.status === 'half-day').length
-    };
+    // Calculate statistics using the new calculateStatistics function
+    const statistics = calculateStatistics(attendanceRecords, allEmployees.length, summaryType);
 
     res.json({
       success: true,
       data: {
         date: reportDate,
-        statistics: stats,
+        statistics,
         records: attendanceRecords,
         absentEmployees: absentEmployees.map(emp => ({
           _id: emp._id,
