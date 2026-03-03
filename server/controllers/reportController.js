@@ -586,6 +586,14 @@ exports.getCustomReport = async (req, res) => {
 };
 
 // @desc    Generate PDF report
+// Helper function to capitalize names properly
+const toProperCase = (str) => {
+  if (!str) return '';
+  return str.split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  ).join(' ');
+};
+
 // @route   GET /api/reports/pdf
 // @access  Private
 exports.generatePDFReport = async (req, res) => {
@@ -716,6 +724,17 @@ exports.generatePDFReport = async (req, res) => {
       });
       
       const finalRecords = Array.from(employeeSummary.values());
+      
+      // Calculate attendance percentages for each employee
+      finalRecords.forEach(record => {
+        const totalWorkingDays = record.attendance.totalDays;
+        const presentDays = record.attendance.present;
+        record.attendance.attendancePercentage = totalWorkingDays > 0 
+          ? Math.round((presentDays / totalWorkingDays) * 100 * 100) / 100 
+          : 0;
+        record.attendance.totalWorkHours = Math.round(record.attendance.totalWorkHours * 100) / 100;
+        record.attendance.totalOvertime = Math.round(record.attendance.totalOvertime * 100) / 100;
+      });
       
       // Get total employees for the facility
       const employeeFilter = { status: 'active' };
@@ -920,11 +939,11 @@ exports.generatePDFReport = async (req, res) => {
       let tableHeaders, columnWidths;
       
       if (type === 'monthly') {
-        tableHeaders = ['ID', 'Name', 'Dept', 'Present', 'Late', 'Absent', 'Hours', 'Attend%'];
-        columnWidths = [45, 120, 65, 43, 43, 43, 48, 48]; // Total: 455px (wider name column)
+        tableHeaders = ['S/N', 'ID', 'Name', 'Dept', 'Present', 'Late', 'Absent', 'Hours', 'Attend%'];
+        columnWidths = [30, 45, 110, 60, 38, 38, 38, 45, 45]; // Total: 449px
       } else {
-        tableHeaders = ['ID', 'Name', 'Dept', 'Check In', 'Check Out', 'Hours', 'Status'];
-        columnWidths = [45, 120, 65, 60, 60, 45, 50]; // Total: 445px (wider name column)
+        tableHeaders = ['S/N', 'ID', 'Name', 'Dept', 'Check In', 'Check Out', 'Hours', 'Status'];
+        columnWidths = [30, 45, 105, 60, 58, 58, 42, 47]; // Total: 445px
       }
       
       let xPosition = 50;
@@ -951,10 +970,12 @@ exports.generatePDFReport = async (req, res) => {
         let rowData;
         if (type === 'monthly') {
           // Monthly report shows aggregate data
+          const fullName = `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim();
           rowData = [
+            (index + 1).toString(),
             record.employee?.employeeId || '-',
-            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim() || '-',
-            record.employee?.department || '-',
+            toProperCase(fullName) || '-',
+            toProperCase(record.employee?.department) || '-',
             record.attendance?.present || '0',
             record.attendance?.late || '0',
             record.attendance?.absent || '0',
@@ -963,10 +984,12 @@ exports.generatePDFReport = async (req, res) => {
           ];
         } else {
           // Daily/custom reports show daily data
+          const fullName = `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim();
           rowData = [
+            (index + 1).toString(),
             record.employee?.employeeId || '-',
-            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim() || '-',
-            record.employee?.department || '-',
+            toProperCase(fullName) || '-',
+            toProperCase(record.employee?.department) || '-',
             record.checkIn?.time ? moment(record.checkIn.time).format('hh:mm A') : '-',
             record.checkOut?.time ? moment(record.checkOut.time).format('hh:mm A') : '-',
             record.workHours ? `${record.workHours.toFixed(1)}h` : '-',
@@ -1012,7 +1035,7 @@ exports.generatePDFReport = async (req, res) => {
       });
     }
     
-    // Add absent employees if any
+    // Add absent employees table if any (daily reports only)
     if (reportData.absentEmployees && reportData.absentEmployees.length > 0) {
       yPosition += 30;
       
@@ -1024,16 +1047,68 @@ exports.generatePDFReport = async (req, res) => {
       doc.fontSize(14).fillColor('red').text('Absent Employees', 50, yPosition);
       yPosition += 25;
       
-      console.log(`📝 Writing ${reportData.absentEmployees.length} absent employees to PDF...`);
+      console.log(`📝 Writing ${reportData.absentEmployees.length} absent employees to PDF table...`);
       
-      reportData.absentEmployees.forEach((employee) => {
-        const employeeName = `${employee.employeeId} - ${employee.firstName} ${employee.lastName} (${employee.department || 'N/A'})`;
-        doc.fontSize(10).fillColor('black').text(employeeName, 70, yPosition);
+      // Table headers for absent employees
+      const absentHeaders = ['S/N', 'ID', 'Name', 'Department', 'Facility'];
+      const absentColumnWidths = [30, 50, 150, 120, 95]; // Total: 445px
+      let xPosition = 50;
+      
+      // Draw header row
+      doc.fontSize(9).fillColor('black');
+      absentHeaders.forEach((header, i) => {
+        doc.rect(xPosition, yPosition, absentColumnWidths[i], 20).stroke();
+        doc.text(header, xPosition + 3, yPosition + 5, {
+          width: absentColumnWidths[i] - 6,
+          align: 'center',
+          ellipsis: true
+        });
+        xPosition += absentColumnWidths[i];
+      });
+      yPosition += 20;
+      
+      // Draw data rows for absent employees
+      reportData.absentEmployees.forEach((employee, index) => {
+        xPosition = 50;
+        const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
+        const absentRowData = [
+          (index + 1).toString(),
+          employee.employeeId || '-',
+          toProperCase(fullName) || '-',
+          toProperCase(employee.department) || '-',
+          employee.facility?.name || '-'
+        ];
+        
+        absentRowData.forEach((text, i) => {
+          doc.rect(xPosition, yPosition, absentColumnWidths[i], 15).stroke();
+          doc.fontSize(8).text(String(text), xPosition + 2, yPosition + 2, {
+            width: absentColumnWidths[i] - 4,
+            height: 15,
+            ellipsis: true,
+            lineBreak: false
+          });
+          xPosition += absentColumnWidths[i];
+        });
         yPosition += 15;
         
-        if (yPosition > 720) {
+        // Check if we need a new page
+        if (yPosition > 700) {
           doc.addPage();
           yPosition = 50;
+          
+          // Redraw table headers on new page
+          xPosition = 50;
+          doc.fontSize(9).fillColor('black');
+          absentHeaders.forEach((header, i) => {
+            doc.rect(xPosition, yPosition, absentColumnWidths[i], 20).stroke();
+            doc.text(header, xPosition + 3, yPosition + 5, {
+              width: absentColumnWidths[i] - 6,
+              align: 'center',
+              ellipsis: true
+            });
+            xPosition += absentColumnWidths[i];
+          });
+          yPosition += 20;
         }
       });
     }
