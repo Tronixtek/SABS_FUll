@@ -635,6 +635,7 @@ exports.getDashboardAnalytics = async (req, res) => {
           todayOvertime: todayStats.totalOvertime,
           // Add period statistics based on summaryType
           periodPresent: periodStats.present,
+          periodOnTime: periodStats.onTime,
           periodAbsent: periodStats.absent,
           periodLate: periodStats.late,
           periodExcused: periodStats.excused,

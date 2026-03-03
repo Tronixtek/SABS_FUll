@@ -557,6 +557,25 @@ const Reports = () => {
             </div>
           </div>
 
+          <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-teal-50 to-teal-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs sm:text-sm text-teal-600 font-medium">On-time</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-teal-700 mt-1">
+                  {reportData.statistics?.onTime || 0}
+                </p>
+                {reportData.statistics?.totalEmployees > 0 && (
+                  <p className="text-xs text-teal-600 mt-1">
+                    {((reportData.statistics.onTime / reportData.statistics.totalEmployees) * 100).toFixed(1)}%
+                  </p>
+                )}
+              </div>
+              <div className="p-2 sm:p-3 bg-teal-200 rounded-full flex-shrink-0 ml-2">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-teal-700" />
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-4 lg:p-6 border border-gray-100 bg-gradient-to-br from-yellow-50 to-yellow-100">
             <div className="flex items-center justify-between">
               <div className="flex-1">

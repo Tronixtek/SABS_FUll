@@ -157,6 +157,7 @@ const Analytics = () => {
       present: 0,
       absent: 0,
       late: 0,
+      onTime: 0,
       totalWorkHours: 0,
       totalOvertime: 0,
       excused: 0,
@@ -168,6 +169,7 @@ const Analytics = () => {
       stats.present = dashboardData.summary.periodPresent || 0;
       stats.absent = dashboardData.summary.periodAbsent || 0;
       stats.late = dashboardData.summary.periodLate || 0;
+      stats.onTime = dashboardData.summary.periodOnTime || 0;
       stats.excused = dashboardData.summary.periodExcused || 0;
       stats.incomplete = dashboardData.summary.periodIncomplete || 0;
       
@@ -478,10 +480,14 @@ const Analytics = () => {
               <Calendar className="w-6 h-6 text-blue-600" />
               Month Statistics
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <p className="text-sm text-gray-600">Present Days</p>
                 <p className="text-2xl font-bold text-green-600">{monthStats.present}</p>
+              </div>
+              <div className="text-center p-4 bg-teal-50 rounded-lg">
+                <p className="text-sm text-gray-600">On-time Days</p>
+                <p className="text-2xl font-bold text-teal-600">{monthStats.onTime}</p>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
                 <p className="text-sm text-gray-600">Late Days</p>
