@@ -1047,69 +1047,110 @@ exports.generatePDFReport = async (req, res) => {
       doc.fontSize(14).fillColor('red').text('Absent Employees', 50, yPosition);
       yPosition += 25;
       
-      console.log(`📝 Writing ${reportData.absentEmployees.length} absent employees to PDF table...`);
+      console.log(`📝 Writing ${reportData.absentEmployees.length} absent employees to PDF table (grouped by facility)...`);
+      
+      // Group absent employees by facility
+      const absentByFacility = reportData.absentEmployees.reduce((groups, employee) => {
+        const facilityId = employee.facility?._id?.toString() || 'no-facility';
+        const facilityName = employee.facility?.name || 'No Facility Assigned';
+        
+        if (!groups[facilityId]) {
+          groups[facilityId] = {
+            name: facilityName,
+            employees: []
+          };
+        }
+        groups[facilityId].employees.push(employee);
+        return groups;
+      }, {});
+      
+      // Sort facilities by name
+      const facilitiesData = Object.values(absentByFacility).sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
       
       // Table headers for absent employees
-      const absentHeaders = ['S/N', 'ID', 'Name', 'Department', 'Facility'];
-      const absentColumnWidths = [30, 50, 150, 120, 95]; // Total: 445px
-      let xPosition = 50;
+      const absentHeaders = ['S/N', 'ID', 'Name', 'Department'];
+      const absentColumnWidths = [30, 60, 180, 175]; // Total: 445px (removed Facility column)
       
-      // Draw header row
-      doc.fontSize(9).fillColor('black');
-      absentHeaders.forEach((header, i) => {
-        doc.rect(xPosition, yPosition, absentColumnWidths[i], 20).stroke();
-        doc.text(header, xPosition + 3, yPosition + 5, {
-          width: absentColumnWidths[i] - 6,
-          align: 'center',
-          ellipsis: true
-        });
-        xPosition += absentColumnWidths[i];
-      });
-      yPosition += 20;
+      let globalSerialNumber = 1;
       
-      // Draw data rows for absent employees
-      reportData.absentEmployees.forEach((employee, index) => {
-        xPosition = 50;
-        const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
-        const absentRowData = [
-          (index + 1).toString(),
-          employee.employeeId || '-',
-          toProperCase(fullName) || '-',
-          toProperCase(employee.department) || '-',
-          employee.facility?.name || '-'
-        ];
+      // Draw each facility section
+      facilitiesData.forEach((facilityGroup, facilityIndex) => {
+        // Check if we need a new page for facility header
+        if (yPosition > 680) {
+          doc.addPage();
+          yPosition = 50;
+        }
         
-        absentRowData.forEach((text, i) => {
-          doc.rect(xPosition, yPosition, absentColumnWidths[i], 15).stroke();
-          doc.fontSize(8).text(String(text), xPosition + 2, yPosition + 2, {
-            width: absentColumnWidths[i] - 4,
-            height: 15,
-            ellipsis: true,
-            lineBreak: false
+        // Draw facility name header
+        doc.fontSize(12).fillColor('blue').text(`📍 ${facilityGroup.name}`, 50, yPosition);
+        yPosition += 20;
+        
+        // Draw table headers
+        let xPosition = 50;
+        doc.fontSize(9).fillColor('black');
+        absentHeaders.forEach((header, i) => {
+          doc.rect(xPosition, yPosition, absentColumnWidths[i], 20).stroke();
+          doc.text(header, xPosition + 3, yPosition + 5, {
+            width: absentColumnWidths[i] - 6,
+            align: 'center',
+            ellipsis: true
           });
           xPosition += absentColumnWidths[i];
         });
-        yPosition += 15;
+        yPosition += 20;
         
-        // Check if we need a new page
-        if (yPosition > 700) {
-          doc.addPage();
-          yPosition = 50;
-          
-          // Redraw table headers on new page
+        // Draw employees for this facility
+        facilityGroup.employees.forEach((employee) => {
           xPosition = 50;
-          doc.fontSize(9).fillColor('black');
-          absentHeaders.forEach((header, i) => {
-            doc.rect(xPosition, yPosition, absentColumnWidths[i], 20).stroke();
-            doc.text(header, xPosition + 3, yPosition + 5, {
-              width: absentColumnWidths[i] - 6,
-              align: 'center',
-              ellipsis: true
+          const fullName = `${employee.firstName || ''} ${employee.lastName || ''}`.trim();
+          const absentRowData = [
+            globalSerialNumber.toString(),
+            employee.employeeId || '-',
+            toProperCase(fullName) || '-',
+            toProperCase(employee.department) || '-'
+          ];
+          
+          absentRowData.forEach((text, i) => {
+            doc.rect(xPosition, yPosition, absentColumnWidths[i], 15).stroke();
+            doc.fontSize(8).text(String(text), xPosition + 2, yPosition + 2, {
+              width: absentColumnWidths[i] - 4,
+              height: 15,
+              ellipsis: true,
+              lineBreak: false
             });
             xPosition += absentColumnWidths[i];
           });
-          yPosition += 20;
-        }
+          yPosition += 15;
+          globalSerialNumber++;
+          
+          // Check if we need a new page
+          if (yPosition > 700) {
+            doc.addPage();
+            yPosition = 50;
+            
+            // Redraw facility name and table headers on new page
+            doc.fontSize(12).fillColor('blue').text(`📍 ${facilityGroup.name} (continued)`, 50, yPosition);
+            yPosition += 20;
+            
+            xPosition = 50;
+            doc.fontSize(9).fillColor('black');
+            absentHeaders.forEach((header, i) => {
+              doc.rect(xPosition, yPosition, absentColumnWidths[i], 20).stroke();
+              doc.text(header, xPosition + 3, yPosition + 5, {
+                width: absentColumnWidths[i] - 6,
+                align: 'center',
+                ellipsis: true
+              });
+              xPosition += absentColumnWidths[i];
+            });
+            yPosition += 20;
+          }
+        });
+        
+        // Add spacing between facilities
+        yPosition += 15;
       });
     }
     
