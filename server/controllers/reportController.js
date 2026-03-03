@@ -38,6 +38,10 @@ const calculateStatistics = (records, totalEmployees, summaryType = 'unique') =>
         uniqueExcused.add(employeeId);
         uniquePresent.add(employeeId);
       }
+      if (status === 'incomplete') {
+        uniqueIncomplete.add(employeeId);
+        uniquePresent.add(employeeId);  // Incomplete means they checked in, so they showed up
+      }
       if (status === 'absent') {
         uniqueAbsent.add(employeeId);
       }
@@ -46,9 +50,6 @@ const calculateStatistics = (records, totalEmployees, summaryType = 'unique') =>
       }
       if (status === 'on-leave') {
         uniqueOnLeave.add(employeeId);
-      }
-      if (status === 'incomplete') {
-        uniqueIncomplete.add(employeeId);
       }
     });
 
@@ -100,14 +101,15 @@ const calculateStatistics = (records, totalEmployees, summaryType = 'unique') =>
       } else if (status === 'excused') {
         dateGroups[dateKey].excused++;
         if (employeeId) dateGroups[dateKey].employeesPresent.add(employeeId);
+      } else if (status === 'incomplete') {
+        dateGroups[dateKey].incomplete++;
+        if (employeeId) dateGroups[dateKey].employeesPresent.add(employeeId);  // They showed up
       } else if (status === 'absent') {
         dateGroups[dateKey].absent++;
       } else if (status === 'half-day') {
         dateGroups[dateKey].halfDay++;
       } else if (status === 'on-leave') {
         dateGroups[dateKey].onLeave++;
-      } else if (status === 'incomplete') {
-        dateGroups[dateKey].incomplete++;
       }
     });
 
