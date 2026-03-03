@@ -196,7 +196,7 @@ const Reports = () => {
           ...(filters.facility && { facility: filters.facility })
         });
 
-        const response = await fetch(`/api/reports/payroll-pdf?${params.toString()}`, {
+        const response = await fetch(`${API_URL}/api/reports/payroll-pdf?${params.toString()}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -232,7 +232,7 @@ const Reports = () => {
       });
 
       // Make request to server-side PDF generation
-      const response = await fetch(`/api/reports/pdf?${params.toString()}`, {
+      const response = await fetch(`${API_URL}/api/reports/pdf?${params.toString()}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}` // Add auth if needed
