@@ -867,13 +867,27 @@ exports.generatePDFReport = async (req, res) => {
     
     // Add header
     doc.fontSize(20).text('SABS Attendance System', 50, 50);
-    doc.fontSize(16).text(reportTitle, 50, 80);
-    doc.fontSize(10).text(`Generated: ${moment().format('MMM DD, YYYY hh:mm A')}`, 50, 105);
     
-    // Add line
-    doc.moveTo(50, 125).lineTo(550, 125).stroke();
+    // Report title with word wrap (may span multiple lines)
+    const titleY = 80;
+    doc.fontSize(14).text(reportTitle, 50, titleY, {
+      width: 495, // A4 width minus margins
+      align: 'left',
+      lineGap: 3
+    });
     
-    let yPosition = 150;
+    // Calculate where title ended (account for potential wrapping)
+    const titleLines = Math.ceil(doc.widthOfString(reportTitle) / 495) || 1;
+    const titleHeight = titleLines * 17; // ~17px per line at font size 14
+    const generatedY = titleY + titleHeight + 5;
+    
+    doc.fontSize(10).text(`Generated: ${moment().format('MMM DD, YYYY hh:mm A')}`, 50, generatedY);
+    
+    // Add line below header
+    const lineY = generatedY + 20;
+    doc.moveTo(50, lineY).lineTo(545, lineY).stroke();
+    
+    let yPosition = lineY + 25;
     
     // Add statistics
     doc.fontSize(14).text('Summary Statistics', 50, yPosition);
