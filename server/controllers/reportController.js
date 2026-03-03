@@ -779,8 +779,10 @@ exports.generatePDFReport = async (req, res) => {
       });
       yPosition += 20;
       
-      // Draw data rows
-      reportData.records.slice(0, 25).forEach((record) => { // Limit to 25 records for PDF
+      console.log(`📝 Writing ${reportData.records.length} attendance records to PDF...`);
+      
+      // Draw data rows - show all records
+      reportData.records.forEach((record, index) => {
         xPosition = 50;
         const rowData = [
           record.employee?.employeeId || '-',
@@ -803,6 +805,16 @@ exports.generatePDFReport = async (req, res) => {
         if (yPosition > 700) {
           doc.addPage();
           yPosition = 50;
+          
+          // Redraw table headers on new page
+          xPosition = 50;
+          doc.fontSize(9).fillColor('black');
+          tableHeaders.forEach((header, i) => {
+            doc.rect(xPosition, yPosition, columnWidths[i], 20).stroke();
+            doc.text(header, xPosition + 5, yPosition + 5);
+            xPosition += columnWidths[i];
+          });
+          yPosition += 20;
         }
       });
     }
@@ -819,7 +831,9 @@ exports.generatePDFReport = async (req, res) => {
       doc.fontSize(14).fillColor('red').text('Absent Employees', 50, yPosition);
       yPosition += 25;
       
-      reportData.absentEmployees.slice(0, 15).forEach((employee) => { // Limit absent list
+      console.log(`📝 Writing ${reportData.absentEmployees.length} absent employees to PDF...`);
+      
+      reportData.absentEmployees.forEach((employee) => {
         const employeeName = `${employee.employeeId} - ${employee.firstName} ${employee.lastName} (${employee.department || 'N/A'})`;
         doc.fontSize(10).fillColor('black').text(employeeName, 70, yPosition);
         yPosition += 15;
