@@ -902,14 +902,15 @@ exports.generatePDFReport = async (req, res) => {
       yPosition += 25;
       
       // Table headers - different for monthly vs daily reports
+      // A4 portrait: 595px width - 100px margins = 495px available
       let tableHeaders, columnWidths;
       
       if (type === 'monthly') {
-        tableHeaders = ['ID', 'Name', 'Dept', 'Present', 'Late', 'Absent', 'Work Hrs', 'Attend%'];
-        columnWidths = [60, 120, 80, 55, 55, 55, 60, 55];
+        tableHeaders = ['ID', 'Name', 'Dept', 'Present', 'Late', 'Absent', 'Hours', 'Attend%'];
+        columnWidths = [50, 100, 70, 45, 45, 45, 50, 50]; // Total: 455px
       } else {
         tableHeaders = ['ID', 'Name', 'Dept', 'Check In', 'Check Out', 'Hours', 'Status'];
-        columnWidths = [60, 120, 80, 70, 70, 60, 70];
+        columnWidths = [50, 110, 75, 55, 55, 50, 50]; // Total: 445px
       }
       
       let xPosition = 50;
@@ -918,7 +919,11 @@ exports.generatePDFReport = async (req, res) => {
       doc.fontSize(9).fillColor('black');
       tableHeaders.forEach((header, i) => {
         doc.rect(xPosition, yPosition, columnWidths[i], 20).stroke();
-        doc.text(header, xPosition + 5, yPosition + 5);
+        doc.text(header, xPosition + 3, yPosition + 5, {
+          width: columnWidths[i] - 6,
+          align: 'center',
+          ellipsis: true
+        });
         xPosition += columnWidths[i];
       });
       yPosition += 20;
@@ -956,8 +961,17 @@ exports.generatePDFReport = async (req, res) => {
         }
         
         rowData.forEach((text, i) => {
+          // Draw cell border
           doc.rect(xPosition, yPosition, columnWidths[i], 15).stroke();
-          doc.fontSize(8).text(text, xPosition + 2, yPosition + 2);
+          
+          // Draw text with clipping to prevent overflow
+          doc.fontSize(8).text(String(text), xPosition + 2, yPosition + 2, {
+            width: columnWidths[i] - 4,
+            height: 15,
+            ellipsis: true,
+            lineBreak: false
+          });
+          
           xPosition += columnWidths[i];
         });
         yPosition += 15;
@@ -972,7 +986,11 @@ exports.generatePDFReport = async (req, res) => {
           doc.fontSize(9).fillColor('black');
           tableHeaders.forEach((header, i) => {
             doc.rect(xPosition, yPosition, columnWidths[i], 20).stroke();
-            doc.text(header, xPosition + 5, yPosition + 5);
+            doc.text(header, xPosition + 3, yPosition + 5, {
+              width: columnWidths[i] - 6,
+              align: 'center',
+              ellipsis: true
+            });
             xPosition += columnWidths[i];
           });
           yPosition += 20;
