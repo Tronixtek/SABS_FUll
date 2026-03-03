@@ -749,27 +749,53 @@ exports.generatePDFReport = async (req, res) => {
         sum + (record.attendance.totalWorkHours || 0), 0
       );
       
-      // Calculate working days in the month (excluding weekends - approximation)
+      // Calculate days in the month
       const daysInMonth = moment(`${reportYear}-${reportMonth}-01`).daysInMonth();
-      const workingDaysApprox = Math.floor(daysInMonth * (5/7)); // Approximate 5 working days per week
       
       // Fetch all employees with their shift data to calculate expected hours
       const employeesWithShifts = await Employee.find(employeeFilter)
-        .populate('shift', 'workingHours')
+        .populate('shift', 'workingHours workingDays')
         .lean();
       
-      // Calculate expected hours based on each employee's shift working hours
+      // Calculate expected hours based on each employee's shift working hours and working days
       const expectedTotalHours = employeesWithShifts.reduce((total, emp) => {
         const shiftHours = emp.shift?.workingHours || 8; // Fallback to 8 hours if shift not defined
-        return total + (shiftHours * workingDaysApprox);
+        
+        // Calculate working days per week based on shift schedule
+        // For healthcare facilities (PHC), shifts often work 6-7 days per week
+        let workingDaysPerWeek = 7; // Default: assume 7-day operations (healthcare context)
+        
+        if (emp.shift?.workingDays && emp.shift.workingDays.length > 0) {
+          // Use actual scheduled working days from shift
+          workingDaysPerWeek = emp.shift.workingDays.length;
+        }
+        
+        // Calculate expected working days in the month for this employee
+        const weeksInMonth = daysInMonth / 7;
+        const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInMonth);
+        
+        return total + (shiftHours * expectedWorkingDays);
       }, 0);
+      
+      // Calculate average working days for display (weighted average based on employees)
+      const totalExpectedDays = employeesWithShifts.reduce((total, emp) => {
+        let workingDaysPerWeek = 7;
+        if (emp.shift?.workingDays && emp.shift.workingDays.length > 0) {
+          workingDaysPerWeek = emp.shift.workingDays.length;
+        }
+        const weeksInMonth = daysInMonth / 7;
+        return total + Math.floor(workingDaysPerWeek * weeksInMonth);
+      }, 0);
+      const avgWorkingDays = employeesWithShifts.length > 0 
+        ? Math.round(totalExpectedDays / employeesWithShifts.length) 
+        : Math.floor(daysInMonth * (6/7)); // Fallback to 6-day week for healthcare
       
       reportData = {
         statistics,
         records: finalRecords,
         totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
         expectedTotalHours: Math.round(expectedTotalHours * 100) / 100,
-        workingDays: workingDaysApprox
+        workingDays: avgWorkingDays
       };
       
       reportTitle = `Monthly Attendance Report - ${moment(`${reportYear}-${reportMonth}-01`).format('MMMM YYYY')}`;
