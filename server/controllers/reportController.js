@@ -901,9 +901,17 @@ exports.generatePDFReport = async (req, res) => {
       doc.fontSize(14).text('Attendance Records', 50, yPosition);
       yPosition += 25;
       
-      // Table headers
-      const tableHeaders = ['ID', 'Name', 'Dept', 'Check In', 'Check Out', 'Hours', 'Status'];
-      const columnWidths = [60, 120, 80, 70, 70, 60, 70];
+      // Table headers - different for monthly vs daily reports
+      let tableHeaders, columnWidths;
+      
+      if (type === 'monthly') {
+        tableHeaders = ['ID', 'Name', 'Dept', 'Present', 'Late', 'Absent', 'Work Hrs', 'Attend%'];
+        columnWidths = [60, 120, 80, 55, 55, 55, 60, 55];
+      } else {
+        tableHeaders = ['ID', 'Name', 'Dept', 'Check In', 'Check Out', 'Hours', 'Status'];
+        columnWidths = [60, 120, 80, 70, 70, 60, 70];
+      }
+      
       let xPosition = 50;
       
       // Draw header row
@@ -920,15 +928,32 @@ exports.generatePDFReport = async (req, res) => {
       // Draw data rows - show all records
       reportData.records.forEach((record, index) => {
         xPosition = 50;
-        const rowData = [
-          record.employee?.employeeId || '-',
-          `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim().substring(0, 15) || '-',
-          record.employee?.department?.substring(0, 10) || '-',
-          record.checkIn?.time ? moment(record.checkIn.time).format('HH:mm') : '-',
-          record.checkOut?.time ? moment(record.checkOut.time).format('HH:mm') : '-',
-          record.workHours ? `${record.workHours.toFixed(1)}h` : '-',
-          record.status || '-'
-        ];
+        
+        let rowData;
+        if (type === 'monthly') {
+          // Monthly report shows aggregate data
+          rowData = [
+            record.employee?.employeeId || '-',
+            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim().substring(0, 15) || '-',
+            record.employee?.department?.substring(0, 10) || '-',
+            record.attendance?.present || '0',
+            record.attendance?.late || '0',
+            record.attendance?.absent || '0',
+            record.attendance?.totalWorkHours ? `${record.attendance.totalWorkHours.toFixed(1)}h` : '0h',
+            record.attendance?.attendancePercentage ? `${record.attendance.attendancePercentage.toFixed(0)}%` : '0%'
+          ];
+        } else {
+          // Daily/custom reports show daily data
+          rowData = [
+            record.employee?.employeeId || '-',
+            `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim().substring(0, 15) || '-',
+            record.employee?.department?.substring(0, 10) || '-',
+            record.checkIn?.time ? moment(record.checkIn.time).format('HH:mm') : '-',
+            record.checkOut?.time ? moment(record.checkOut.time).format('HH:mm') : '-',
+            record.workHours ? `${record.workHours.toFixed(1)}h` : '-',
+            record.status || '-'
+          ];
+        }
         
         rowData.forEach((text, i) => {
           doc.rect(xPosition, yPosition, columnWidths[i], 15).stroke();

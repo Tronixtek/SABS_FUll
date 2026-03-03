@@ -147,7 +147,10 @@ const Reports = () => {
       return;
     }
 
-    const headers = ['Employee ID', 'Name', 'Department', 'Designation', 'Facility', 'Status', 'Check In', 'Check Out', 'Work Hours', 'Overtime'];
+    const headers = reportType === 'monthly' 
+      ? ['Employee ID', 'Name', 'Department', 'Designation', 'Facility', 'Present Days', 'Late Days', 'Absent Days', 'Total Work Hours', 'Attendance %']
+      : ['Employee ID', 'Name', 'Department', 'Designation', 'Facility', 'Status', 'Check In', 'Check Out', 'Work Hours', 'Overtime'];
+    
     const rows = reportData.records.map(record => {
       const formatTime = (timeValue) => {
         try {
@@ -160,6 +163,21 @@ const Reports = () => {
           return '';
         }
       };
+
+      if (reportType === 'monthly') {
+        return [
+          record.employee?.employeeId || '',
+          `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim(),
+          record.employee?.department || '',
+          record.employee?.designation || '',
+          record.facility?.name || '',
+          record.attendance?.present || '0',
+          record.attendance?.late || '0',
+          record.attendance?.absent || '0',
+          record.attendance?.totalWorkHours?.toFixed(2) || '0.00',
+          record.attendance?.attendancePercentage?.toFixed(1) || '0.0'
+        ];
+      }
 
       return [
         record.employee?.employeeId || '',
@@ -724,10 +742,22 @@ const Reports = () => {
                   <th>Department</th>
                   <th>Designation</th>
                   <th>Facility</th>
-                  <th>Check In</th>
-                  <th>Check Out</th>
-                  <th>Work Hours</th>
-                  <th>Status</th>
+                  {reportType === 'monthly' ? (
+                    <>
+                      <th>Present Days</th>
+                      <th>Late Days</th>
+                      <th>Absent Days</th>
+                      <th>Total Work Hours</th>
+                      <th>Attendance %</th>
+                    </>
+                  ) : (
+                    <>
+                      <th>Check In</th>
+                      <th>Check Out</th>
+                      <th>Work Hours</th>
+                      <th>Status</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -762,58 +792,86 @@ const Reports = () => {
                       <td className="text-sm text-gray-600">{record.employee?.department || '-'}</td>
                       <td className="text-sm text-gray-600">{record.employee?.designation || '-'}</td>
                       <td className="text-sm text-gray-600">{record.facility?.name || '-'}</td>
-                      <td>
-                        {record.checkIn?.time ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            {(() => {
-                              try {
-                                const date = new Date(record.checkIn.time);
-                                if (isNaN(date.getTime())) return '-';
-                                return format(date, 'hh:mm a');
-                              } catch (error) {
-                                console.warn('Invalid check-in time:', record.checkIn.time);
-                                return '-';
-                              }
-                            })()}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td>
-                        {record.checkOut?.time ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            {(() => {
-                              try {
-                                const date = new Date(record.checkOut.time);
-                                if (isNaN(date.getTime())) return '-';
-                                return format(date, 'hh:mm a');
-                              } catch (error) {
-                                console.warn('Invalid check-out time:', record.checkOut.time);
-                                return '-';
-                              }
-                            })()}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="font-medium">
-                        {record.workHours ? `${record.workHours.toFixed(2)} hrs` : '-'}
-                      </td>
-                      <td>
-                        <span className={`badge ${
-                          record.status === 'present' ? 'badge-success' : 
-                          record.status === 'absent' ? 'badge-danger' : 
-                          record.status === 'late' ? 'badge-warning' :
-                          record.status === 'half-day' ? 'badge-info' :
-                          'badge-gray'
-                        }`}>
-                          {record.status || (record.attendance?.present > 0 ? 'Present' : 'Absent')}
-                        </span>
-                      </td>
+                      {reportType === 'monthly' ? (
+                        <>
+                          <td className="font-medium text-green-600">
+                            {record.attendance?.present || 0}
+                          </td>
+                          <td className="font-medium text-yellow-600">
+                            {record.attendance?.late || 0}
+                          </td>
+                          <td className="font-medium text-red-600">
+                            {record.attendance?.absent || 0}
+                          </td>
+                          <td className="font-medium text-blue-600">
+                            {record.attendance?.totalWorkHours ? `${record.attendance.totalWorkHours.toFixed(2)} hrs` : '0.00 hrs'}
+                          </td>
+                          <td>
+                            <span className={`badge ${
+                              record.attendance?.attendancePercentage >= 90 ? 'badge-success' :
+                              record.attendance?.attendancePercentage >= 75 ? 'badge-warning' :
+                              'badge-danger'
+                            }`}>
+                              {record.attendance?.attendancePercentage?.toFixed(1) || '0'}%
+                            </span>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td>
+                            {record.checkIn?.time ? (
+                              <div className="flex items-center gap-1 text-sm">
+                                <Clock className="w-3 h-3 text-gray-400" />
+                                {(() => {
+                                  try {
+                                    const date = new Date(record.checkIn.time);
+                                    if (isNaN(date.getTime())) return '-';
+                                    return format(date, 'hh:mm a');
+                                  } catch (error) {
+                                    console.warn('Invalid check-in time:', record.checkIn.time);
+                                    return '-';
+                                  }
+                                })()}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td>
+                            {record.checkOut?.time ? (
+                              <div className="flex items-center gap-1 text-sm">
+                                <Clock className="w-3 h-3 text-gray-400" />
+                                {(() => {
+                                  try {
+                                    const date = new Date(record.checkOut.time);
+                                    if (isNaN(date.getTime())) return '-';
+                                    return format(date, 'hh:mm a');
+                                  } catch (error) {
+                                    console.warn('Invalid check-out time:', record.checkOut.time);
+                                    return '-';
+                                  }
+                                })()}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="font-medium">
+                            {record.workHours ? `${record.workHours.toFixed(2)} hrs` : '-'}
+                          </td>
+                          <td>
+                            <span className={`badge ${
+                              record.status === 'present' ? 'badge-success' : 
+                              record.status === 'absent' ? 'badge-danger' : 
+                              record.status === 'late' ? 'badge-warning' :
+                              record.status === 'half-day' ? 'badge-info' :
+                              'badge-gray'
+                            }`}>
+                              {record.status || (record.attendance?.present > 0 ? 'Present' : 'Absent')}
+                            </span>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))
                 ) : (
