@@ -910,7 +910,7 @@ exports.generatePDFReport = async (req, res) => {
         columnWidths = [50, 100, 70, 45, 45, 45, 50, 50]; // Total: 455px
       } else {
         tableHeaders = ['ID', 'Name', 'Dept', 'Check In', 'Check Out', 'Hours', 'Status'];
-        columnWidths = [50, 110, 75, 55, 55, 50, 50]; // Total: 445px
+        columnWidths = [50, 105, 70, 60, 60, 50, 50]; // Total: 445px (widened time columns for AM/PM)
       }
       
       let xPosition = 50;
@@ -953,8 +953,8 @@ exports.generatePDFReport = async (req, res) => {
             record.employee?.employeeId || '-',
             `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim().substring(0, 15) || '-',
             record.employee?.department?.substring(0, 10) || '-',
-            record.checkIn?.time ? moment(record.checkIn.time).format('HH:mm') : '-',
-            record.checkOut?.time ? moment(record.checkOut.time).format('HH:mm') : '-',
+            record.checkIn?.time ? moment(record.checkIn.time).format('hh:mm A') : '-',
+            record.checkOut?.time ? moment(record.checkOut.time).format('hh:mm A') : '-',
             record.workHours ? `${record.workHours.toFixed(1)}h` : '-',
             record.status || '-'
           ];
