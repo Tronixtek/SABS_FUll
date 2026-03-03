@@ -31,6 +31,7 @@ const Analytics = () => {
   });
   const [selectedFacility, setSelectedFacility] = useState('');
   const [facilities, setFacilities] = useState([]);
+  const [summaryType, setSummaryType] = useState('unique'); // 'unique' or 'daily'
   
   const [dashboardData, setDashboardData] = useState({
     summary: {
@@ -56,7 +57,7 @@ const Analytics = () => {
   useEffect(() => {
     fetchFacilities();
     fetchAnalytics();
-  }, [dateRange, selectedFacility]);
+  }, [dateRange, selectedFacility, summaryType]);
 
   const fetchFacilities = async () => {
     try {
@@ -74,6 +75,7 @@ const Analytics = () => {
       const params = {
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
+        summaryType,
         ...(selectedFacility && { facility: selectedFacility })
       };
 
@@ -334,6 +336,39 @@ const Analytics = () => {
               onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
             />
           </div>
+        </div>
+      </div>
+      
+      {/* Summary Type Toggle */}
+      <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+        <label className="block text-sm font-medium text-gray-700 mb-3">Summary Calculation Method</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            onClick={() => setSummaryType('unique')}
+            className={`p-3 rounded-lg border-2 transition-all text-left ${
+              summaryType === 'unique'
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+            }`}
+          >
+            <div className="font-medium mb-1">Unique Employees</div>
+            <div className="text-xs opacity-75">
+              Count each employee once per status (for HR review)
+            </div>
+          </button>
+          <button
+            onClick={() => setSummaryType('daily')}
+            className={`p-3 rounded-lg border-2 transition-all text-left ${
+              summaryType === 'daily'
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-gray-200 hover:border-gray-300 text-gray-700'
+            }`}
+          >
+            <div className="font-medium mb-1">Daily Average</div>
+            <div className="text-xs opacity-75">
+              Average attendance per day (for staffing decisions)
+            </div>
+          </button>
         </div>
       </div>
 

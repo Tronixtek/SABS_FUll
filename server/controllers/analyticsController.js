@@ -3,6 +3,105 @@ const Employee = require('../models/Employee');
 const Facility = require('../models/Facility');
 const moment = require('moment');
 
+// Helper function to calculate statistics based on summary type
+const calculateStatistics = (records, totalEmployees, summaryType = 'unique') => {
+  if (summaryType === 'unique') {
+    // Count unique employees per status
+    const uniquePresent = new Set();
+    const uniqueAbsent = new Set();
+    const uniqueLate = new Set();
+    const uniqueHalfDay = new Set();
+    const uniqueOnLeave = new Set();
+    const uniqueExcused = new Set();
+    const uniqueIncomplete = new Set();
+
+    records.forEach(record => {
+      const employeeId = record.employee?._id?.toString() || record.employee?.toString();
+      if (!employeeId) return;
+
+      const status = record.status?.toLowerCase();
+      
+      if (status === 'present' || status === 'late' || status === 'excused') {
+        uniquePresent.add(employeeId);
+      }
+      if (status === 'absent') uniqueAbsent.add(employeeId);
+      if (status === 'late') uniqueLate.add(employeeId);
+      if (status === 'half-day') uniqueHalfDay.add(employeeId);
+      if (status === 'on-leave') uniqueOnLeave.add(employeeId);
+      if (status === 'excused') uniqueExcused.add(employeeId);
+      if (status === 'incomplete') uniqueIncomplete.add(employeeId);
+    });
+
+    return {
+      totalEmployees,
+      present: uniquePresent.size,
+      absent: uniqueAbsent.size,
+      late: uniqueLate.size,
+      halfDay: uniqueHalfDay.size,
+      onLeave: uniqueOnLeave.size,
+      excused: uniqueExcused.size,
+      incomplete: uniqueIncomplete.size,
+      summaryType: 'unique'
+    };
+  } else {
+    // Daily average mode - calculate average per day
+    const dateGroups = {};
+    
+    records.forEach(record => {
+      const dateKey = moment(record.date).format('YYYY-MM-DD');
+      if (!dateGroups[dateKey]) {
+        dateGroups[dateKey] = {
+          present: 0,
+          absent: 0,
+          late: 0,
+          halfDay: 0,
+          onLeave: 0, 
+          excused: 0,
+          incomplete: 0
+        };
+      }
+      
+      const status = record.status?.toLowerCase();
+      if (status === 'present' || status === 'late' || status === 'excused') {
+        dateGroups[dateKey].present++;
+      }
+      if (status === 'absent') dateGroups[dateKey].absent++;
+      if (status === 'late') dateGroups[dateKey].late++;
+      if (status === 'half-day') dateGroups[dateKey].halfDay++;
+      if (status === 'on-leave') dateGroups[dateKey].onLeave++;
+      if (status === 'excused') dateGroups[dateKey].excused++;
+      if (status === 'incomplete') dateGroups[dateKey].incomplete++;
+    });
+
+    const numDays = Object.keys(dateGroups).length || 1;
+    const totals = Object.values(dateGroups).reduce(
+      (acc, day) => ({
+        present: acc.present + day.present,
+        absent: acc.absent + day.absent,
+        late: acc.late + day.late,
+        halfDay: acc.halfDay + day.halfDay,
+        onLeave: acc.onLeave + day.onLeave,
+        excused: acc.excused + day.excused,
+        incomplete: acc.incomplete + day.incomplete
+      }),
+      { present: 0, absent: 0, late: 0, halfDay: 0, onLeave: 0, excused: 0, incomplete: 0 }
+    );
+
+    return {
+      totalEmployees,
+      present: Math.round(totals.present / numDays),
+      absent: Math.round(totals.absent / numDays),
+      late: Math.round(totals.late / numDays),
+      halfDay: Math.round(totals.halfDay / numDays),
+      onLeave: Math.round(totals.onLeave / numDays),
+      excused: Math.round(totals.excused / numDays),
+      incomplete: Math.round(totals.incomplete / numDays),
+      numDays,
+      summaryType: 'daily'
+    };
+  }
+};
+
 // Helper function to aggregate attendance records (same as other controllers)
 const aggregateAttendanceRecords = (rawRecords) => {
   const attendanceMap = new Map();
@@ -100,7 +199,7 @@ const aggregateAttendanceRecords = (rawRecords) => {
 // @access  Private
 exports.getDashboardAnalytics = async (req, res) => {
   try {
-    const { facility, startDate, endDate } = req.query;
+    const { facility, startDate, endDate, summaryType = 'unique' } = req.query;
     
     const start = startDate ? new Date(startDate) : moment().startOf('month').toDate();
     const end = endDate ? new Date(endDate) : moment().endOf('month').toDate();
@@ -120,6 +219,7 @@ exports.getDashboardAnalytics = async (req, res) => {
     
     console.log('📊 Analytics facility filter:', facilityFilter);
     console.log('📅 Analytics date range:', { start, end, today, todayEnd });
+    console.log('📊 Summary Type:', summaryType);
     
     // Total employees
     const totalEmployees = await Employee.countDocuments({
@@ -252,7 +352,10 @@ exports.getDashboardAnalytics = async (req, res) => {
     
     console.log(`📊 Month aggregated with absent: ${monthAggregatedWithAbsent.length} (${monthAggregated.length} attended + ${absentRecords.length} absent)`);
     
-    // Calculate month statistics
+    // Calculate period statistics using the new helper function based on summaryType
+    const periodStats = calculateStatistics(monthAggregatedWithAbsent, totalEmployees, summaryType);
+    
+    // Keep the old monthStats format for backward compatibility
     const monthStats = {
       presentDays: monthAggregatedWithAbsent.filter(a => ['present', 'late'].includes(a.status)).length,
       lateDays: monthAggregatedWithAbsent.filter(a => a.status === 'late').length,
@@ -262,6 +365,7 @@ exports.getDashboardAnalytics = async (req, res) => {
     };
     
     console.log('📈 Month stats:', monthStats);
+    console.log('📊 Period stats (with summaryType):', periodStats);
     
     // Top performers (employees with highest attendance rate)
     const topPerformers = monthAggregatedWithAbsent.reduce((acc, record) => {
@@ -508,7 +612,14 @@ exports.getDashboardAnalytics = async (req, res) => {
           attendanceRate,
           punctualityRate,
           todayWorkHours: todayStats.totalWorkHours,
-          todayOvertime: todayStats.totalOvertime
+          todayOvertime: todayStats.totalOvertime,
+          // Add period statistics based on summaryType
+          periodPresent: periodStats.present,
+          periodAbsent: periodStats.absent,
+          periodLate: periodStats.late,
+          periodExcused: periodStats.excused,
+          periodIncomplete: periodStats.incomplete,
+          summaryType: periodStats.summaryType
         },
         monthlyStats: {
           presentDays: monthStats.presentDays,

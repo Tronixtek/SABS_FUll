@@ -29,6 +29,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [facilities, setFacilities] = useState([]);
+  const [summaryType, setSummaryType] = useState('unique'); // 'unique' or 'daily'
   const [filters, setFilters] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     startDate: format(new Date(), 'yyyy-MM-01'),
@@ -69,14 +70,20 @@ const Reports = () => {
           break;
         case 'monthly':
           endpoint = '/api/reports/monthly';
-          params = { month: filters.month, year: filters.year, facility: filters.facility };
+          params = { 
+            month: filters.month, 
+            year: filters.year, 
+            facility: filters.facility,
+            summaryType 
+          };
           break;
         case 'custom':
           endpoint = '/api/reports/custom';
           params = { 
             startDate: filters.startDate, 
             endDate: filters.endDate, 
-            facility: filters.facility 
+            facility: filters.facility,
+            summaryType 
           };
           break;
         case 'payroll':
@@ -226,8 +233,8 @@ const Reports = () => {
       const params = new URLSearchParams({
         type: reportType,
         ...(reportType === 'daily' && { date: filters.date }),
-        ...(reportType === 'monthly' && { month: filters.month, year: filters.year }),
-        ...(reportType === 'custom' && { startDate: filters.startDate, endDate: filters.endDate }),
+        ...(reportType === 'monthly' && { month: filters.month, year: filters.year, summaryType }),
+        ...(reportType === 'custom' && { startDate: filters.startDate, endDate: filters.endDate, summaryType }),
         ...(filters.facility && { facility: filters.facility })
       });
 
@@ -450,6 +457,43 @@ const Reports = () => {
               ))}
             </select>
           </div>
+          
+          {/* Summary Type Toggle - Only for multi-day reports */}
+          {(reportType === 'monthly' || reportType === 'custom') && (
+            <div className="col-span-1 sm:col-span-2 lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Summary Calculation</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSummaryType('unique')}
+                  className={`p-3 rounded-lg border-2 transition-all text-left ${
+                    summaryType === 'unique'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <div className="font-medium mb-1">Unique Employees</div>
+                  <div className="text-xs opacity-75">
+                    Count each employee once per status (for HR review)
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSummaryType('daily')}
+                  className={`p-3 rounded-lg border-2 transition-all text-left ${
+                    summaryType === 'daily'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <div className="font-medium mb-1">Daily Average</div>
+                  <div className="text-xs opacity-75">
+                    Average attendance per day (for staffing decisions)
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-6 pt-4 border-t border-gray-200">

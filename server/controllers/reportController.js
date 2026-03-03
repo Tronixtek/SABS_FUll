@@ -4,6 +4,105 @@ const Payroll = require('../models/Payroll');
 const moment = require('moment');
 const PDFDocument = require('pdfkit');
 
+// Helper function to calculate statistics based on summary type
+const calculateStatistics = (records, totalEmployees, summaryType = 'unique') => {
+  if (summaryType === 'unique') {
+    // Count unique employees per status
+    const uniquePresent = new Set();
+    const uniqueAbsent = new Set();
+    const uniqueLate = new Set();
+    const uniqueHalfDay = new Set();
+    const uniqueOnLeave = new Set();
+    const uniqueExcused = new Set();
+    const uniqueIncomplete = new Set();
+
+    records.forEach(record => {
+      const employeeId = record.employee?._id?.toString() || record.employee?.toString();
+      if (!employeeId) return;
+
+      const status = record.status?.toLowerCase();
+      
+      if (status === 'present' || status === 'late' || status === 'excused') {
+        uniquePresent.add(employeeId);
+      }
+      if (status === 'absent') uniqueAbsent.add(employeeId);
+      if (status === 'late') uniqueLate.add(employeeId);
+      if (status === 'half-day') uniqueHalfDay.add(employeeId);
+      if (status === 'on-leave') uniqueOnLeave.add(employeeId);
+      if (status === 'excused') uniqueExcused.add(employeeId);
+      if (status === 'incomplete') uniqueIncomplete.add(employeeId);
+    });
+
+    return {
+      totalEmployees,
+      present: uniquePresent.size,
+      absent: uniqueAbsent.size,
+      late: uniqueLate.size,
+      halfDay: uniqueHalfDay.size,
+      onLeave: uniqueOnLeave.size,
+      excused: uniqueExcused.size,
+      incomplete: uniqueIncomplete.size,
+      summaryType: 'unique'
+    };
+  } else {
+    // Daily average mode - calculate average per day
+    const dateGroups = {};
+    
+    records.forEach(record => {
+      const dateKey = moment(record.date).format('YYYY-MM-DD');
+      if (!dateGroups[dateKey]) {
+        dateGroups[dateKey] = {
+          present: 0,
+          absent: 0,
+          late: 0,
+          halfDay: 0,
+          onLeave: 0,
+          excused: 0,
+          incomplete: 0
+        };
+      }
+      
+      const status = record.status?.toLowerCase();
+      if (status === 'present' || status === 'late' || status === 'excused') {
+        dateGroups[dateKey].present++;
+      }
+      if (status === 'absent') dateGroups[dateKey].absent++;
+      if (status === 'late') dateGroups[dateKey].late++;
+      if (status === 'half-day') dateGroups[dateKey].halfDay++;
+      if (status === 'on-leave') dateGroups[dateKey].onLeave++;
+      if (status === 'excused') dateGroups[dateKey].excused++;
+      if (status === 'incomplete') dateGroups[dateKey].incomplete++;
+    });
+
+    const numDays = Object.keys(dateGroups).length || 1;
+    const totals = Object.values(dateGroups).reduce(
+      (acc, day) => ({
+        present: acc.present + day.present,
+        absent: acc.absent + day.absent,
+        late: acc.late + day.late,
+        halfDay: acc.halfDay + day.halfDay,
+        onLeave: acc.onLeave + day.onLeave,
+        excused: acc.excused + day.excused,
+        incomplete: acc.incomplete + day.incomplete
+      }),
+      { present: 0, absent: 0, late: 0, halfDay: 0, onLeave: 0, excused: 0, incomplete: 0 }
+    );
+
+    return {
+      totalEmployees,
+      present: Math.round(totals.present / numDays),
+      absent: Math.round(totals.absent / numDays),
+      late: Math.round(totals.late / numDays),
+      halfDay: Math.round(totals.halfDay / numDays),
+      onLeave: Math.round(totals.onLeave / numDays),
+      excused: Math.round(totals.excused / numDays),
+      incomplete: Math.round(totals.incomplete / numDays),
+      numDays,
+      summaryType: 'daily'
+    };
+  }
+};
+
 // Helper function to aggregate attendance records (same logic as attendanceController)
 const aggregateAttendanceRecords = (rawRecords) => {
   const attendanceMap = new Map();
@@ -191,7 +290,7 @@ exports.getDailyReport = async (req, res) => {
 // @access  Private
 exports.getMonthlyReport = async (req, res) => {
   try {
-    const { month, year, facility, employeeId } = req.query;
+    const { month, year, facility, employeeId, summaryType = 'unique' } = req.query;
     
     const reportMonth = month || moment().month() + 1;
     const reportYear = year || moment().year();
@@ -216,6 +315,7 @@ exports.getMonthlyReport = async (req, res) => {
     if (employeeId) query.employee = employeeId;
     
     console.log('🔍 Monthly report query:', JSON.stringify(query, null, 2));
+    console.log('📊 Summary Type:', summaryType);
     
     // Get raw attendance records
     const rawAttendance = await Attendance.find(query)
@@ -315,22 +415,13 @@ exports.getMonthlyReport = async (req, res) => {
     
     const finalRecords = Array.from(employeeSummary.values());
     
-    // Calculate overall statistics
-    const statistics = {
-      totalEmployees: finalRecords.length,
-      present: finalRecords.reduce((sum, emp) => sum + emp.attendance.present, 0),
-      absent: finalRecords.reduce((sum, emp) => sum + emp.attendance.absent, 0),
-      late: finalRecords.reduce((sum, emp) => sum + emp.attendance.late, 0),
-      halfDay: finalRecords.reduce((sum, emp) => sum + emp.attendance.halfDay, 0),
-      onLeave: finalRecords.reduce((sum, emp) => sum + emp.attendance.onLeave, 0),
-      excused: finalRecords.reduce((sum, emp) => sum + emp.attendance.excused, 0),
-      incomplete: 0, // Monthly reports don't track incomplete
-      totalWorkHours: Math.round(finalRecords.reduce((sum, emp) => sum + emp.attendance.totalWorkHours, 0) * 100) / 100,
-      totalOvertime: Math.round(finalRecords.reduce((sum, emp) => sum + emp.attendance.totalOvertime, 0) * 100) / 100,
-      averageWorkHours: finalRecords.length > 0 
-        ? Math.round((finalRecords.reduce((sum, emp) => sum + emp.attendance.totalWorkHours, 0) / finalRecords.length) * 100) / 100
-        : 0
-    };
+    // Get total employees for the facility
+    const employeeFilter = { status: 'active' };
+    if (facility) employeeFilter.facility = facility;
+    const totalEmployees = await Employee.countDocuments(employeeFilter);
+    
+    // Calculate statistics based on summary type
+    const statistics = calculateStatistics(aggregatedRecords, totalEmployees, summaryType);
     
     res.json({
       success: true,
@@ -338,7 +429,7 @@ exports.getMonthlyReport = async (req, res) => {
         month: reportMonth,
         year: reportYear,
         period: `${moment(`${reportYear}-${reportMonth}-01`).format('MMMM YYYY')}`,
-        totalEmployees: finalRecords.length,
+        totalEmployees: statistics.totalEmployees,
         statistics,
         records: finalRecords
       }
@@ -357,7 +448,7 @@ exports.getMonthlyReport = async (req, res) => {
 // @access  Private
 exports.getCustomReport = async (req, res) => {
   try {
-    const { startDate, endDate, facility, department, status } = req.query;
+    const { startDate, endDate, facility, department, status, summaryType = 'unique' } = req.query;
     
     if (!startDate || !endDate) {
       return res.status(400).json({
@@ -379,6 +470,7 @@ exports.getCustomReport = async (req, res) => {
     if (status) query.status = status;
     
     console.log('🔍 Custom report query:', JSON.stringify(query, null, 2));
+    console.log('📊 Summary Type:', summaryType);
     
     // Get raw attendance records
     const rawAttendance = await Attendance.find(query)
@@ -401,7 +493,17 @@ exports.getCustomReport = async (req, res) => {
     
     console.log('✅ Aggregated records:', aggregatedRecords.length);
     
-    // Calculate summary statistics
+    // Get total employees for the facility/department
+    const employeeFilter = { status: 'active' };
+    if (facility) employeeFilter.facility = facility;
+    if (department) employeeFilter.department = department;
+    
+    const totalEmployees = await Employee.countDocuments(employeeFilter);
+    
+    // Calculate statistics based on summary type
+    const statistics = calculateStatistics(aggregatedRecords, totalEmployees, summaryType);
+    
+    // Keep the old summary format for backward compatibility
     const summary = {
       totalRecords: aggregatedRecords.length,
       present: aggregatedRecords.filter(r => r.status === 'present').length,
@@ -417,21 +519,6 @@ exports.getCustomReport = async (req, res) => {
       averageWorkHours: aggregatedRecords.length > 0 
         ? Math.round((aggregatedRecords.reduce((sum, r) => sum + (r.workHours || 0), 0) / aggregatedRecords.length) * 100) / 100
         : 0
-    };
-    
-    // Also create statistics object for frontend compatibility
-    const statistics = {
-      totalEmployees: new Set(aggregatedRecords.map(r => r.employee._id.toString())).size,
-      present: summary.present,
-      absent: summary.absent,
-      late: summary.late,
-      halfDay: summary.halfDay,
-      onLeave: summary.onLeave,
-      excused: summary.excused,
-      incomplete: summary.incomplete,
-      totalWorkHours: summary.totalWorkHours,
-      totalOvertime: summary.totalOvertime,
-      averageWorkHours: summary.averageWorkHours
     };
     
     res.json({
@@ -461,9 +548,9 @@ exports.generatePDFReport = async (req, res) => {
   console.log('Query params:', req.query);
   
   try {
-    const { type = 'daily', date, facility, month, year } = req.query;
+    const { type = 'daily', date, facility, month, year, summaryType = 'unique' } = req.query;
     
-    console.log(`📊 Generating ${type} report...`);
+    console.log(`📊 Generating ${type} report with summaryType: ${summaryType}...`);
     
     let reportData;
     let reportTitle;
@@ -585,16 +672,13 @@ exports.generatePDFReport = async (req, res) => {
       
       const finalRecords = Array.from(employeeSummary.values());
       
-      const statistics = {
-        totalEmployees: finalRecords.length,
-        present: finalRecords.reduce((sum, emp) => sum + emp.attendance.present, 0),
-        absent: finalRecords.reduce((sum, emp) => sum + emp.attendance.absent, 0),
-        late: finalRecords.reduce((sum, emp) => sum + emp.attendance.late, 0),
-        excused: finalRecords.reduce((sum, emp) => sum + emp.attendance.excused, 0),
-        incomplete: 0,
-        totalWorkHours: Math.round(finalRecords.reduce((sum, emp) => sum + emp.attendance.totalWorkHours, 0) * 100) / 100,
-        totalOvertime: Math.round(finalRecords.reduce((sum, emp) => sum + emp.attendance.totalOvertime, 0) * 100) / 100
-      };
+      // Get total employees for the facility
+      const employeeFilter = { status: 'active' };
+      if (facility) employeeFilter.facility = facility;
+      const totalEmployees = await Employee.countDocuments(employeeFilter);
+      
+      // Calculate statistics based on summary type
+      const statistics = calculateStatistics(aggregatedRecords, totalEmployees, summaryType);
       
       reportData = {
         statistics,
@@ -602,6 +686,11 @@ exports.generatePDFReport = async (req, res) => {
       };
       
       reportTitle = `Monthly Attendance Report - ${moment(`${reportYear}-${reportMonth}-01`).format('MMMM YYYY')}`;
+      if (summaryType === 'daily') {
+        reportTitle += ' (Daily Average)';
+      } else {
+        reportTitle += ' (Unique Employees)';
+      }
     } else if (type === 'custom') {
       // Handle custom report
       const { startDate, endDate } = req.query;
@@ -632,16 +721,13 @@ exports.generatePDFReport = async (req, res) => {
       
       const aggregatedRecords = aggregateAttendanceRecords(rawAttendance);
       
-      const statistics = {
-        totalEmployees: new Set(aggregatedRecords.map(r => r.employee._id.toString())).size,
-        present: aggregatedRecords.filter(r => r.status === 'present').length,
-        absent: aggregatedRecords.filter(r => r.status === 'absent').length,
-        late: aggregatedRecords.filter(r => r.status === 'late').length,
-        excused: aggregatedRecords.filter(r => r.status === 'excused').length,
-        incomplete: aggregatedRecords.filter(r => r.status === 'incomplete').length,
-        totalWorkHours: Math.round(aggregatedRecords.reduce((sum, r) => sum + (r.workHours || 0), 0) * 100) / 100,
-        totalOvertime: Math.round(aggregatedRecords.reduce((sum, r) => sum + (r.overtime || 0), 0) * 100) / 100
-      };
+      // Get total employees for the facility
+      const employeeFilter = { status: 'active' };
+      if (facility) employeeFilter.facility = facility;
+      const totalEmployees = await Employee.countDocuments(employeeFilter);
+      
+      // Calculate statistics based on summary type
+      const statistics = calculateStatistics(aggregatedRecords, totalEmployees, summaryType);
       
       reportData = {
         statistics,
@@ -649,6 +735,11 @@ exports.generatePDFReport = async (req, res) => {
       };
       
       reportTitle = `Custom Attendance Report - ${moment(startDate).format('MMM DD')} to ${moment(endDate).format('MMM DD, YYYY')}`;
+      if (summaryType === 'daily') {
+        reportTitle += ' (Daily Average)';
+      } else {
+        reportTitle += ' (Unique Employees)';
+      }
     } else {
       return res.status(400).json({
         success: false,
