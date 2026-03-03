@@ -447,18 +447,59 @@ exports.getMonthlyReport = async (req, res) => {
       summary.attendance.totalLateMinutes += record.lateArrival || 0;
     });
     
-    // Calculate attendance percentages
-    for (const [employeeId, summary] of employeeSummary) {
-      const totalWorkingDays = summary.attendance.totalDays;
-      const presentDays = summary.attendance.present;
-      summary.attendance.attendancePercentage = totalWorkingDays > 0 
-        ? Math.round((presentDays / totalWorkingDays) * 100 * 100) / 100 
-        : 0;
-      summary.attendance.totalWorkHours = Math.round(summary.attendance.totalWorkHours * 100) / 100;
-      summary.attendance.totalOvertime = Math.round(summary.attendance.totalOvertime * 100) / 100;
-    }
-    
     const finalRecords = Array.from(employeeSummary.values());
+    
+    // Calculate days in the month
+    const daysInMonth = moment(`${reportYear}-${reportMonth}-01`).daysInMonth();
+    
+    // Fetch all employees with their shift data to calculate expected working days
+    // Include ALL employees who had attendance, not just active ones
+    const employeeIdsInRecords = finalRecords.map(r => r.employee._id);
+    const empQueryFilter = { 
+      _id: { $in: employeeIdsInRecords }
+    };
+    if (facility) empQueryFilter.facility = facility;
+    
+    const employeesWithShifts = await Employee.find(empQueryFilter)
+      .populate('shift', 'workingHours workingDays')
+      .lean();
+    
+    // Create a map for quick lookup of employee shift data
+    const employeeShiftMap = new Map();
+    employeesWithShifts.forEach(emp => {
+      employeeShiftMap.set(emp._id.toString(), emp.shift);
+    });
+    
+    // Calculate attendance percentages and correct absent days for each employee
+    finalRecords.forEach(record => {
+      const employeeId = record.employee._id.toString();
+      const employeeShift = employeeShiftMap.get(employeeId);
+      
+      // Calculate expected working days for this employee
+      let workingDaysPerWeek = 7; // Default
+      if (employeeShift?.workingDays && employeeShift.workingDays.length > 0) {
+        workingDaysPerWeek = employeeShift.workingDays.length;
+      }
+      
+      const weeksInMonth = daysInMonth / 7;
+      const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInMonth);
+      
+      // Calculate actual absent days: expected days minus days with positive attendance
+      const attendedDays = record.attendance.present + record.attendance.excused;
+      const actualAbsentDays = Math.max(0, expectedWorkingDays - attendedDays);
+      
+      // Update the record with corrected values
+      record.attendance.totalDays = expectedWorkingDays;
+      record.attendance.absent = actualAbsentDays;
+      
+      // Calculate attendance percentage based on expected working days
+      const presentDays = record.attendance.present;
+      record.attendance.attendancePercentage = expectedWorkingDays > 0 
+        ? Math.round((presentDays / expectedWorkingDays) * 100 * 100) / 100 
+        : 0;
+      record.attendance.totalWorkHours = Math.round(record.attendance.totalWorkHours * 100) / 100;
+      record.attendance.totalOvertime = Math.round(record.attendance.totalOvertime * 100) / 100;
+    });
     
     // Get total employees for the facility
     const employeeFilter = { status: 'active' };
