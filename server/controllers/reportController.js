@@ -7,10 +7,10 @@ const PDFDocument = require('pdfkit');
 // Helper function to calculate statistics based on summary type
 const calculateStatistics = (records, totalEmployees, summaryType = 'unique') => {
   if (summaryType === 'unique') {
-    // Count unique employees per status
-    const uniquePresent = new Set();
-    const uniqueAbsent = new Set();
+    // Count unique employees per status - mutually exclusive categories
+    const uniqueOnTime = new Set();  // On-time only (present but not late)
     const uniqueLate = new Set();
+    const uniqueAbsent = new Set();
     const uniqueHalfDay = new Set();
     const uniqueOnLeave = new Set();
     const uniqueExcused = new Set();
@@ -22,20 +22,31 @@ const calculateStatistics = (records, totalEmployees, summaryType = 'unique') =>
 
       const status = record.status?.toLowerCase();
       
-      if (status === 'present' || status === 'late' || status === 'excused') {
-        uniquePresent.add(employeeId);
+      // Mutually exclusive: each employee goes into only ONE category
+      if (status === 'late') {
+        uniqueLate.add(employeeId);
+      } else if (status === 'present') {
+        uniqueOnTime.add(employeeId);
+      } else if (status === 'excused') {
+        uniqueExcused.add(employeeId);
+      } else if (status === 'absent') {
+        uniqueAbsent.add(employeeId);
+      } else if (status === 'half-day') {
+        uniqueHalfDay.add(employeeId);
+      } else if (status === 'on-leave') {
+        uniqueOnLeave.add(employeeId);
+      } else if (status === 'incomplete') {
+        uniqueIncomplete.add(employeeId);
       }
-      if (status === 'absent') uniqueAbsent.add(employeeId);
-      if (status === 'late') uniqueLate.add(employeeId);
-      if (status === 'half-day') uniqueHalfDay.add(employeeId);
-      if (status === 'on-leave') uniqueOnLeave.add(employeeId);
-      if (status === 'excused') uniqueExcused.add(employeeId);
-      if (status === 'incomplete') uniqueIncomplete.add(employeeId);
     });
+
+    // Calculate present as on-time + late + excused
+    const present = uniqueOnTime.size + uniqueLate.size + uniqueExcused.size;
 
     return {
       totalEmployees,
-      present: uniquePresent.size,
+      present: present,  // Total who showed up
+      onTime: uniqueOnTime.size,  // On-time arrivals only
       absent: uniqueAbsent.size,
       late: uniqueLate.size,
       halfDay: uniqueHalfDay.size,
@@ -52,9 +63,9 @@ const calculateStatistics = (records, totalEmployees, summaryType = 'unique') =>
       const dateKey = moment(record.date).format('YYYY-MM-DD');
       if (!dateGroups[dateKey]) {
         dateGroups[dateKey] = {
-          present: 0,
-          absent: 0,
+          onTime: 0,
           late: 0,
+          absent: 0,
           halfDay: 0,
           onLeave: 0,
           excused: 0,
@@ -63,39 +74,51 @@ const calculateStatistics = (records, totalEmployees, summaryType = 'unique') =>
       }
       
       const status = record.status?.toLowerCase();
-      if (status === 'present' || status === 'late' || status === 'excused') {
-        dateGroups[dateKey].present++;
+      // Mutually exclusive counting
+      if (status === 'late') {
+        dateGroups[dateKey].late++;
+      } else if (status === 'present') {
+        dateGroups[dateKey].onTime++;
+      } else if (status === 'excused') {
+        dateGroups[dateKey].excused++;
+      } else if (status === 'absent') {
+        dateGroups[dateKey].absent++;
+      } else if (status === 'half-day') {
+        dateGroups[dateKey].halfDay++;
+      } else if (status === 'on-leave') {
+        dateGroups[dateKey].onLeave++;
+      } else if (status === 'incomplete') {
+        dateGroups[dateKey].incomplete++;
       }
-      if (status === 'absent') dateGroups[dateKey].absent++;
-      if (status === 'late') dateGroups[dateKey].late++;
-      if (status === 'half-day') dateGroups[dateKey].halfDay++;
-      if (status === 'on-leave') dateGroups[dateKey].onLeave++;
-      if (status === 'excused') dateGroups[dateKey].excused++;
-      if (status === 'incomplete') dateGroups[dateKey].incomplete++;
     });
 
     const numDays = Object.keys(dateGroups).length || 1;
     const totals = Object.values(dateGroups).reduce(
       (acc, day) => ({
-        present: acc.present + day.present,
-        absent: acc.absent + day.absent,
+        onTime: acc.onTime + day.onTime,
         late: acc.late + day.late,
+        absent: acc.absent + day.absent,
         halfDay: acc.halfDay + day.halfDay,
         onLeave: acc.onLeave + day.onLeave,
         excused: acc.excused + day.excused,
         incomplete: acc.incomplete + day.incomplete
       }),
-      { present: 0, absent: 0, late: 0, halfDay: 0, onLeave: 0, excused: 0, incomplete: 0 }
+      { onTime: 0, late: 0, absent: 0, halfDay: 0, onLeave: 0, excused: 0, incomplete: 0 }
     );
+
+    const avgOnTime = Math.round(totals.onTime / numDays);
+    const avgLate = Math.round(totals.late / numDays);
+    const avgExcused = Math.round(totals.excused / numDays);
 
     return {
       totalEmployees,
-      present: Math.round(totals.present / numDays),
+      present: avgOnTime + avgLate + avgExcused,  // Total average who showed up
+      onTime: avgOnTime,
       absent: Math.round(totals.absent / numDays),
-      late: Math.round(totals.late / numDays),
+      late: avgLate,
       halfDay: Math.round(totals.halfDay / numDays),
       onLeave: Math.round(totals.onLeave / numDays),
-      excused: Math.round(totals.excused / numDays),
+      excused: avgExcused,
       incomplete: Math.round(totals.incomplete / numDays),
       numDays,
       summaryType: 'daily'

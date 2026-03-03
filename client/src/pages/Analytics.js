@@ -158,11 +158,26 @@ const Analytics = () => {
       absent: 0,
       late: 0,
       totalWorkHours: 0,
-      totalOvertime: 0
+      totalOvertime: 0,
+      excused: 0,
+      incomplete: 0
     };
 
-    // Check for monthlyStats first (new format), then fall back to monthAttendance (old format)
-    if (dashboardData?.monthlyStats) {
+    // Use period statistics from summary (respects summaryType toggle)
+    if (dashboardData?.summary) {
+      stats.present = dashboardData.summary.periodPresent || 0;
+      stats.absent = dashboardData.summary.periodAbsent || 0;
+      stats.late = dashboardData.summary.periodLate || 0;
+      stats.excused = dashboardData.summary.periodExcused || 0;
+      stats.incomplete = dashboardData.summary.periodIncomplete || 0;
+      
+      // Fallback to monthlyStats for work hours if period stats not available
+      if (dashboardData.monthlyStats) {
+        stats.totalWorkHours = dashboardData.monthlyStats.totalWorkHours || 0;
+        stats.totalOvertime = dashboardData.monthlyStats.totalOvertime || 0;
+      }
+    } else if (dashboardData?.monthlyStats) {
+      // Fallback to old format if new period stats not available
       stats.present = dashboardData.monthlyStats.presentDays || 0;
       stats.absent = dashboardData.monthlyStats.absentDays || 0;
       stats.late = dashboardData.monthlyStats.lateDays || 0;
