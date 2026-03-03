@@ -744,9 +744,23 @@ exports.generatePDFReport = async (req, res) => {
       // Calculate statistics based on summary type
       const statistics = calculateStatistics(aggregatedRecords, totalEmployees, summaryType);
       
+      // Calculate total worked hours and expected hours for monthly report
+      const totalWorkedHours = finalRecords.reduce((sum, record) => 
+        sum + (record.attendance.totalWorkHours || 0), 0
+      );
+      
+      // Calculate working days in the month (excluding weekends - approximation)
+      const daysInMonth = moment(`${reportYear}-${reportMonth}-01`).daysInMonth();
+      const workingDaysApprox = Math.floor(daysInMonth * (5/7)); // Approximate 5 working days per week
+      const standardHoursPerDay = 8; // Standard 8-hour workday
+      const expectedTotalHours = totalEmployees * workingDaysApprox * standardHoursPerDay;
+      
       reportData = {
         statistics,
-        records: finalRecords
+        records: finalRecords,
+        totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
+        expectedTotalHours: expectedTotalHours,
+        workingDays: workingDaysApprox
       };
       
       reportTitle = `Monthly Attendance Report - ${moment(`${reportYear}-${reportMonth}-01`).format('MMMM YYYY')}`;
@@ -921,6 +935,17 @@ exports.generatePDFReport = async (req, res) => {
       `Absent: ${stats.absent} (${stats.totalEmployees > 0 ? ((stats.absent / stats.totalEmployees) * 100).toFixed(1) : 0}%)`,
       `Incomplete: ${stats.incomplete} (${stats.totalEmployees > 0 ? ((stats.incomplete / stats.totalEmployees) * 100).toFixed(1) : 0}%)`
     ];
+    
+    // Add total hours for monthly reports
+    if (reportData.totalWorkedHours !== undefined && reportData.expectedTotalHours !== undefined) {
+      const utilizationRate = reportData.expectedTotalHours > 0 
+        ? ((reportData.totalWorkedHours / reportData.expectedTotalHours) * 100).toFixed(1) 
+        : 0;
+      statisticsData.push('');  // Empty line for spacing
+      statisticsData.push(`Total Expected Work Hours: ${reportData.expectedTotalHours.toLocaleString()} hrs (${reportData.workingDays} working days)`);
+      statisticsData.push(`Total Worked Hours: ${reportData.totalWorkedHours.toLocaleString()} hrs`);
+      statisticsData.push(`Hour Utilization: ${utilizationRate}%`);
+    }
     
     statisticsData.forEach((text) => {
       doc.fontSize(10).text(text, 70, yPosition);
