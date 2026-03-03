@@ -478,23 +478,23 @@ const Analytics = () => {
           <div className="card">
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Calendar className="w-6 h-6 text-blue-600" />
-              Month Statistics
+              Month Statistics {summaryType === 'unique' ? '(Unique Employees)' : '(Daily Average)'}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-gray-600">Present Days</p>
+                <p className="text-sm text-gray-600">{summaryType === 'unique' ? 'Present' : 'Avg Present'}</p>
                 <p className="text-2xl font-bold text-green-600">{monthStats.present}</p>
               </div>
               <div className="text-center p-4 bg-teal-50 rounded-lg">
-                <p className="text-sm text-gray-600">On-time Days</p>
+                <p className="text-sm text-gray-600">{summaryType === 'unique' ? 'On-time' : 'Avg On-time'}</p>
                 <p className="text-2xl font-bold text-teal-600">{monthStats.onTime}</p>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <p className="text-sm text-gray-600">Late Days</p>
+                <p className="text-sm text-gray-600">{summaryType === 'unique' ? 'Late' : 'Avg Late'}</p>
                 <p className="text-2xl font-bold text-orange-600">{monthStats.late}</p>
               </div>
               <div className="text-center p-4 bg-red-50 rounded-lg">
-                <p className="text-sm text-gray-600">Absent Days</p>
+                <p className="text-sm text-gray-600">{summaryType === 'unique' ? 'Absent' : 'Avg Absent'}</p>
                 <p className="text-2xl font-bold text-red-600">{monthStats.absent}</p>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">

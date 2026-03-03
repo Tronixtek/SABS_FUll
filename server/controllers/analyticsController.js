@@ -403,7 +403,8 @@ exports.getDashboardAnalytics = async (req, res) => {
     console.log(`📊 Month aggregated with absent: ${monthAggregatedWithAbsent.length} (${monthAggregated.length} attended + ${absentRecords.length} absent)`);
     
     // Calculate period statistics using the new helper function based on summaryType
-    const periodStats = calculateStatistics(monthAggregatedWithAbsent, totalEmployees, summaryType);
+    // NOTE: Pass monthAggregated (without pre-generated absent records) so calculateStatistics can properly calculate absent
+    const periodStats = calculateStatistics(monthAggregated, totalEmployees, summaryType);
     
     // Keep the old monthStats format for backward compatibility
     const monthStats = {
