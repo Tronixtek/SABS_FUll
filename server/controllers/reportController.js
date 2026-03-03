@@ -668,22 +668,43 @@ exports.generatePDFReport = async (req, res) => {
     const doc = new PDFDocument({ 
       margin: 50,
       size: 'A4',
-      bufferPages: true
+      bufferPages: true,
+      autoFirstPage: true
+    });
+    
+    // Buffer to collect PDF data
+    const chunks = [];
+    
+    // Collect PDF chunks
+    doc.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    
+    // Handle PDF completion
+    doc.on('end', () => {
+      console.log('✅ PDF generation completed successfully');
+      const pdfBuffer = Buffer.concat(chunks);
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="report_${type}_${moment().format('YYYY-MM-DD')}.pdf"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      
+      // Send the complete PDF
+      res.send(pdfBuffer);
     });
     
     // Handle errors
     doc.on('error', (err) => {
       console.error('❌ PDF document error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'PDF generation failed',
+          error: err.message
+        });
+      }
     });
-    
-    // Set response headers for PDF
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="report_${type}_${moment().format('YYYY-MM-DD')}.pdf"`);
-    
-    console.log('📤 Piping PDF to response...');
-    
-    // Pipe the PDF to response
-    doc.pipe(res);
     
     console.log('✏️ Writing PDF content...');
     
@@ -944,12 +965,39 @@ exports.generatePayrollPDF = async (req, res) => {
     const monthName = moment().month(parseInt(month) - 1).format('MMMM');
     const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
 
-    // Set response headers
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=payroll-report-${monthName}-${year}.pdf`);
-
-    // Pipe the PDF to the response
-    doc.pipe(res);
+    // Buffer to collect PDF data
+    const chunks = [];
+    
+    // Collect PDF chunks
+    doc.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    
+    // Handle PDF completion
+    doc.on('end', () => {
+      console.log('✅ Payroll PDF generation completed successfully');
+      const pdfBuffer = Buffer.concat(chunks);
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=payroll-report-${monthName}-${year}.pdf`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      
+      // Send the complete PDF
+      res.send(pdfBuffer);
+    });
+    
+    // Handle errors
+    doc.on('error', (err) => {
+      console.error('❌ Payroll PDF document error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Payroll PDF generation failed',
+          error: err.message
+        });
+      }
+    });
 
     // Header
     doc.fontSize(20).font('Helvetica-Bold').text('PAYROLL REPORT', { align: 'center' });
