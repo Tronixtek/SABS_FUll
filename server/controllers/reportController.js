@@ -1023,27 +1023,75 @@ exports.generatePDFReport = async (req, res) => {
       
       console.log('✏️ Writing PDF content...');
     
-    // Add header
-    doc.fontSize(20).text('SABS Attendance System', 50, 50);
+    // === PROFESSIONAL HEADER DESIGN ===
+    const pageWidth = 595; // A4 width in points
+    const centerX = pageWidth / 2;
+    
+    // Top decorative line
+    doc.strokeColor('#1976d2')
+       .lineWidth(2)
+       .moveTo(50, 35)
+       .lineTo(545, 35)
+       .stroke();
+    
+    // Organization Name (Main Header)
+    doc.fillColor('#1976d2')
+       .fontSize(18)
+       .font('Helvetica-Bold')
+       .text('Kano State Primary Health Care Management Board', 50, 45, {
+         width: 495,
+         align: 'center'
+       });
+    
+    // System Name (Subtitle)
+    doc.fillColor('#333333')
+       .fontSize(12)
+       .font('Helvetica')
+       .text('Staff Attendance Biometric System', 50, 70, {
+         width: 495,
+         align: 'center'
+       });
+    
+    // Bottom decorative line
+    doc.strokeColor('#1976d2')
+       .lineWidth(1)
+       .moveTo(150, 90)
+       .lineTo(445, 90)
+       .stroke();
+    
+    // Reset colors and font
+    doc.fillColor('black').font('Helvetica');
     
     // Report title with word wrap (may span multiple lines)
-    const titleY = 80;
-    doc.fontSize(14).text(reportTitle, 50, titleY, {
-      width: 495, // A4 width minus margins
-      align: 'left',
-      lineGap: 3
-    });
+    const titleY = 105;
+    doc.fontSize(14)
+       .font('Helvetica-Bold')
+       .text(reportTitle, 50, titleY, {
+         width: 495, // A4 width minus margins
+         align: 'left',
+         lineGap: 3
+       });
     
     // Calculate where title ended (account for potential wrapping)
     const titleLines = Math.ceil(doc.widthOfString(reportTitle) / 495) || 1;
     const titleHeight = titleLines * 17; // ~17px per line at font size 14
     const generatedY = titleY + titleHeight + 5;
     
-    doc.fontSize(10).text(`Generated: ${moment().format('MMM DD, YYYY hh:mm A')}`, 50, generatedY);
+    doc.fontSize(10)
+       .font('Helvetica')
+       .fillColor('#666666')
+       .text(`Generated: ${moment().format('MMM DD, YYYY hh:mm A')}`, 50, generatedY);
     
-    // Add line below header
+    // Add separator line below header section
     const lineY = generatedY + 20;
-    doc.moveTo(50, lineY).lineTo(545, lineY).stroke();
+    doc.strokeColor('#cccccc')
+       .lineWidth(0.5)
+       .moveTo(50, lineY)
+       .lineTo(545, lineY)
+       .stroke();
+    
+    // Reset for content
+    doc.fillColor('black').strokeColor('black');
     
     let yPosition = lineY + 25;
     
