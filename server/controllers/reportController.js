@@ -1723,3 +1723,420 @@ exports.generatePayrollPDF = async (req, res) => {
     }
   }
 };
+
+/**
+ * Generate monthly report PDF and return buffer (for email attachments)
+ * @param {Object} options - Report options
+ * @param {String} options.facilityId - Facility ID
+ * @param {String} options.startDate - Start date (YYYY-MM-DD)
+ * @param {String} options.endDate - End date (YYYY-MM-DD)
+ * @returns {Promise<Buffer>} PDF buffer
+ */
+exports.generateMonthlyReportPDF = async (options) => {
+  try {
+    const { facilityId, startDate, endDate } = options;
+    
+    const start = moment(startDate).startOf('day').toDate();
+    const end = moment(endDate).endOf('day').toDate();
+    
+    const query = {
+      date: { $gte: start, $lte: end }
+    };
+    
+    if (facilityId) query.facility = facilityId;
+    
+    // Fetch attendance data
+    const rawAttendance = await Attendance.find(query)
+      .populate('employee', 'employeeId firstName lastName department designation')
+      .populate('facility', 'name code')
+      .populate('shift', 'name startTime endTime workingHours')
+      .sort({ date: 1, timestamp: 1 });
+    
+    const aggregatedRecords = aggregateAttendanceRecords(rawAttendance);
+    
+    // Group by employee for monthly summary
+    const employeeSummary = new Map();
+    
+    aggregatedRecords.forEach(record => {
+      if (!record.employee || !record.employee._id) return;
+      
+      const employeeId = record.employee._id.toString();
+      
+      if (!employeeSummary.has(employeeId)) {
+        employeeSummary.set(employeeId, {
+          employee: record.employee,
+          facility: record.facility,
+          attendance: {
+            totalDays: 0,
+            present: 0,
+            absent: 0,
+            late: 0,
+            excused: 0,
+            totalWorkHours: 0,
+            totalOvertime: 0
+          }
+        });
+      }
+      
+      const summary = employeeSummary.get(employeeId);
+      summary.attendance.totalDays++;
+      
+      switch(record.status) {
+        case 'present':
+          summary.attendance.present++;
+          break;
+        case 'late':
+          summary.attendance.late++;
+          summary.attendance.present++;
+          break;
+        case 'absent':
+          summary.attendance.absent++;
+          break;
+        case 'excused':
+          summary.attendance.excused++;
+          break;
+      }
+      
+      summary.attendance.totalWorkHours += record.workHours || 0;
+      summary.attendance.totalOvertime += record.overtime || 0;
+    });
+    
+    const finalRecords = Array.from(employeeSummary.values());
+    
+    // Calculate days in the period
+    const daysInPeriod = moment(end).diff(moment(start), 'days') + 1;
+    
+    // Fetch employees with shifts
+    const employeeIdsInRecords = finalRecords.map(r => r.employee._id);
+    const employeeFilter = { 
+      _id: { $in: employeeIdsInRecords }
+    };
+    if (facilityId) employeeFilter.facility = facilityId;
+    
+    const employeesWithShifts = await Employee.find(employeeFilter)
+      .populate('shift', 'workingHours workingDays')
+      .populate('facility', 'name code')
+      .lean();
+    
+    const employeeShiftMap = new Map();
+    employeesWithShifts.forEach(emp => {
+      employeeShiftMap.set(emp._id.toString(), emp.shift);
+    });
+    
+    // Calculate attendance metrics
+    finalRecords.forEach(record => {
+      const employeeId = record.employee._id.toString();
+      const employeeShift = employeeShiftMap.get(employeeId);
+      
+      let workingDaysPerWeek = 7;
+      if (employeeShift?.workingDays && employeeShift.workingDays.length > 0) {
+        workingDaysPerWeek = employeeShift.workingDays.length;
+      }
+      
+      const weeksInPeriod = daysInPeriod / 7;
+      const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInPeriod);
+      
+      const attendedDays = record.attendance.present + record.attendance.excused;
+      const actualAbsentDays = Math.max(0, expectedWorkingDays - attendedDays);
+      
+      record.attendance.totalDays = expectedWorkingDays;
+      record.attendance.absent = actualAbsentDays;
+      
+      const presentDays = record.attendance.present;
+      record.attendance.attendancePercentage = expectedWorkingDays > 0 
+        ? Math.round((presentDays / expectedWorkingDays) * 100 * 100) / 100 
+        : 0;
+      record.attendance.totalWorkHours = Math.round(record.attendance.totalWorkHours * 100) / 100;
+      record.attendance.totalOvertime = Math.round(record.attendance.totalOvertime * 100) / 100;
+    });
+    
+    // Calculate statistics
+    const statsEmployeeFilter = { status: 'active' };
+    if (facilityId) statsEmployeeFilter.facility = facilityId;
+    const totalEmployees = await Employee.countDocuments(statsEmployeeFilter);
+    
+    const statistics = calculateStatistics(aggregatedRecords, totalEmployees, 'unique');
+    
+    // Calculate total worked hours
+    const totalWorkedHours = finalRecords.reduce((sum, record) => 
+      sum + (record.attendance.totalWorkHours || 0), 0
+    );
+    
+    const expectedTotalHours = employeesWithShifts.reduce((total, emp) => {
+      const shiftHours = emp.shift?.workingHours || 8;
+      let workingDaysPerWeek = 7;
+      if (emp.shift?.workingDays && emp.shift.workingDays.length > 0) {
+        workingDaysPerWeek = emp.shift.workingDays.length;
+      }
+      const weeksInPeriod = daysInPeriod / 7;
+      const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInPeriod);
+      return total + (shiftHours * expectedWorkingDays);
+    }, 0);
+    
+    // Get facility name
+    let facilityName = 'All Facilities';
+    if (facilityId) {
+      const facility = await Facility.findById(facilityId);
+      if (facility) facilityName = facility.name;
+    }
+    
+    const reportTitle = `Monthly Attendance Report - ${facilityName}`;
+    const reportData = {
+      statistics,
+      records: finalRecords,
+      totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
+      expectedTotalHours: Math.round(expectedTotalHours * 100) / 100,
+      workingDays: Math.floor(daysInPeriod * (workingDaysPerWeek / 7))
+    };
+    
+    // Generate PDF
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 40 });
+      const chunks = [];
+      
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      
+      // === PROFESSIONAL HEADER DESIGN ===
+      const pageWidth = 595;
+      const centerX = pageWidth / 2;
+      
+      // Top decorative line
+      doc.strokeColor('#1976d2')
+         .lineWidth(2)
+         .moveTo(50, 35)
+         .lineTo(545, 35)
+         .stroke();
+      
+      // Organization Name
+      doc.fillColor('#1976d2')
+         .fontSize(18)
+         .font('Helvetica-Bold')
+         .text('Kano State Primary Health Care Management Board', 50, 45, {
+           width: 495,
+           align: 'center'
+         });
+      
+      // System Name
+      doc.fillColor('#333333')
+         .fontSize(12)
+         .font('Helvetica')
+         .text('Staff Attendance Biometric System', 50, 70, {
+           width: 495,
+           align: 'center'
+         });
+      
+      // Bottom decorative line
+      doc.strokeColor('#1976d2')
+         .lineWidth(1)
+         .moveTo(150, 90)
+         .lineTo(445, 90)
+         .stroke();
+      
+      // Reset colors and font
+      doc.fillColor('black').font('Helvetica');
+      
+      // Report title
+      const titleY = 105;
+      doc.fontSize(14)
+         .font('Helvetica-Bold')
+         .text(reportTitle, 50, titleY, {
+           width: 495,
+           align: 'left',
+           lineGap: 3
+         });
+      
+      const titleLines = Math.ceil(doc.widthOfString(reportTitle) / 495) || 1;
+      const titleHeight = titleLines * 17;
+      const generatedY = titleY + titleHeight + 5;
+      
+      doc.fontSize(10)
+         .font('Helvetica')
+         .fillColor('#666666')
+         .text(`Period: ${moment(startDate).format('MMM DD, YYYY')} - ${moment(endDate).format('MMM DD, YYYY')}`, 50, generatedY);
+      
+      doc.text(`Generated: ${moment().format('MMM DD, YYYY hh:mm A')}`, 50, generatedY + 15);
+      
+      // Add separator line
+      const lineY = generatedY + 35;
+      doc.strokeColor('#cccccc')
+         .lineWidth(0.5)
+         .moveTo(50, lineY)
+         .lineTo(545, lineY)
+         .stroke();
+      
+      doc.fillColor('black').strokeColor('black');
+      
+      let yPosition = lineY + 25;
+      
+      // Statistics
+      doc.fontSize(14).font('Helvetica-Bold').text('Summary Statistics', 50, yPosition);
+      yPosition += 25;
+      
+      doc.fontSize(10).font('Helvetica');
+      const stats = [
+        ['Total Employees:', reportData.statistics.totalEmployees],
+        ['Present:', reportData.statistics.present],
+        ['Absent:', reportData.statistics.absent],
+        ['Late Arrivals:', reportData.statistics.late],
+        ['On Leave:', reportData.statistics.onLeave || 0],
+        ['Total Work Hours:', `${reportData.totalWorkedHours.toFixed(2)} hrs`],
+        ['Expected Hours:', `${reportData.expectedTotalHours.toFixed(2)} hrs`],
+        ['Utilization Rate:', `${((reportData.totalWorkedHours / reportData.expectedTotalHours) * 100).toFixed(1)}%`]
+      ];
+      
+      stats.forEach(([label, value]) => {
+        doc.text(label, 60, yPosition, { continued: true })
+           .text(String(value), 300, yPosition);
+        yPosition += 18;
+      });
+      
+      yPosition += 15;
+      
+      // Employee records table
+      doc.fontSize(14).font('Helvetica-Bold').text('Employee Attendance', 50, yPosition);
+      yPosition += 25;
+      
+      // Table headers
+      doc.fontSize(9).font('Helvetica-Bold');
+      doc.text('Employee ID', 50, yPosition);
+      doc.text('Name', 120, yPosition);
+      doc.text('Present', 280, yPosition);
+      doc.text('Absent', 330, yPosition);
+      doc.text('Late', 375, yPosition);
+      doc.text('Work Hrs', 420, yPosition);
+      doc.text('Attendance %', 485, yPosition);
+      
+      yPosition += 15;
+      doc.strokeColor('#cccccc').lineWidth(0.5)
+         .moveTo(50, yPosition)
+         .lineTo(545, yPosition)
+         .stroke();
+      
+      yPosition += 10;
+      
+      // Table rows
+      doc.fontSize(8).font('Helvetica');
+      reportData.records.forEach((record, index) => {
+        if (yPosition > 720) {
+          doc.addPage();
+          yPosition = 50;
+        }
+        
+        const emp = record.employee;
+        const att = record.attendance;
+        
+        doc.text(emp.employeeId || 'N/A', 50, yPosition, { width: 65 });
+        doc.text(`${emp.firstName} ${emp.lastName}`, 120, yPosition, { width: 155 });
+        doc.text(String(att.present || 0), 280, yPosition, { width: 45 });
+        doc.text(String(att.absent || 0), 330, yPosition, { width: 40 });
+        doc.text(String(att.late || 0), 375, yPosition, { width: 40 });
+        doc.text((att.totalWorkHours || 0).toFixed(1), 420, yPosition, { width: 60 });
+        doc.text(`${(att.attendancePercentage || 0).toFixed(1)}%`, 485, yPosition, { width: 60 });
+        
+        yPosition += 20;
+      });
+      
+      // Footer
+      doc.fontSize(8).font('Helvetica').fillColor('gray');
+      doc.text(
+        `Generated on ${moment().format('MMMM D, YYYY [at] h:mm A')}`,
+        40,
+        doc.page.height - 50,
+        { align: 'center' }
+      );
+      
+      doc.end();
+    });
+    
+  } catch (error) {
+    console.error('Error generating monthly report PDF:', error);
+    throw error;
+  }
+};
+
+/**
+ * Send report via email (on-demand)
+ */
+exports.sendReportEmail = async (req, res) => {
+  try {
+    const { facilityId, startDate, endDate, recipients, additionalEmails } = req.body;
+    
+    if (!facilityId || !startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Facility, start date, and end date are required'
+      });
+    }
+    
+    if ((!recipients || recipients.length === 0) && 
+        (!additionalEmails || additionalEmails.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one recipient is required'
+      });
+    }
+    
+    // Get facility details
+    const facility = await Facility.findById(facilityId);
+    if (!facility) {
+      return res.status(404).json({
+        success: false,
+        message: 'Facility not found'
+      });
+    }
+    
+    // Get recipient emails
+    const emailAddresses = [];
+    
+    if (recipients && recipients.length > 0) {
+      const users = await User.find({ _id: { $in: recipients } });
+      emailAddresses.push(...users.map(u => u.email).filter(Boolean));
+    }
+    
+    if (additionalEmails && additionalEmails.length > 0) {
+      emailAddresses.push(...additionalEmails);
+    }
+    
+    if (emailAddresses.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid email addresses found'
+      });
+    }
+    
+    // Generate PDF
+    const pdfBuffer = await exports.generateMonthlyReportPDF({
+      facilityId,
+      startDate,
+      endDate
+    });
+    
+    // Send email
+    const { sendReportEmail: sendEmail } = require('../utils/emailService');
+    
+    await sendEmail({
+      recipients: emailAddresses,
+      subject: `Attendance Report - ${facility.name}`,
+      reportType: 'custom',
+      pdfBuffer,
+      facilityName: facility.name,
+      startDate: moment(startDate).format('MMM D, YYYY'),
+      endDate: moment(endDate).format('MMM D, YYYY')
+    });
+    
+    res.json({
+      success: true,
+      message: `Report sent successfully to ${emailAddresses.length} recipient(s)`
+    });
+    
+  } catch (error) {
+    console.error('Error sending report email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send report email',
+      error: error.message
+    });
+  }
+};

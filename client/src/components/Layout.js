@@ -15,6 +15,7 @@ import {
   XMarkIcon,
   BellIcon,
   CalendarIcon,
+  CalendarDaysIcon,
   BanknotesIcon,
   AcademicCapIcon
 } from '@heroicons/react/24/outline';
@@ -49,6 +50,7 @@ const Layout = () => {
     { name: 'Shifts', to: '/app/shifts', icon: ClockIcon },
     { name: 'Monthly Rosters', to: '/app/rosters', icon: CalendarIcon, permission: 'manage_settings' },
     { name: 'Reports', to: '/app/reports', icon: DocumentTextIcon },
+    { name: 'Scheduled Reports', to: '/app/scheduled-reports', icon: CalendarDaysIcon, permission: 'view_reports' },
     { name: 'Analytics', to: '/app/analytics', icon: ChartBarIcon },
     { name: 'Users', to: '/app/users', icon: UsersIcon, permission: 'manage_users' },
     { name: 'Settings', to: '/app/settings', icon: Cog6ToothIcon },

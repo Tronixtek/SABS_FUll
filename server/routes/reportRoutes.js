@@ -6,7 +6,8 @@ const {
   getCustomReport,
   generatePDFReport,
   getPayrollReport,
-  generatePayrollPDF
+  generatePayrollPDF,
+  sendReportEmail
 } = require('../controllers/reportController');
 const { protect, checkPermission } = require('../middleware/auth');
 
@@ -19,5 +20,6 @@ router.get('/custom', getCustomReport);
 router.get('/pdf', generatePDFReport);
 router.get('/payroll', getPayrollReport);
 router.get('/payroll-pdf', generatePayrollPDF);
+router.post('/send-email', sendReportEmail);
 
 module.exports = router;

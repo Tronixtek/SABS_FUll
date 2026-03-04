@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Clock,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  Mail,
+  X
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -30,6 +32,12 @@ const Reports = () => {
   const [reportData, setReportData] = useState(null);
   const [facilities, setFacilities] = useState([]);
   const [summaryType, setSummaryType] = useState('unique'); // 'unique' or 'daily'
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [emailRecipients, setEmailRecipients] = useState([]);
+  const [additionalEmails, setAdditionalEmails] = useState([]);
+  const [emailInput, setEmailInput] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [filters, setFilters] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     startDate: format(new Date(), 'yyyy-MM-01'),
@@ -41,6 +49,7 @@ const Reports = () => {
 
   useEffect(() => {
     fetchFacilities();
+    fetchUsers();
   }, []);
 
   const fetchFacilities = async () => {
@@ -49,6 +58,15 @@ const Reports = () => {
       setFacilities(response.data.data);
     } catch (error) {
       console.error('Failed to fetch facilities');
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get('/api/auth/users');
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Failed to fetch users');
     }
   };
 
@@ -290,6 +308,59 @@ const Reports = () => {
     }
   };
 
+  const handleAddEmail = () => {
+    const email = emailInput.trim();
+    if (email && /^\S+@\S+\.\S+$/.test(email)) {
+      if (!additionalEmails.includes(email)) {
+        setAdditionalEmails([...additionalEmails, email]);
+      }
+      setEmailInput('');
+    } else if (email) {
+      toast.error('Please enter a valid email address');
+    }
+  };
+
+  const handleRemoveEmail = (email) => {
+    setAdditionalEmails(additionalEmails.filter(e => e !== email));
+  };
+
+  const sendReportEmail = async () => {
+    try {
+      if (emailRecipients.length === 0 && additionalEmails.length === 0) {
+        toast.error('Please select at least one recipient');
+        return;
+      }
+
+      if (!filters.facility) {
+        toast.error('Please select a facility before sending email');
+        return;
+      }
+
+      setSendingEmail(true);
+      
+      const payload = {
+        facilityId: filters.facility,
+        startDate: reportType === 'daily' ? filters.date : filters.startDate,
+        endDate: reportType === 'daily' ? filters.date : filters.endDate,
+        recipients: emailRecipients.map(r => r._id),
+        additionalEmails
+      };
+
+      await axios.post('/api/reports/send-email', payload);
+      
+      toast.success('Report sent successfully!');
+      setEmailDialogOpen(false);
+      setEmailRecipients([]);
+      setAdditionalEmails([]);
+      setEmailInput('');
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      toast.error(error.response?.data?.message || 'Failed to send email. Please try again.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -320,6 +391,13 @@ const Reports = () => {
             >
               <FileText className="w-4 h-4" />
               Export PDF
+            </button>
+            <button
+              onClick={() => setEmailDialogOpen(true)}
+              className="flex-1 sm:flex-none bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              <Mail className="w-4 h-4" />
+              Send Email
             </button>
           </div>
         )}
@@ -998,6 +1076,140 @@ const Reports = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Email Dialog */}
+      {emailDialogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-800">Send Report via Email</h3>
+              <button
+                onClick={() => setEmailDialogOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* System Recipients */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  System Recipients
+                </label>
+                <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-auto">
+                  {users.length === 0 ? (
+                    <p className="text-sm text-gray-500">No users available</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {users.map((user) => (
+                        <label key={user._id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={emailRecipients.some(r => r._id === user._id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEmailRecipients([...emailRecipients, user]);
+                              } else {
+                                setEmailRecipients(emailRecipients.filter(r => r._id !== user._id));
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {user.name} ({user.email})
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Emails */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Additional Email Addresses
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddEmail()}
+                    placeholder="email@example.com"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={handleAddEmail}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {additionalEmails.map((email) => (
+                    <div
+                      key={email}
+                      className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                    >
+                      <span>{email}</span>
+                      <button
+                        onClick={() => handleRemoveEmail(email)}
+                        className="hover:text-blue-900"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Report Info */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h4 className="text-sm font-medium text-gray-800 mb-2">Report Details</h4>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p><strong>Type:</strong> {reportType.charAt(0).toUpperCase() + reportType.slice(1)}</p>
+                  <p><strong>Facility:</strong> {facilities.find(f => f._id === filters.facility)?.name || 'Not selected'}</p>
+                  {reportType === 'daily' && (
+                    <p><strong>Date:</strong> {format(new Date(filters.date), 'MMM dd, yyyy')}</p>
+                  )}
+                  {(reportType === 'monthly' || reportType === 'custom') && (
+                    <p><strong>Period:</strong> {format(new Date(filters.startDate), 'MMM dd, yyyy')} - {format(new Date(filters.endDate), 'MMM dd, yyyy')}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => setEmailDialogOpen(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                disabled={sendingEmail}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendReportEmail}
+                disabled={sendingEmail || (emailRecipients.length === 0 && additionalEmails.length === 0)}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sendingEmail ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    <span>Send Email</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -42,6 +42,7 @@ const salaryGradeRoutes = require('./routes/salaryGradeRoutes');
 const staffIdPrefixRoutes = require('./routes/staffIdPrefix');
 const publicRoutes = require('./routes/publicRoutes');
 const rosterRoutes = require('./routes/rosterRoutes');
+const reportScheduleRoutes = require('./routes/reportScheduleRoutes');
 
 // Models
 const Employee = require('./models/Employee');
@@ -49,6 +50,8 @@ const SyncFailure = require('./models/SyncFailure');
 
 // Import services
 const DataSyncService = require('./services/dataSyncService');
+const { initializeScheduledReports } = require('./services/scheduledReports');
+const { verifyEmailConfig } = require('./utils/emailService');
 
 const app = express();
 
@@ -142,6 +145,12 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => {
   console.log('✅ MongoDB Connected Successfully');
   
+  // Verify email configuration
+  verifyEmailConfig();
+  
+  // Initialize scheduled reports
+  initializeScheduledReports();
+  
   // Start data sync service after DB connection
   const dataSyncService = new DataSyncService();
   dataSyncService.startSync();
@@ -172,6 +181,7 @@ app.use('/api/salary-grades', salaryGradeRoutes);
 app.use('/api/staff-id-prefix', staffIdPrefixRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/rosters', rosterRoutes);
+app.use('/api/report-schedules', reportScheduleRoutes);
 
 // Debug route to check if files exist
 app.get('/uploads/debug', (req, res) => {

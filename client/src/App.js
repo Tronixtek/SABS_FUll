@@ -16,6 +16,7 @@ import Attendance from './pages/Attendance';
 import Facilities from './pages/Facilities';
 import Shifts from './pages/Shifts';
 import Reports from './pages/Reports';
+import ScheduledReports from './pages/ScheduledReports';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
@@ -66,6 +67,7 @@ function App() {
               <Route path="shifts" element={<Shifts />} />
               <Route path="rosters" element={<MonthlyRosterManagement />} />
               <Route path="reports" element={<Reports />} />
+              <Route path="scheduled-reports" element={<ScheduledReports />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="users" element={<Users />} />
               <Route path="settings" element={<Settings />} />
