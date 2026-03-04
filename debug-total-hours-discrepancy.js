@@ -100,11 +100,11 @@ const aggregateAttendanceRecords = (rawRecords) => {
 
 async function debugTotalHours() {
   try {
-    // Get current month range (same as Analytics page)
-    const start = moment().startOf('month').toDate();
-    const end = moment().endOf('month').toDate();
+    // Check February 2026 (the month in the PDF report)
+    const start = moment('2026-02-01').startOf('month').toDate();
+    const end = moment('2026-02-28').endOf('month').toDate();
     
-    console.log('\n📅 Date Range (Current Month):');
+    console.log('\n📅 Date Range (February 2026):');
     console.log('Start:', moment(start).format('YYYY-MM-DD HH:mm:ss'));
     console.log('End:', moment(end).format('YYYY-MM-DD HH:mm:ss'));
     console.log('');
