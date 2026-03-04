@@ -6,6 +6,7 @@ require('dotenv').config({ path: './server/.env' });
 const mongoose = require('mongoose');
 const moment = require('moment');
 const Attendance = require('./server/models/Attendance');
+const Facility = require('./server/models/Facility');
 
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,

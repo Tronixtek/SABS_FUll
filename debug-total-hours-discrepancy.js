@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const moment = require('moment');
 const Attendance = require('./server/models/Attendance');
 const Employee = require('./server/models/Employee');
+const Facility = require('./server/models/Facility');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
