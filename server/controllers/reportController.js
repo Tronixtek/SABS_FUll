@@ -2041,8 +2041,8 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     ];
     
     summaryStats.forEach(([label, value]) => {
-      doc.text(label, 60, yPosition, { continued: true })
-         .text(String(value), 300, yPosition);
+      doc.text(label, 60, yPosition);
+      doc.text(String(value), 280, yPosition);
       yPosition += 18;
     });
     
@@ -2275,11 +2275,13 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       yPosition = 50;
       
       // Facility header
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#1976d2')
-         .text(`Detailed Report: ${group.facility.name}`, 50, yPosition);
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#1976d2');
+      const facilityName = String(group.facility.name || 'Unknown Facility');
+      doc.text('Detailed Report - ' + facilityName, 50, yPosition);
       yPosition += 10;
-      doc.fontSize(10).font('Helvetica').fillColor('#666666')
-         .text(`Code: ${group.facility.code || 'N/A'}`, 50, yPosition);
+      doc.fontSize(10).font('Helvetica').fillColor('#666666');
+      const facilityCode = String(group.facility.code || 'N/A');
+      doc.text('Code - ' + facilityCode, 50, yPosition);
       yPosition += 25;
       
       // Facility stats
