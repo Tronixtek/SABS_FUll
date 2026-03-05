@@ -139,7 +139,8 @@ const LeaveManagement = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get('/api/employees');
+      // Fetch all active employees for the dropdown (no pagination limit)
+      const response = await axios.get('/api/employees?limit=10000&status=active');
       setEmployees(response.data.data || []);
     } catch (error) {
       console.error('Failed to fetch employees:', error);
