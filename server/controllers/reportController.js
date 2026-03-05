@@ -1805,6 +1805,7 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
           absent: 0,
           late: 0,
           excused: 0,
+          incomplete: 0,
           totalWorkHours: 0,
           totalOvertime: 0,
           lateCount: 0
@@ -1829,6 +1830,10 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         break;
       case 'excused':
         summary.attendance.excused++;
+        break;
+      case 'incomplete':
+        summary.attendance.incomplete++;
+        summary.attendance.present++; // Incomplete means they showed up
         break;
     }
     
@@ -1897,8 +1902,11 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
           totalPresent: 0,
           totalAbsent: 0,
           totalLate: 0,
+          totalExcused: 0,
+          totalIncomplete: 0,
           totalWorkHours: 0,
-          totalOvertime: 0
+          totalOvertime: 0,
+          expectedWorkHours: 0
         },
         topPerformers: [],
         frequentLateArrivals: [],
@@ -1912,6 +1920,8 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     group.stats.totalPresent += record.attendance.present;
     group.stats.totalAbsent += record.attendance.absent;
     group.stats.totalLate += record.attendance.late;
+    group.stats.totalExcused += record.attendance.excused;
+    group.stats.totalIncomplete += record.attendance.incomplete;
     group.stats.totalWorkHours += record.attendance.totalWorkHours;
     group.stats.totalOvertime += record.attendance.totalOvertime;
   });
@@ -1936,6 +1946,37 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       group.stats.totalEmployees = count;
     }
   });
+  
+  // Calculate expected work hours per facility
+  for (const [facilityId, group] of facilityGroups) {
+    const facilityEmployees = await Employee.find({ 
+      facility: facilityId,
+      status: 'active',
+      isDeleted: false
+    }).populate('shift', 'workingHours workingDays').lean();
+    
+    let totalExpectedHours = 0;
+    facilityEmployees.forEach(emp => {
+      const shift = emp.shift;
+      let workingDaysPerWeek = 7;
+      let hoursPerDay = 8;
+      
+      if (shift) {
+        if (shift.workingDays && shift.workingDays.length > 0) {
+          workingDaysPerWeek = shift.workingDays.length;
+        }
+        if (shift.workingHours) {
+          hoursPerDay = shift.workingHours;
+        }
+      }
+      
+      const weeksInPeriod = daysInPeriod / 7;
+      const expectedWorkDays = Math.floor(workingDaysPerWeek * weeksInPeriod);
+      totalExpectedHours += expectedWorkDays * hoursPerDay;
+    });
+    
+    group.stats.expectedWorkHours = totalExpectedHours;
+  }
   
   // Get total active employees globally (matching dashboard count)
   const totalEmployeesGlobal = await Employee.countDocuments({ 
@@ -2311,16 +2352,44 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       doc.text('Facility Code: ' + facilityCode, 50, yPosition);
       yPosition += 25;
       
-      // Facility stats
-      doc.fillColor('black').fontSize(10);
+      // Facility stats with percentages
+      doc.fillColor('black').fontSize(10).font('Helvetica-Bold');
       doc.text(`Total Employees: ${group.stats.totalEmployees}`, 60, yPosition);
+      yPosition += 18;
+      
+      doc.font('Helvetica');
+      const presentPct = group.stats.totalEmployees > 0 ? ((group.stats.totalPresent / group.stats.totalEmployees) * 100).toFixed(1) : '0.0';
+      doc.text(`Present: ${group.stats.totalPresent} (${presentPct}%)`, 60, yPosition);
       yPosition += 15;
-      doc.text(`Total Present Days: ${group.stats.totalPresent}`, 60, yPosition);
+      
+      const latePct = group.stats.totalEmployees > 0 ? ((group.stats.totalLate / group.stats.totalEmployees) * 100).toFixed(1) : '0.0';
+      doc.text(`Late: ${group.stats.totalLate} (${latePct}%)`, 60, yPosition);
       yPosition += 15;
-      doc.text(`Total Late: ${group.stats.totalLate}`, 60, yPosition);
+      
+      const excusedPct = group.stats.totalEmployees > 0 ? ((group.stats.totalExcused / group.stats.totalEmployees) * 100).toFixed(1) : '0.0';
+      doc.text(`Excused: ${group.stats.totalExcused} (${excusedPct}%)`, 60, yPosition);
       yPosition += 15;
-      doc.text(`Total Work Hours: ${group.stats.totalWorkHours.toFixed(2)} hrs`, 60, yPosition);
+      
+      const absentPct = group.stats.totalEmployees > 0 ? ((group.stats.totalAbsent / group.stats.totalEmployees) * 100).toFixed(1) : '0.0';
+      doc.text(`Absent: ${group.stats.totalAbsent} (${absentPct}%)`, 60, yPosition);
       yPosition += 15;
+      
+      const incompletePct = group.stats.totalEmployees > 0 ? ((group.stats.totalIncomplete / group.stats.totalEmployees) * 100).toFixed(1) : '0.0';
+      doc.text(`Incomplete: ${group.stats.totalIncomplete} (${incompletePct}%)`, 60, yPosition);
+      yPosition += 15;
+      
+      // Calculate working days in period
+      const workingDaysInPeriod = Math.ceil(daysInPeriod * (5/7)); // Approximate working days
+      doc.text(`Total Expected Work Hours: ${group.stats.expectedWorkHours.toFixed(0)} hrs (${workingDaysInPeriod} working days)`, 60, yPosition);
+      yPosition += 15;
+      
+      doc.text(`Total Worked Hours: ${group.stats.totalWorkHours.toFixed(2)} hrs`, 60, yPosition);
+      yPosition += 15;
+      
+      const hourUtilization = group.stats.expectedWorkHours > 0 ? ((group.stats.totalWorkHours / group.stats.expectedWorkHours) * 100).toFixed(1) : '0.0';
+      doc.text(`Hour Utilization: ${hourUtilization}%`, 60, yPosition);
+      yPosition += 20;
+      
       doc.text(`Total Overtime: ${group.stats.totalOvertime.toFixed(2)} hrs`, 60, yPosition);
       yPosition += 25;
       
