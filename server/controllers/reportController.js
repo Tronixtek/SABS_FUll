@@ -2277,11 +2277,12 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       // Facility header
       doc.fontSize(14).font('Helvetica-Bold').fillColor('#1976d2');
       const facilityName = String(group.facility.name || 'Unknown Facility');
-      doc.text('Detailed Report - ' + facilityName, 50, yPosition);
-      yPosition += 10;
+      doc.text(facilityName, 50, yPosition);
+      yPosition += 20;
+      
       doc.fontSize(10).font('Helvetica').fillColor('#666666');
       const facilityCode = String(group.facility.code || 'N/A');
-      doc.text('Code - ' + facilityCode, 50, yPosition);
+      doc.text('Facility Code: ' + facilityCode, 50, yPosition);
       yPosition += 25;
       
       // Facility stats
