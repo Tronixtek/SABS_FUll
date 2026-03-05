@@ -2095,7 +2095,7 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         yPosition = 50;
       }
       
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#006400').text('🏆 Top Performers (Best Attendance)', 50, yPosition);
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#006400').text('TOP PERFORMERS (Best Attendance)', 50, yPosition);
       yPosition += 25;
       
       doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
@@ -2144,7 +2144,7 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         yPosition = 50;
       }
       
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#DC143C').text('⚠️  Frequent Late Arrivals', 50, yPosition);
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#DC143C').text('FREQUENT LATE ARRIVALS', 50, yPosition);
       yPosition += 25;
       
       doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
@@ -2192,7 +2192,7 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         yPosition = 50;
       }
       
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#4169E1').text('⏰ Top Overtime Workers', 50, yPosition);
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#4169E1').text('TOP OVERTIME WORKERS', 50, yPosition);
       yPosition += 25;
       
       doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
