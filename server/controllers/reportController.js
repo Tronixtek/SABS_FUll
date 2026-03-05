@@ -2036,7 +2036,13 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     sum + (record.attendance.totalWorkHours || 0), 0
   );
   
-  const expectedTotalHours = employeesWithShifts.reduce((total, emp) => {
+  // Calculate expected hours based on ALL active employees (not just those with records)
+  const allActiveEmployees = await Employee.find({ 
+    status: 'active',
+    isDeleted: false
+  }).populate('shift', 'workingHours workingDays').lean();
+  
+  const expectedTotalHours = allActiveEmployees.reduce((total, emp) => {
     const shiftHours = emp.shift?.workingHours || 8;
     let workingDaysPerWeek = 7;
     if (emp.shift?.workingDays && emp.shift.workingDays.length > 0) {
