@@ -1806,6 +1806,7 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
           late: 0,
           excused: 0,
           incomplete: 0,
+          onLeave: 0,
           totalWorkHours: 0,
           totalOvertime: 0,
           lateCount: 0
@@ -1834,6 +1835,9 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       case 'incomplete':
         summary.attendance.incomplete++;
         summary.attendance.present++; // Incomplete means they showed up
+        break;
+      case 'on-leave':
+        summary.attendance.onLeave++;
         break;
     }
     
@@ -1904,6 +1908,7 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
           totalLate: 0,
           totalExcused: 0,
           totalIncomplete: 0,
+          totalOnLeave: 0,
           totalWorkHours: 0,
           totalOvertime: 0,
           expectedWorkHours: 0
@@ -1922,6 +1927,7 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     group.stats.totalLate += record.attendance.late;
     group.stats.totalExcused += record.attendance.excused;
     group.stats.totalIncomplete += record.attendance.incomplete;
+    group.stats.totalOnLeave += record.attendance.onLeave;
     group.stats.totalWorkHours += record.attendance.totalWorkHours;
     group.stats.totalOvertime += record.attendance.totalOvertime;
   });
@@ -2378,6 +2384,10 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       doc.text(`Incomplete: ${group.stats.totalIncomplete} (${incompletePct}%)`, 60, yPosition);
       yPosition += 15;
       
+      const onLeavePct = group.stats.totalEmployees > 0 ? ((group.stats.totalOnLeave / group.stats.totalEmployees) * 100).toFixed(1) : '0.0';
+      doc.text(`On Leave: ${group.stats.totalOnLeave} (${onLeavePct}%)`, 60, yPosition);
+      yPosition += 15;
+      
       // Calculate working days in period
       const workingDaysInPeriod = Math.ceil(daysInPeriod * (5/7)); // Approximate working days
       doc.text(`Total Expected Work Hours: ${group.stats.expectedWorkHours.toFixed(0)} hrs (${workingDaysInPeriod} working days)`, 60, yPosition);
@@ -2525,6 +2535,7 @@ exports.generateMonthlyReportPDF = async (options) => {
             absent: 0,
             late: 0,
             excused: 0,
+            onLeave: 0,
             totalWorkHours: 0,
             totalOvertime: 0
           }
@@ -2547,6 +2558,9 @@ exports.generateMonthlyReportPDF = async (options) => {
           break;
         case 'excused':
           summary.attendance.excused++;
+          break;
+        case 'on-leave':
+          summary.attendance.onLeave++;
           break;
       }
       
