@@ -1,6 +1,8 @@
 const Attendance = require('../models/Attendance');
 const Employee = require('../models/Employee');
 const Payroll = require('../models/Payroll');
+const Facility = require('../models/Facility');
+const User = require('../models/User');
 const moment = require('moment');
 const PDFDocument = require('pdfkit');
 
@@ -1725,9 +1727,556 @@ exports.generatePayrollPDF = async (req, res) => {
 };
 
 /**
+ * Generate comprehensive multi-facility report with analytics
+ */
+const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
+  const query = {
+    date: { $gte: start, $lte: end }
+  };
+  
+  // Fetch all attendance data
+  const rawAttendance = await Attendance.find(query)
+    .populate('employee', 'employeeId firstName lastName department designation')
+    .populate('facility', 'name code')
+    .populate('shift', 'name startTime endTime workingHours')
+    .sort({ date: 1, timestamp: 1 });
+  
+  const aggregatedRecords = aggregateAttendanceRecords(rawAttendance);
+  
+  // Get all facilities
+  const facilities = await Facility.find({ status: 'active' }).lean();
+  const facilityMap = new Map(facilities.map(f => [f._id.toString(), f]));
+  
+  // Group by employee
+  const employeeSummary = new Map();
+  
+  aggregatedRecords.forEach(record => {
+    if (!record.employee || !record.employee._id) return;
+    
+    const employeeId = record.employee._id.toString();
+    
+    if (!employeeSummary.has(employeeId)) {
+      employeeSummary.set(employeeId, {
+        employee: record.employee,
+        facility: record.facility,
+        attendance: {
+          totalDays: 0,
+          present: 0,
+          absent: 0,
+          late: 0,
+          excused: 0,
+          totalWorkHours: 0,
+          totalOvertime: 0,
+          lateCount: 0
+        }
+      });
+    }
+    
+    const summary = employeeSummary.get(employeeId);
+    summary.attendance.totalDays++;
+    
+    switch(record.status) {
+      case 'present':
+        summary.attendance.present++;
+        break;
+      case 'late':
+        summary.attendance.late++;
+        summary.attendance.present++;
+        summary.attendance.lateCount++;
+        break;
+      case 'absent':
+        summary.attendance.absent++;
+        break;
+      case 'excused':
+        summary.attendance.excused++;
+        break;
+    }
+    
+    summary.attendance.totalWorkHours += record.workHours || 0;
+    summary.attendance.totalOvertime += record.overtime || 0;
+  });
+  
+  const finalRecords = Array.from(employeeSummary.values());
+  
+  // Calculate days in period
+  const daysInPeriod = moment(end).diff(moment(start), 'days') + 1;
+  
+  // Fetch all employees for expected hours calculation
+  const employeeIdsInRecords = finalRecords.map(r => r.employee._id);
+  const employeesWithShifts = await Employee.find({ 
+    _id: { $in: employeeIdsInRecords }
+  })
+    .populate('shift', 'workingHours workingDays')
+    .populate('facility', 'name code')
+    .lean();
+  
+  const employeeShiftMap = new Map();
+  employeesWithShifts.forEach(emp => {
+    employeeShiftMap.set(emp._id.toString(), emp.shift);
+  });
+  
+  // Calculate attendance metrics
+  finalRecords.forEach(record => {
+    const employeeId = record.employee._id.toString();
+    const employeeShift = employeeShiftMap.get(employeeId);
+    
+    let workingDaysPerWeek = 7;
+    if (employeeShift?.workingDays && employeeShift.workingDays.length > 0) {
+      workingDaysPerWeek = employeeShift.workingDays.length;
+    }
+    
+    const weeksInPeriod = daysInPeriod / 7;
+    const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInPeriod);
+    
+    const attendedDays = record.attendance.present + record.attendance.excused;
+    const actualAbsentDays = Math.max(0, expectedWorkingDays - attendedDays);
+    
+    record.attendance.totalDays = expectedWorkingDays;
+    record.attendance.absent = actualAbsentDays;
+    
+    const presentDays = record.attendance.present;
+    record.attendance.attendancePercentage = expectedWorkingDays > 0 
+      ? Math.round((presentDays / expectedWorkingDays) * 100 * 100) / 100 
+      : 0;
+    record.attendance.totalWorkHours = Math.round(record.attendance.totalWorkHours * 100) / 100;
+    record.attendance.totalOvertime = Math.round(record.attendance.totalOvertime * 100) / 100;
+  });
+  
+  // Group records by facility
+  const facilityGroups = new Map();
+  finalRecords.forEach(record => {
+    if (!record.facility || !record.facility._id) return;
+    
+    const facilityId = record.facility._id.toString();
+    if (!facilityGroups.has(facilityId)) {
+      facilityGroups.set(facilityId, {
+        facility: record.facility,
+        records: [],
+        stats: {
+          totalEmployees: 0,
+          totalPresent: 0,
+          totalAbsent: 0,
+          totalLate: 0,
+          totalWorkHours: 0,
+          totalOvertime: 0
+        }
+      });
+    }
+    
+    const group = facilityGroups.get(facilityId);
+    group.records.push(record);
+    group.stats.totalEmployees++;
+    group.stats.totalPresent += record.attendance.present;
+    group.stats.totalAbsent += record.attendance.absent;
+    group.stats.totalLate += record.attendance.late;
+    group.stats.totalWorkHours += record.attendance.totalWorkHours;
+    group.stats.totalOvertime += record.attendance.totalOvertime;
+  });
+  
+  // Overall statistics
+  const totalEmployees = await Employee.countDocuments({ status: 'active' });
+  const statistics = calculateStatistics(aggregatedRecords, totalEmployees, 'unique');
+  
+  const totalWorkedHours = finalRecords.reduce((sum, record) => 
+    sum + (record.attendance.totalWorkHours || 0), 0
+  );
+  
+  const expectedTotalHours = employeesWithShifts.reduce((total, emp) => {
+    const shiftHours = emp.shift?.workingHours || 8;
+    let workingDaysPerWeek = 7;
+    if (emp.shift?.workingDays && emp.shift.workingDays.length > 0) {
+      workingDaysPerWeek = emp.shift.workingDays.length;
+    }
+    const weeksInPeriod = daysInPeriod / 7;
+    const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInPeriod);
+    return total + (shiftHours * expectedWorkingDays);
+  }, 0);
+  
+  // Identify top performers (highest attendance percentage)
+  const topPerformers = [...finalRecords]
+    .filter(r => r.attendance.totalDays > 0)
+    .sort((a, b) => b.attendance.attendancePercentage - a.attendance.attendancePercentage)
+    .slice(0, 10);
+  
+  // Identify frequent late arrivals
+  const frequentLateArrivals = [...finalRecords]
+    .filter(r => r.attendance.lateCount > 0)
+    .sort((a, b) => b.attendance.lateCount - a.attendance.lateCount)
+    .slice(0, 10);
+  
+  // Identify overtime workers
+  const overtimeWorkers = [...finalRecords]
+    .filter(r => r.attendance.totalOvertime > 0)
+    .sort((a, b) => b.attendance.totalOvertime - a.attendance.totalOvertime)
+    .slice(0, 10);
+  
+  // Generate PDF
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40 });
+    const chunks = [];
+    
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    
+    // === PROFESSIONAL HEADER ===
+    const pageWidth = 595;
+    const centerX = pageWidth / 2;
+    
+    doc.strokeColor('#1976d2')
+       .lineWidth(2)
+       .moveTo(50, 35)
+       .lineTo(545, 35)
+       .stroke();
+    
+    doc.fillColor('#1976d2')
+       .fontSize(18)
+       .font('Helvetica-Bold')
+       .text('Kano State Primary Health Care Management Board', 50, 45, {
+         width: 495,
+         align: 'center'
+       });
+    
+    doc.fillColor('#333333')
+       .fontSize(12)
+       .font('Helvetica')
+       .text('Staff Attendance Biometric System', 50, 70, {
+         width: 495,
+         align: 'center'
+       });
+    
+    doc.strokeColor('#1976d2')
+       .lineWidth(1)
+       .moveTo(150, 90)
+       .lineTo(445, 90)
+       .stroke();
+    
+    doc.fillColor('black').font('Helvetica');
+    
+    // Report title
+    doc.fontSize(14)
+       .font('Helvetica-Bold')
+       .text('Comprehensive Multi-Facility Attendance Report', 50, 105, {
+         width: 495,
+         align: 'left'
+       });
+    
+    doc.fontSize(10)
+       .font('Helvetica')
+       .fillColor('#666666')
+       .text(`Period: ${moment(startDate).format('MMM DD, YYYY')} - ${moment(endDate).format('MMM DD, YYYY')}`, 50, 125);
+    
+    doc.text(`Generated: ${moment().format('MMM DD, YYYY hh:mm A')}`, 50, 140);
+    
+    doc.strokeColor('#cccccc')
+       .lineWidth(0.5)
+       .moveTo(50, 160)
+       .lineTo(545, 160)
+       .stroke();
+    
+    doc.fillColor('black').strokeColor('black');
+    let yPosition = 175;
+    
+    // === OVERALL SUMMARY ===
+    doc.fontSize(14).font('Helvetica-Bold').text('Overall Summary', 50, yPosition);
+    yPosition += 25;
+    
+    doc.fontSize(10).font('Helvetica');
+    const summaryStats = [
+      ['Total Facilities:', facilities.length],
+      ['Total Employees:', statistics.totalEmployees],
+      ['Employees Present:', statistics.present],
+      ['Employees Absent:', statistics.absent],
+      ['Late Arrivals:', statistics.late],
+      ['On Leave:', statistics.onLeave || 0],
+      ['Total Work Hours:', `${totalWorkedHours.toFixed(2)} hrs`],
+      ['Expected Hours:', `${expectedTotalHours.toFixed(2)} hrs`],
+      ['Utilization Rate:', `${((totalWorkedHours / expectedTotalHours) * 100).toFixed(1)}%`]
+    ];
+    
+    summaryStats.forEach(([label, value]) => {
+      doc.text(label, 60, yPosition, { continued: true })
+         .text(String(value), 300, yPosition);
+      yPosition += 18;
+    });
+    
+    yPosition += 20;
+    
+    // === FACILITY BREAKDOWN ===
+    doc.fontSize(14).font('Helvetica-Bold').text('Facility-wise Performance', 50, yPosition);
+    yPosition += 25;
+    
+    // Table header
+    doc.fontSize(9).font('Helvetica-Bold');
+    doc.text('Facility', 50, yPosition, { width: 140 });
+    doc.text('Employees', 200, yPosition, { width: 50 });
+    doc.text('Present', 260, yPosition, { width: 40 });
+    doc.text('Late', 310, yPosition, { width: 40 });
+    doc.text('Work Hours', 360, yPosition, { width: 60 });
+    doc.text('Overtime', 430, yPosition, { width: 60 });
+    doc.text('Att. Rate', 500, yPosition, { width: 45 });
+    
+    yPosition += 15;
+    doc.strokeColor('#cccccc').lineWidth(0.5)
+       .moveTo(50, yPosition)
+       .lineTo(545, yPosition)
+       .stroke();
+    yPosition += 10;
+    
+    // Facility rows
+    doc.fontSize(8).font('Helvetica');
+    for (const [facilityId, group] of facilityGroups) {
+      if (yPosition > 720) {
+        doc.addPage();
+        yPosition = 50;
+      }
+      
+      const attRate = group.stats.totalEmployees > 0 
+        ? ((group.stats.totalPresent / (group.stats.totalPresent + group.stats.totalAbsent)) * 100).toFixed(1)
+        : 0;
+      
+      doc.text(group.facility.name || 'Unknown', 50, yPosition, { width: 140 });
+      doc.text(String(group.stats.totalEmployees), 200, yPosition, { width: 50 });
+      doc.text(String(group.stats.totalPresent), 260, yPosition, { width: 40 });
+      doc.text(String(group.stats.totalLate), 310, yPosition, { width: 40 });
+      doc.text(group.stats.totalWorkHours.toFixed(1), 360, yPosition, { width: 60 });
+      doc.text(group.stats.totalOvertime.toFixed(1), 430, yPosition, { width: 60 });
+      doc.text(`${attRate}%`, 500, yPosition, { width: 45 });
+      
+      yPosition += 20;
+    }
+    
+    yPosition += 20;
+    
+    // === TOP PERFORMERS ===
+    if (topPerformers.length > 0) {
+      if (yPosition > 650) {
+        doc.addPage();
+        yPosition = 50;
+      }
+      
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#006400').text('🏆 Top Performers (Best Attendance)', 50, yPosition);
+      yPosition += 25;
+      
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
+      doc.text('Rank', 50, yPosition, { width: 30 });
+      doc.text('Employee ID', 90, yPosition, { width: 70 });
+      doc.text('Name', 170, yPosition, { width: 120 });
+      doc.text('Facility', 300, yPosition, { width: 100 });
+      doc.text('Present', 410, yPosition, { width: 40 });
+      doc.text('Attendance %', 465, yPosition, { width: 80 });
+      
+      yPosition += 15;
+      doc.strokeColor('#cccccc').lineWidth(0.5)
+         .moveTo(50, yPosition)
+         .lineTo(545, yPosition)
+         .stroke();
+      yPosition += 10;
+      
+      doc.fontSize(8).font('Helvetica');
+      topPerformers.forEach((record, index) => {
+        if (yPosition > 720) {
+          doc.addPage();
+          yPosition = 50;
+        }
+        
+        const emp = record.employee;
+        const att = record.attendance;
+        
+        doc.text(String(index + 1), 50, yPosition, { width: 30 });
+        doc.text(emp.employeeId || 'N/A', 90, yPosition, { width: 70 });
+        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 120 });
+        doc.text(record.facility?.name || 'Unknown', 300, yPosition, { width: 100 });
+        doc.text(String(att.present), 410, yPosition, { width: 40 });
+        doc.fillColor('#006400').text(`${att.attendancePercentage.toFixed(1)}%`, 465, yPosition, { width: 80 });
+        doc.fillColor('black');
+        
+        yPosition += 20;
+      });
+      
+      yPosition += 15;
+    }
+    
+    // === FREQUENT LATE ARRIVALS ===
+    if (frequentLateArrivals.length > 0) {
+      if (yPosition > 650) {
+        doc.addPage();
+        yPosition = 50;
+      }
+      
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#DC143C').text('⚠️  Frequent Late Arrivals', 50, yPosition);
+      yPosition += 25;
+      
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
+      doc.text('Rank', 50, yPosition, { width: 30 });
+      doc.text('Employee ID', 90, yPosition, { width: 70 });
+      doc.text('Name', 170, yPosition, { width: 120 });
+      doc.text('Facility', 300, yPosition, { width: 100 });
+      doc.text('Late Count', 410, yPosition, { width: 50 });
+      doc.text('Work Hours', 475, yPosition, { width: 70 });
+      
+      yPosition += 15;
+      doc.strokeColor('#cccccc').lineWidth(0.5)
+         .moveTo(50, yPosition)
+         .lineTo(545, yPosition)
+         .stroke();
+      yPosition += 10;
+      
+      doc.fontSize(8).font('Helvetica');
+      frequentLateArrivals.forEach((record, index) => {
+        if (yPosition > 720) {
+          doc.addPage();
+          yPosition = 50;
+        }
+        
+        const emp = record.employee;
+        const att = record.attendance;
+        
+        doc.text(String(index + 1), 50, yPosition, { width: 30 });
+        doc.text(emp.employeeId || 'N/A', 90, yPosition, { width: 70 });
+        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 120 });
+        doc.text(record.facility?.name || 'Unknown', 300, yPosition, { width: 100 });
+        doc.fillColor('#DC143C').text(String(att.lateCount), 410, yPosition, { width: 50 });
+        doc.fillColor('black').text(att.totalWorkHours.toFixed(1), 475, yPosition, { width: 70 });
+        
+        yPosition += 20;
+      });
+      
+      yPosition += 15;
+    }
+    
+    // === OVERTIME WORKERS ===
+    if (overtimeWorkers.length > 0) {
+      if (yPosition > 650) {
+        doc.addPage();
+        yPosition = 50;
+      }
+      
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#4169E1').text('⏰ Top Overtime Workers', 50, yPosition);
+      yPosition += 25;
+      
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
+      doc.text('Rank', 50, yPosition, { width: 30 });
+      doc.text('Employee ID', 90, yPosition, { width: 70 });
+      doc.text('Name', 170, yPosition, { width: 120 });
+      doc.text('Facility', 300, yPosition, { width: 100 });
+      doc.text('Overtime Hrs', 410, yPosition, { width: 60 });
+      doc.text('Total Work Hrs', 485, yPosition, { width: 60 });
+      
+      yPosition += 15;
+      doc.strokeColor('#cccccc').lineWidth(0.5)
+         .moveTo(50, yPosition)
+         .lineTo(545, yPosition)
+         .stroke();
+      yPosition += 10;
+      
+      doc.fontSize(8).font('Helvetica');
+      overtimeWorkers.forEach((record, index) => {
+        if (yPosition > 720) {
+          doc.addPage();
+          yPosition = 50;
+        }
+        
+        const emp = record.employee;
+        const att = record.attendance;
+        
+        doc.text(String(index + 1), 50, yPosition, { width: 30 });
+        doc.text(emp.employeeId || 'N/A', 90, yPosition, { width: 70 });
+        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 120 });
+        doc.text(record.facility?.name || 'Unknown', 300, yPosition, { width: 100 });
+        doc.fillColor('#4169E1').text(att.totalOvertime.toFixed(1), 410, yPosition, { width: 60 });
+        doc.fillColor('black').text(att.totalWorkHours.toFixed(1), 485, yPosition, { width: 60 });
+        
+        yPosition += 20;
+      });
+    }
+    
+    // === DETAILED FACILITY BREAKDOWN ===
+    for (const [facilityId, group] of facilityGroups) {
+      doc.addPage();
+      yPosition = 50;
+      
+      // Facility header
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#1976d2')
+         .text(`Detailed Report: ${group.facility.name}`, 50, yPosition);
+      yPosition += 10;
+      doc.fontSize(10).font('Helvetica').fillColor('#666666')
+         .text(`Code: ${group.facility.code || 'N/A'}`, 50, yPosition);
+      yPosition += 25;
+      
+      // Facility stats
+      doc.fillColor('black').fontSize(10);
+      doc.text(`Total Employees: ${group.stats.totalEmployees}`, 60, yPosition);
+      yPosition += 15;
+      doc.text(`Total Present Days: ${group.stats.totalPresent}`, 60, yPosition);
+      yPosition += 15;
+      doc.text(`Total Late: ${group.stats.totalLate}`, 60, yPosition);
+      yPosition += 15;
+      doc.text(`Total Work Hours: ${group.stats.totalWorkHours.toFixed(2)} hrs`, 60, yPosition);
+      yPosition += 15;
+      doc.text(`Total Overtime: ${group.stats.totalOvertime.toFixed(2)} hrs`, 60, yPosition);
+      yPosition += 25;
+      
+      // Employee table
+      doc.fontSize(9).font('Helvetica-Bold');
+      doc.text('Emp ID', 50, yPosition, { width: 60 });
+      doc.text('Name', 120, yPosition, { width: 110 });
+      doc.text('Present', 240, yPosition, { width: 40 });
+      doc.text('Late', 290, yPosition, { width: 35 });
+      doc.text('Absent', 335, yPosition, { width: 40 });
+      doc.text('Work Hrs', 385, yPosition, { width: 50 });
+      doc.text('Overtime', 445, yPosition, { width: 50 });
+      doc.text('Att. %', 505, yPosition, { width: 40 });
+      
+      yPosition += 15;
+      doc.strokeColor('#cccccc').lineWidth(0.5)
+         .moveTo(50, yPosition)
+         .lineTo(545, yPosition)
+         .stroke();
+      yPosition += 10;
+      
+      doc.fontSize(8).font('Helvetica');
+      group.records
+        .sort((a, b) => b.attendance.attendancePercentage - a.attendance.attendancePercentage)
+        .forEach(record => {
+          if (yPosition > 720) {
+            doc.addPage();
+            yPosition = 50;
+          }
+          
+          const emp = record.employee;
+          const att = record.attendance;
+          
+          doc.text(emp.employeeId || 'N/A', 50, yPosition, { width: 60 });
+          doc.text(`${emp.firstName} ${emp.lastName}`, 120, yPosition, { width: 110 });
+          doc.text(String(att.present), 240, yPosition, { width: 40 });
+          doc.text(String(att.late), 290, yPosition, { width: 35 });
+          doc.text(String(att.absent), 335, yPosition, { width: 40 });
+          doc.text(att.totalWorkHours.toFixed(1), 385, yPosition, { width: 50 });
+          doc.text(att.totalOvertime.toFixed(1), 445, yPosition, { width: 50 });
+          doc.text(`${att.attendancePercentage.toFixed(1)}%`, 505, yPosition, { width: 40 });
+          
+          yPosition += 18;
+        });
+    }
+    
+    // Footer on last page
+    doc.fontSize(8).font('Helvetica').fillColor('gray');
+    doc.text(
+      `Generated on ${moment().format('MMMM D, YYYY [at] h:mm A')} | Kano State PHCMB SABS`,
+      40,
+      doc.page.height - 50,
+      { align: 'center' }
+    );
+    
+    doc.end();
+  });
+};
+
+/**
  * Generate monthly report PDF and return buffer (for email attachments)
  * @param {Object} options - Report options
- * @param {String} options.facilityId - Facility ID
+ * @param {String} options.facilityId - Facility ID (optional - if not provided, generates multi-facility report)
  * @param {String} options.startDate - Start date (YYYY-MM-DD)
  * @param {String} options.endDate - End date (YYYY-MM-DD)
  * @returns {Promise<Buffer>} PDF buffer
@@ -1738,6 +2287,11 @@ exports.generateMonthlyReportPDF = async (options) => {
     
     const start = moment(startDate).startOf('day').toDate();
     const end = moment(endDate).endOf('day').toDate();
+    
+    // If no facility specified, generate comprehensive multi-facility report
+    if (!facilityId) {
+      return await generateMultiFacilityReport(start, end, startDate, endDate);
+    }
     
     const query = {
       date: { $gte: start, $lte: end }
