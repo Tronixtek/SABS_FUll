@@ -285,6 +285,11 @@ const LeaveManagement = () => {
 
   // Filter employees based on search
   const filteredEmployees = employees.filter(emp => {
+    // If no search term, show all employees
+    if (!employeeSearch || employeeSearch.trim() === '') {
+      return true;
+    }
+    
     const searchLower = employeeSearch.toLowerCase();
     return (
       emp.firstName?.toLowerCase().includes(searchLower) ||
@@ -292,7 +297,7 @@ const LeaveManagement = () => {
       emp.employeeId?.toLowerCase().includes(searchLower) ||
       emp.staffId?.toLowerCase().includes(searchLower)
     );
-  });
+  }).slice(0, 50); // Limit to first 50 results for performance
 
   const handleEmployeeSelect = (employee) => {
     setFormData({ ...formData, employeeId: employee.employeeId });
@@ -642,7 +647,14 @@ const LeaveManagement = () => {
                             ))
                           ) : (
                             <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                              No employees found
+                              {employees.length === 0 
+                                ? 'Loading employees...' 
+                                : `No employees match "${employeeSearch}"`}
+                            </div>
+                          )}
+                          {filteredEmployees.length > 0 && filteredEmployees.length === 50 && (
+                            <div className="px-4 py-2 text-xs text-gray-500 text-center bg-gray-50 border-t">
+                              Showing first 50 results. Type to search for more.
                             </div>
                           )}
                         </div>

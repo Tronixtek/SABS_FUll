@@ -1937,8 +1937,8 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       .slice(0, 5);
   }
   
-  // Overall statistics
-  const totalEmployees = await Employee.countDocuments({ status: 'active' });
+  // Overall statistics - count only employees with attendance records in this period
+  const totalEmployees = finalRecords.length;
   const statistics = calculateStatistics(aggregatedRecords, totalEmployees, 'unique');
   
   const totalWorkedHours = finalRecords.reduce((sum, record) => 
