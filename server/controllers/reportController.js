@@ -1899,7 +1899,10 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
           totalLate: 0,
           totalWorkHours: 0,
           totalOvertime: 0
-        }
+        },
+        topPerformers: [],
+        frequentLateArrivals: [],
+        overtimeWorkers: []
       });
     }
     
@@ -1912,6 +1915,27 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     group.stats.totalWorkHours += record.attendance.totalWorkHours;
     group.stats.totalOvertime += record.attendance.totalOvertime;
   });
+  
+  // Calculate analytics per facility
+  for (const [facilityId, group] of facilityGroups) {
+    // Top performers for this facility (top 5)
+    group.topPerformers = [...group.records]
+      .filter(r => r.attendance.totalDays > 0)
+      .sort((a, b) => b.attendance.attendancePercentage - a.attendance.attendancePercentage)
+      .slice(0, 5);
+    
+    // Frequent late arrivals for this facility (top 5)
+    group.frequentLateArrivals = [...group.records]
+      .filter(r => r.attendance.lateCount > 0)
+      .sort((a, b) => b.attendance.lateCount - a.attendance.lateCount)
+      .slice(0, 5);
+    
+    // Overtime workers for this facility (top 5)
+    group.overtimeWorkers = [...group.records]
+      .filter(r => r.attendance.totalOvertime > 0)
+      .sort((a, b) => b.attendance.totalOvertime - a.attendance.totalOvertime)
+      .slice(0, 5);
+  }
   
   // Overall statistics
   const totalEmployees = await Employee.countDocuments({ status: 'active' });
@@ -1931,24 +1955,6 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInPeriod);
     return total + (shiftHours * expectedWorkingDays);
   }, 0);
-  
-  // Identify top performers (highest attendance percentage)
-  const topPerformers = [...finalRecords]
-    .filter(r => r.attendance.totalDays > 0)
-    .sort((a, b) => b.attendance.attendancePercentage - a.attendance.attendancePercentage)
-    .slice(0, 10);
-  
-  // Identify frequent late arrivals
-  const frequentLateArrivals = [...finalRecords]
-    .filter(r => r.attendance.lateCount > 0)
-    .sort((a, b) => b.attendance.lateCount - a.attendance.lateCount)
-    .slice(0, 10);
-  
-  // Identify overtime workers
-  const overtimeWorkers = [...finalRecords]
-    .filter(r => r.attendance.totalOvertime > 0)
-    .sort((a, b) => b.attendance.totalOvertime - a.attendance.totalOvertime)
-    .slice(0, 10);
   
   // Generate PDF
   return new Promise((resolve, reject) => {
@@ -2088,23 +2094,33 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     
     yPosition += 20;
     
-    // === TOP PERFORMERS ===
-    if (topPerformers.length > 0) {
+    // === TOP PERFORMERS BY FACILITY ===
+    doc.addPage();
+    yPosition = 50;
+    
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#006400').text('TOP PERFORMERS (Best Attendance) - By Facility', 50, yPosition);
+    yPosition += 25;
+    
+    for (const [facilityId, group] of facilityGroups) {
+      if (group.topPerformers.length === 0) continue;
+      
       if (yPosition > 650) {
         doc.addPage();
         yPosition = 50;
       }
       
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#006400').text('TOP PERFORMERS (Best Attendance)', 50, yPosition);
-      yPosition += 25;
+      // Facility name header
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#006400')
+         .text(`${group.facility.name}`, 50, yPosition);
+      yPosition += 20;
       
+      // Table header
       doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
       doc.text('Rank', 50, yPosition, { width: 30 });
       doc.text('Employee ID', 90, yPosition, { width: 70 });
-      doc.text('Name', 170, yPosition, { width: 120 });
-      doc.text('Facility', 300, yPosition, { width: 100 });
-      doc.text('Present', 410, yPosition, { width: 40 });
-      doc.text('Attendance %', 465, yPosition, { width: 80 });
+      doc.text('Name', 170, yPosition, { width: 150 });
+      doc.text('Present', 330, yPosition, { width: 40 });
+      doc.text('Attendance %', 385, yPosition, { width: 80 });
       
       yPosition += 15;
       doc.strokeColor('#cccccc').lineWidth(0.5)
@@ -2113,8 +2129,9 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
          .stroke();
       yPosition += 10;
       
+      // Top performers for this facility
       doc.fontSize(8).font('Helvetica');
-      topPerformers.forEach((record, index) => {
+      group.topPerformers.forEach((record, index) => {
         if (yPosition > 720) {
           doc.addPage();
           yPosition = 50;
@@ -2123,37 +2140,46 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         const emp = record.employee;
         const att = record.attendance;
         
-        doc.text(String(index + 1), 50, yPosition, { width: 30 });
+        doc.fillColor('black').text(String(index + 1), 50, yPosition, { width: 30 });
         doc.text(emp.employeeId || 'N/A', 90, yPosition, { width: 70 });
-        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 120 });
-        doc.text(record.facility?.name || 'Unknown', 300, yPosition, { width: 100 });
-        doc.text(String(att.present), 410, yPosition, { width: 40 });
-        doc.fillColor('#006400').text(`${att.attendancePercentage.toFixed(1)}%`, 465, yPosition, { width: 80 });
+        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 150 });
+        doc.text(String(att.present), 330, yPosition, { width: 40 });
+        doc.fillColor('#006400').text(`${att.attendancePercentage.toFixed(1)}%`, 385, yPosition, { width: 80 });
         doc.fillColor('black');
         
-        yPosition += 20;
+        yPosition += 18;
       });
       
       yPosition += 15;
     }
     
-    // === FREQUENT LATE ARRIVALS ===
-    if (frequentLateArrivals.length > 0) {
+    // === FREQUENT LATE ARRIVALS BY FACILITY ===
+    doc.addPage();
+    yPosition = 50;
+    
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#DC143C').text('FREQUENT LATE ARRIVALS - By Facility', 50, yPosition);
+    yPosition += 25;
+    
+    for (const [facilityId, group] of facilityGroups) {
+      if (group.frequentLateArrivals.length === 0) continue;
+      
       if (yPosition > 650) {
         doc.addPage();
         yPosition = 50;
       }
       
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#DC143C').text('FREQUENT LATE ARRIVALS', 50, yPosition);
-      yPosition += 25;
+      // Facility name header
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#DC143C')
+         .text(`${group.facility.name}`, 50, yPosition);
+      yPosition += 20;
       
+      // Table header
       doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
       doc.text('Rank', 50, yPosition, { width: 30 });
       doc.text('Employee ID', 90, yPosition, { width: 70 });
-      doc.text('Name', 170, yPosition, { width: 120 });
-      doc.text('Facility', 300, yPosition, { width: 100 });
-      doc.text('Late Count', 410, yPosition, { width: 50 });
-      doc.text('Work Hours', 475, yPosition, { width: 70 });
+      doc.text('Name', 170, yPosition, { width: 150 });
+      doc.text('Late Count', 330, yPosition, { width: 50 });
+      doc.text('Work Hours', 395, yPosition, { width: 70 });
       
       yPosition += 15;
       doc.strokeColor('#cccccc').lineWidth(0.5)
@@ -2162,8 +2188,9 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
          .stroke();
       yPosition += 10;
       
+      // Late arrivals for this facility
       doc.fontSize(8).font('Helvetica');
-      frequentLateArrivals.forEach((record, index) => {
+      group.frequentLateArrivals.forEach((record, index) => {
         if (yPosition > 720) {
           doc.addPage();
           yPosition = 50;
@@ -2172,36 +2199,45 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         const emp = record.employee;
         const att = record.attendance;
         
-        doc.text(String(index + 1), 50, yPosition, { width: 30 });
+        doc.fillColor('black').text(String(index + 1), 50, yPosition, { width: 30 });
         doc.text(emp.employeeId || 'N/A', 90, yPosition, { width: 70 });
-        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 120 });
-        doc.text(record.facility?.name || 'Unknown', 300, yPosition, { width: 100 });
-        doc.fillColor('#DC143C').text(String(att.lateCount), 410, yPosition, { width: 50 });
-        doc.fillColor('black').text(att.totalWorkHours.toFixed(1), 475, yPosition, { width: 70 });
+        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 150 });
+        doc.fillColor('#DC143C').text(String(att.lateCount), 330, yPosition, { width: 50 });
+        doc.fillColor('black').text(att.totalWorkHours.toFixed(1), 395, yPosition, { width: 70 });
         
-        yPosition += 20;
+        yPosition += 18;
       });
       
       yPosition += 15;
     }
     
-    // === OVERTIME WORKERS ===
-    if (overtimeWorkers.length > 0) {
+    // === OVERTIME WORKERS BY FACILITY ===
+    doc.addPage();
+    yPosition = 50;
+    
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#4169E1').text('TOP OVERTIME WORKERS - By Facility', 50, yPosition);
+    yPosition += 25;
+    
+    for (const [facilityId, group] of facilityGroups) {
+      if (group.overtimeWorkers.length === 0) continue;
+      
       if (yPosition > 650) {
         doc.addPage();
         yPosition = 50;
       }
       
-      doc.fontSize(14).font('Helvetica-Bold').fillColor('#4169E1').text('TOP OVERTIME WORKERS', 50, yPosition);
-      yPosition += 25;
+      // Facility name header
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#4169E1')
+         .text(`${group.facility.name}`, 50, yPosition);
+      yPosition += 20;
       
+      // Table header
       doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
       doc.text('Rank', 50, yPosition, { width: 30 });
       doc.text('Employee ID', 90, yPosition, { width: 70 });
-      doc.text('Name', 170, yPosition, { width: 120 });
-      doc.text('Facility', 300, yPosition, { width: 100 });
-      doc.text('Overtime Hrs', 410, yPosition, { width: 60 });
-      doc.text('Total Work Hrs', 485, yPosition, { width: 60 });
+      doc.text('Name', 170, yPosition, { width: 150 });
+      doc.text('Overtime Hrs', 330, yPosition, { width: 60 });
+      doc.text('Total Work Hrs', 405, yPosition, { width: 70 });
       
       yPosition += 15;
       doc.strokeColor('#cccccc').lineWidth(0.5)
@@ -2210,8 +2246,9 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
          .stroke();
       yPosition += 10;
       
+      // Overtime workers for this facility
       doc.fontSize(8).font('Helvetica');
-      overtimeWorkers.forEach((record, index) => {
+      group.overtimeWorkers.forEach((record, index) => {
         if (yPosition > 720) {
           doc.addPage();
           yPosition = 50;
@@ -2220,15 +2257,16 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         const emp = record.employee;
         const att = record.attendance;
         
-        doc.text(String(index + 1), 50, yPosition, { width: 30 });
+        doc.fillColor('black').text(String(index + 1), 50, yPosition, { width: 30 });
         doc.text(emp.employeeId || 'N/A', 90, yPosition, { width: 70 });
-        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 120 });
-        doc.text(record.facility?.name || 'Unknown', 300, yPosition, { width: 100 });
-        doc.fillColor('#4169E1').text(att.totalOvertime.toFixed(1), 410, yPosition, { width: 60 });
-        doc.fillColor('black').text(att.totalWorkHours.toFixed(1), 485, yPosition, { width: 60 });
+        doc.text(`${emp.firstName} ${emp.lastName}`, 170, yPosition, { width: 150 });
+        doc.fillColor('#4169E1').text(att.totalOvertime.toFixed(1), 330, yPosition, { width: 60 });
+        doc.fillColor('black').text(att.totalWorkHours.toFixed(1), 405, yPosition, { width: 70 });
         
-        yPosition += 20;
+        yPosition += 18;
       });
+      
+      yPosition += 15;
     }
     
     // === DETAILED FACILITY BREAKDOWN ===
