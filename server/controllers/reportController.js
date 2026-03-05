@@ -705,6 +705,26 @@ exports.generatePDFReport = async (req, res) => {
       const startDate = moment(`${reportYear}-${reportMonth}-01`).startOf('month').toDate();
       const endDate = moment(`${reportYear}-${reportMonth}-01`).endOf('month').toDate();
       
+      // 🎯 CHECK IF WE SHOULD USE COMPREHENSIVE MULTI-FACILITY REPORT
+      if (!facility || facility.trim() === '') {
+        console.log('🌟 Generating comprehensive multi-facility report for monthly...');
+        
+        const pdfBuffer = await exports.generateMonthlyReportPDF({
+          facilityId: undefined,
+          startDate,
+          endDate
+        });
+        
+        // Send the PDF directly
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="multi_facility_report_${moment(startDate).format('YYYY-MM')}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.send(pdfBuffer);
+        
+        console.log('✅ Comprehensive multi-facility PDF sent successfully');
+        return;
+      }
+      
       const query = {
         date: { $gte: startDate, $lte: endDate }
       };
@@ -911,6 +931,26 @@ exports.generatePDFReport = async (req, res) => {
       start.setHours(0, 0, 0, 0);
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
+      
+      // 🎯 CHECK IF WE SHOULD USE COMPREHENSIVE MULTI-FACILITY REPORT
+      if (!facility || facility.trim() === '') {
+        console.log('🌟 Generating comprehensive multi-facility report for custom date range...');
+        
+        const pdfBuffer = await exports.generateMonthlyReportPDF({
+          facilityId: undefined,
+          startDate: start,
+          endDate: end
+        });
+        
+        // Send the PDF directly
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="multi_facility_report_${moment(start).format('YYYY-MM-DD')}_to_${moment(end).format('YYYY-MM-DD')}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.send(pdfBuffer);
+        
+        console.log('✅ Comprehensive multi-facility PDF sent successfully');
+        return;
+      }
       
       const query = {
         date: { $gte: start, $lte: end }
