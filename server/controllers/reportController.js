@@ -1916,10 +1916,25 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     group.stats.totalOvertime += record.attendance.totalOvertime;
   });
   
-  // Set correct employee counts per facility (each record is one unique employee)
-  for (const [facilityId, group] of facilityGroups) {
-    group.stats.totalEmployees = group.records.length;
-  }
+  // Get actual employee counts per facility from database
+  const facilityIds = Array.from(facilityGroups.keys());
+  const employeeCountsPerFacility = await Promise.all(
+    facilityIds.map(async (facilityId) => {
+      const count = await Employee.countDocuments({ 
+        facility: facilityId, 
+        status: 'active'
+      });
+      return { facilityId, count };
+    })
+  );
+  
+  // Set correct employee counts per facility
+  employeeCountsPerFacility.forEach(({ facilityId, count }) => {
+    const group = facilityGroups.get(facilityId);
+    if (group) {
+      group.stats.totalEmployees = count;
+    }
+  });
   
   // Calculate analytics per facility
   for (const [facilityId, group] of facilityGroups) {
