@@ -1946,7 +1946,6 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       const uniquePresent = new Set();
       const uniqueLate = new Set();
       const uniqueExcused = new Set();
-      const uniqueAbsent = new Set();
       const uniqueIncomplete = new Set();
       const uniqueOnLeave = new Set();
       
@@ -1955,7 +1954,6 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
         if (record.attendance.present > 0) uniquePresent.add(empId);
         if (record.attendance.late > 0) uniqueLate.add(empId);
         if (record.attendance.excused > 0) uniqueExcused.add(empId);
-        if (record.attendance.absent > 0) uniqueAbsent.add(empId);
         if (record.attendance.incomplete > 0) uniqueIncomplete.add(empId);
         if (record.attendance.onLeave > 0) uniqueOnLeave.add(empId);
         
@@ -1966,7 +1964,8 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       group.stats.totalPresent = uniquePresent.size;
       group.stats.totalLate = uniqueLate.size;
       group.stats.totalExcused = uniqueExcused.size;
-      group.stats.totalAbsent = uniqueAbsent.size;
+      // Absent = Total Employees - Present (employees who never showed up or had no attendance records)
+      group.stats.totalAbsent = count - uniquePresent.size;
       group.stats.totalIncomplete = uniqueIncomplete.size;
       group.stats.totalOnLeave = uniqueOnLeave.size;
     }
