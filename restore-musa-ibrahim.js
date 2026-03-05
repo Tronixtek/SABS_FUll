@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const Employee = require('./server/models/Employee');
+const Facility = require('./server/models/Facility');
 
 const restoreEmployee = async () => {
   try {
