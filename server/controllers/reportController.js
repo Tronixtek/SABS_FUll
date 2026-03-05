@@ -1922,7 +1922,8 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     facilityIds.map(async (facilityId) => {
       const count = await Employee.countDocuments({ 
         facility: facilityId, 
-        status: 'active'
+        status: 'active',
+        isDeleted: false
       });
       return { facilityId, count };
     })
@@ -1934,6 +1935,12 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     if (group) {
       group.stats.totalEmployees = count;
     }
+  });
+  
+  // Get total active employees globally (matching dashboard count)
+  const totalEmployeesGlobal = await Employee.countDocuments({ 
+    status: 'active',
+    isDeleted: false
   });
   
   // Calculate analytics per facility
@@ -1957,11 +1964,8 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       .slice(0, 5);
   }
   
-  // Overall statistics - sum all facility employee counts
-  const totalEmployeesAcrossFacilities = Array.from(facilityGroups.values())
-    .reduce((sum, group) => sum + group.stats.totalEmployees, 0);
-  
-  const statistics = calculateStatistics(aggregatedRecords, totalEmployeesAcrossFacilities, 'unique');
+  // Overall statistics - use global employee count (matches dashboard)
+  const statistics = calculateStatistics(aggregatedRecords, totalEmployeesGlobal, 'unique');
   
   const totalWorkedHours = finalRecords.reduce((sum, record) => 
     sum + (record.attendance.totalWorkHours || 0), 0
@@ -2320,47 +2324,70 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       doc.text(`Total Overtime: ${group.stats.totalOvertime.toFixed(2)} hrs`, 60, yPosition);
       yPosition += 25;
       
-      // Employee table
-      doc.fontSize(9).font('Helvetica-Bold');
-      doc.text('Emp ID', 50, yPosition, { width: 60 });
-      doc.text('Name', 120, yPosition, { width: 110 });
-      doc.text('Present', 240, yPosition, { width: 40 });
-      doc.text('Late', 290, yPosition, { width: 35 });
-      doc.text('Absent', 335, yPosition, { width: 40 });
-      doc.text('Work Hrs', 385, yPosition, { width: 50 });
-      doc.text('Overtime', 445, yPosition, { width: 50 });
-      doc.text('Att. %', 505, yPosition, { width: 40 });
+      // Employee table with bordered cells (same format as single facility monthly report)
+      const tableHeaders = ['S/N', 'ID', 'Name', 'Dept', 'Present', 'Late', 'Absent', 'Hours', 'Attend%'];
+      const columnWidths = [30, 45, 110, 60, 38, 38, 38, 45, 45];
       
-      yPosition += 15;
-      doc.strokeColor('#cccccc').lineWidth(0.5)
-         .moveTo(50, yPosition)
-         .lineTo(545, yPosition)
-         .stroke();
-      yPosition += 10;
+      let xPosition = 50;
       
+      // Draw header row with borders
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('black');
+      tableHeaders.forEach((header, i) => {
+        doc.rect(xPosition, yPosition, columnWidths[i], 20).stroke();
+        doc.text(header, xPosition + 3, yPosition + 5, {
+          width: columnWidths[i] - 6,
+          align: 'center',
+          ellipsis: true
+        });
+        xPosition += columnWidths[i];
+      });
+      yPosition += 20;
+      
+      // Draw employee data rows with borders
       doc.fontSize(8).font('Helvetica');
       group.records
         .sort((a, b) => b.attendance.attendancePercentage - a.attendance.attendancePercentage)
-        .forEach(record => {
+        .forEach((record, index) => {
           if (yPosition > 720) {
             doc.addPage();
             yPosition = 50;
           }
           
+          xPosition = 50;
           const emp = record.employee;
           const att = record.attendance;
           
-          doc.text(emp.employeeId || 'N/A', 50, yPosition, { width: 60 });
-          doc.text(`${emp.firstName} ${emp.lastName}`, 120, yPosition, { width: 110 });
-          doc.text(String(att.present), 240, yPosition, { width: 40 });
-          doc.text(String(att.late), 290, yPosition, { width: 35 });
-          doc.text(String(att.absent), 335, yPosition, { width: 40 });
-          doc.text(att.totalWorkHours.toFixed(1), 385, yPosition, { width: 50 });
-          doc.text(att.totalOvertime.toFixed(1), 445, yPosition, { width: 50 });
-          doc.text(`${att.attendancePercentage.toFixed(1)}%`, 505, yPosition, { width: 40 });
+          const rowData = [
+            (index + 1).toString(),
+            emp.employeeId || 'N/A',
+            `${emp.firstName} ${emp.lastName}`,
+            emp.department || '-',
+            String(att.present),
+            String(att.late),
+            String(att.absent),
+            `${att.totalWorkHours.toFixed(1)}h`,
+            `${att.attendancePercentage.toFixed(0)}%`
+          ];
           
-          yPosition += 18;
+          rowData.forEach((text, i) => {
+            // Draw cell border
+            doc.rect(xPosition, yPosition, columnWidths[i], 15).stroke();
+            
+            // Draw text with clipping to prevent overflow
+            doc.text(String(text), xPosition + 2, yPosition + 2, {
+              width: columnWidths[i] - 4,
+              height: 15,
+              ellipsis: true,
+              lineBreak: false
+            });
+            
+            xPosition += columnWidths[i];
+          });
+          
+          yPosition += 15;
         });
+        
+      yPosition += 10;
     }
     
     // Footer on last page
