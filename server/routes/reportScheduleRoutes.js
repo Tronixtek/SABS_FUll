@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const ReportSchedule = require('../models/ReportSchedule');
-const { authenticate, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const { generateAndSendReport } = require('../services/scheduledReports');
 
 // Get all report schedules
-router.get('/', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+router.get('/', protect, authorize(['admin', 'super_admin']), async (req, res) => {
   try {
     const schedules = await ReportSchedule.find()
       .populate('facility', 'name code')
@@ -21,7 +21,7 @@ router.get('/', authenticate, authorize(['admin', 'super_admin']), async (req, r
 });
 
 // Get single report schedule
-router.get('/:id', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+router.get('/:id', protect, authorize(['admin', 'super_admin']), async (req, res) => {
   try {
     const schedule = await ReportSchedule.findById(req.params.id)
       .populate('facility', 'name code')
@@ -40,7 +40,7 @@ router.get('/:id', authenticate, authorize(['admin', 'super_admin']), async (req
 });
 
 // Create new report schedule
-router.post('/', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+router.post('/', protect, authorize(['admin', 'super_admin']), async (req, res) => {
   try {
     const {
       name,
@@ -98,7 +98,7 @@ router.post('/', authenticate, authorize(['admin', 'super_admin']), async (req, 
 });
 
 // Update report schedule
-router.put('/:id', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+router.put('/:id', protect, authorize(['admin', 'super_admin']), async (req, res) => {
   try {
     const {
       name,
@@ -145,7 +145,7 @@ router.put('/:id', authenticate, authorize(['admin', 'super_admin']), async (req
 });
 
 // Delete report schedule
-router.delete('/:id', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+router.delete('/:id', protect, authorize(['admin', 'super_admin']), async (req, res) => {
   try {
     const schedule = await ReportSchedule.findById(req.params.id);
 
@@ -163,7 +163,7 @@ router.delete('/:id', authenticate, authorize(['admin', 'super_admin']), async (
 });
 
 // Manually trigger a scheduled report
-router.post('/:id/trigger', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+router.post('/:id/trigger', protect, authorize(['admin', 'super_admin']), async (req, res) => {
   try {
     const schedule = await ReportSchedule.findById(req.params.id);
 
