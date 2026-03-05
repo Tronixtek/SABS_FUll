@@ -1921,15 +1921,6 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     
     const group = facilityGroups.get(facilityId);
     group.records.push(record);
-    // Don't increment here - set after all records are added
-    group.stats.totalPresent += record.attendance.present;
-    group.stats.totalAbsent += record.attendance.absent;
-    group.stats.totalLate += record.attendance.late;
-    group.stats.totalExcused += record.attendance.excused;
-    group.stats.totalIncomplete += record.attendance.incomplete;
-    group.stats.totalOnLeave += record.attendance.onLeave;
-    group.stats.totalWorkHours += record.attendance.totalWorkHours;
-    group.stats.totalOvertime += record.attendance.totalOvertime;
   });
   
   // Get actual employee counts per facility from database
@@ -1945,11 +1936,39 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     })
   );
   
-  // Set correct employee counts per facility
+  // Set correct employee counts per facility and calculate statistics
   employeeCountsPerFacility.forEach(({ facilityId, count }) => {
     const group = facilityGroups.get(facilityId);
     if (group) {
       group.stats.totalEmployees = count;
+      
+      // Calculate statistics based on unique employees with each status (like individual facility reports)
+      const uniquePresent = new Set();
+      const uniqueLate = new Set();
+      const uniqueExcused = new Set();
+      const uniqueAbsent = new Set();
+      const uniqueIncomplete = new Set();
+      const uniqueOnLeave = new Set();
+      
+      group.records.forEach(record => {
+        const empId = record.employee._id.toString();
+        if (record.attendance.present > 0) uniquePresent.add(empId);
+        if (record.attendance.late > 0) uniqueLate.add(empId);
+        if (record.attendance.excused > 0) uniqueExcused.add(empId);
+        if (record.attendance.absent > 0) uniqueAbsent.add(empId);
+        if (record.attendance.incomplete > 0) uniqueIncomplete.add(empId);
+        if (record.attendance.onLeave > 0) uniqueOnLeave.add(empId);
+        
+        group.stats.totalWorkHours += record.attendance.totalWorkHours;
+        group.stats.totalOvertime += record.attendance.totalOvertime;
+      });
+      
+      group.stats.totalPresent = uniquePresent.size;
+      group.stats.totalLate = uniqueLate.size;
+      group.stats.totalExcused = uniqueExcused.size;
+      group.stats.totalAbsent = uniqueAbsent.size;
+      group.stats.totalIncomplete = uniqueIncomplete.size;
+      group.stats.totalOnLeave = uniqueOnLeave.size;
     }
   });
   
