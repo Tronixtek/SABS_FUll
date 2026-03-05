@@ -1908,13 +1908,18 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
     
     const group = facilityGroups.get(facilityId);
     group.records.push(record);
-    group.stats.totalEmployees++;
+    // Don't increment here - set after all records are added
     group.stats.totalPresent += record.attendance.present;
     group.stats.totalAbsent += record.attendance.absent;
     group.stats.totalLate += record.attendance.late;
     group.stats.totalWorkHours += record.attendance.totalWorkHours;
     group.stats.totalOvertime += record.attendance.totalOvertime;
   });
+  
+  // Set correct employee counts per facility (each record is one unique employee)
+  for (const [facilityId, group] of facilityGroups) {
+    group.stats.totalEmployees = group.records.length;
+  }
   
   // Calculate analytics per facility
   for (const [facilityId, group] of facilityGroups) {
@@ -1937,9 +1942,11 @@ const generateMultiFacilityReport = async (start, end, startDate, endDate) => {
       .slice(0, 5);
   }
   
-  // Overall statistics - count only employees with attendance records in this period
-  const totalEmployees = finalRecords.length;
-  const statistics = calculateStatistics(aggregatedRecords, totalEmployees, 'unique');
+  // Overall statistics - sum all facility employee counts
+  const totalEmployeesAcrossFacilities = Array.from(facilityGroups.values())
+    .reduce((sum, group) => sum + group.stats.totalEmployees, 0);
+  
+  const statistics = calculateStatistics(aggregatedRecords, totalEmployeesAcrossFacilities, 'unique');
   
   const totalWorkedHours = finalRecords.reduce((sum, record) => 
     sum + (record.attendance.totalWorkHours || 0), 0
