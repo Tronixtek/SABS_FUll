@@ -84,6 +84,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5000',
+  'https://localhost',              // Mobile app (Capacitor)
+  'http://localhost',               // Mobile app (Capacitor alternative)
+  'capacitor://localhost',          // Capacitor iOS
+  'ionic://localhost',              // Ionic alternative
   'https://sabs-dashboard.web.app',
   'https://sabs-dashboard.firebaseapp.com',
   process.env.CORS_ORIGIN
