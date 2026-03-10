@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { EmployeeAuthProvider } from './context/EmployeeAuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import EmployeePrivateRoute from './components/EmployeePrivateRoute';
+import { initializeCapacitor } from './utils/capacitorInit';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -42,6 +43,11 @@ import PublicSelfRegister from './components/PublicSelfRegister';
 import Layout from './components/Layout';
 
 function App() {
+  // Initialize Capacitor plugins when app starts
+  useEffect(() => {
+    initializeCapacitor();
+  }, []);
+
   return (
     <AuthProvider>
       <EmployeeAuthProvider>
