@@ -20,8 +20,10 @@ export const initializeCapacitor = async () => {
   try {
     // Configure Status Bar
     if (Capacitor.isPluginAvailable('StatusBar')) {
-      await StatusBar.setStyle({ style: Style.Light });
+      await StatusBar.setStyle({ style: Style.Dark });
       await StatusBar.setBackgroundColor({ color: '#1976d2' });
+      await StatusBar.setOverlaysWebView({ overlay: false }); // Don't overlay the webview
+      await StatusBar.show(); // Ensure status bar is visible
     }
 
     // Hide Splash Screen after app is loaded

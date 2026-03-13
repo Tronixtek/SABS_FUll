@@ -2,13 +2,21 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.sabs.attendance',
-  appName: 'SABS Attendance',
+  appName: 'KANO SABS',
   webDir: 'build',
   server: {
     // For development: Allow CORS and connect to local server
-    // androidScheme: 'https',
-    // iosScheme: 'https',
+    androidScheme: 'https',
+    iosScheme: 'https',
     // cleartext: true,
+  },
+  android: {
+    allowMixedContent: true,
+    captureInput: true,
+    webContentsDebuggingEnabled: true,
+  },
+  ios: {
+    contentInset: 'automatic',
   },
   plugins: {
     SplashScreen: {
@@ -20,6 +28,10 @@ const config: CapacitorConfig = {
       androidSpinnerStyle: 'large',
       iosSpinnerStyle: 'small',
       spinnerColor: '#ffffff',
+    },
+    StatusBar: {
+      style: 'dark',
+      backgroundColor: '#1976d2',
     },
   },
 };

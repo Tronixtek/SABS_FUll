@@ -57,7 +57,7 @@ const Layout = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50" style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}>
       {/* Mobile sidebar overlay */}
       {sidebarOpen && isMobile && (
         <div
@@ -139,47 +139,35 @@ const Layout = () => {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex items-center justify-between h-16 px-4 lg:px-6 bg-white border-b border-gray-200 shadow-sm">
-          <div className="flex items-center space-x-4">
+        <header className="flex items-center h-16 px-3 bg-white border-b border-gray-200 shadow-sm">
+          {/* Left section: Menu + Title */}
+          <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
+            {/* Hamburger Menu - Mobile Only */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="lg:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
             
-            <div className="flex-1">
-              <h2 className="text-xl lg:text-2xl font-semibold text-gray-800 truncate">
+            {/* Title */}
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <h2 className="text-sm sm:text-base lg:text-xl font-semibold text-gray-800 truncate whitespace-nowrap">
                 Smart Attendance System
               </h2>
-              <p className="text-xs text-gray-500 hidden sm:block">
-                Welcome back, {user?.firstName}
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          {/* Right section: Notification + Avatar */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Notification Button */}
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+            <button className="relative p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
               <BellIcon className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+              <span className="absolute top-0 right-0 h-2.5 w-2.5 bg-red-500 rounded-full"></span>
             </button>
             
-            {/* User Info - Desktop */}
-            <div className="hidden md:flex items-center space-x-3 border-l border-gray-200 pl-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-700 truncate max-w-32">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-xs text-gray-500 truncate max-w-32">{user?.email}</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                {user?.firstName?.[0]}{user?.lastName?.[0]}
-              </div>
-            </div>
-
-            {/* Mobile User Avatar */}
-            <div className="md:hidden w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+            {/* User Avatar */}
+            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
               {user?.firstName?.[0]}{user?.lastName?.[0]}
             </div>
           </div>

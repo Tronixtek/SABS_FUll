@@ -37,6 +37,7 @@ const Attendance = () => {
   const [attendance, setAttendance] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(null);
   const [stats, setStats] = useState({
     total: 0,
     present: 0,
@@ -60,6 +61,18 @@ const Attendance = () => {
     fetchAttendance();
   }, [filters]);
 
+  // Auto-refresh attendance data every 30 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (!document.hidden) {
+        // Only fetch when page is visible
+        fetchAttendance();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [filters]); // Re-create interval when filters change
+
   const fetchFacilities = async () => {
     try {
       const response = await axios.get('/api/facilities');
@@ -76,6 +89,7 @@ const Attendance = () => {
       const response = await axios.get(`/api/attendance?${params}`);
       setAttendance(response.data.data);
       calculateStats(response.data.data);
+      setLastUpdate(new Date());
     } catch (error) {
       toast.error('Failed to fetch attendance records');
     } finally {
@@ -232,6 +246,12 @@ const Attendance = () => {
             Attendance Records
           </h1>
           <p className="text-gray-600 mt-1">Monitor daily attendance and track employee presence</p>
+          {lastUpdate && (
+            <p className="text-xs text-gray-500 mt-1">
+              <Activity className="w-3 h-3 inline mr-1" />
+              Last updated: {format(lastUpdate, 'HH:mm:ss')} • Auto-refreshes every 30s
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <button

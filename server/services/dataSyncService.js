@@ -697,16 +697,34 @@ class DataSyncService {
       if (!attendance) {
         attendanceLogger.info('📝 Creating new attendance record...');
         
-        attendance = new Attendance({
-          employee: employee._id,
-          facility: facility._id,
-          date: dateOnly,
-          shift: shift._id,
-          scheduledCheckIn: this.calculateScheduledTime(dateOnly, shift.startTime, facility.timezone),
-          scheduledCheckOut: this.calculateScheduledTime(dateOnly, shift.endTime, facility.timezone),
-          status: 'absent', // Default status, will be updated when check-in/out is recorded
-          deviceData: { raw: [], synced: true },
-        });
+        // Use findOneAndUpdate with upsert for atomic operation (prevents duplicate creation)
+        attendance = await Attendance.findOneAndUpdate(
+          {
+            employee: employee._id,
+            date: dateOnly,
+          },
+          {
+            $setOnInsert: {
+              employee: employee._id,
+              facility: facility._id,
+              date: dateOnly,
+              shift: shift._id,
+              scheduledCheckIn: this.calculateScheduledTime(dateOnly, shift.startTime, facility.timezone),
+              scheduledCheckOut: this.calculateScheduledTime(dateOnly, shift.endTime, facility.timezone),
+              status: 'absent',
+              deviceData: { raw: [], synced: true },
+              createdAt: new Date()
+            }
+          },
+          {
+            upsert: true,
+            new: true,
+            runValidators: true,
+            setDefaultsOnInsert: true
+          }
+        ).populate('shift');
+        
+        attendanceLogger.info(`✅ Attendance record created atomically (ID: ${attendance._id})`);
       } else {
         attendanceLogger.info(`📝 Updating existing attendance record (ID: ${attendance._id})`);
       }

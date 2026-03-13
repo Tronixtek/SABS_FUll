@@ -16,6 +16,7 @@ import {
   Mail,
   X
 } from 'lucide-react';
+import { downloadPDFReport, downloadExcelReport } from '../utils/mobileFileHandler';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -149,13 +150,23 @@ const Reports = () => {
 
       const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `payroll_report_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast.success('Payroll report exported successfully');
+      const filename = `payroll_report_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      
+      // Use mobile file handler for downloads
+      import('../utils/mobileFileHandler').then(({ downloadFileOnMobile }) => {
+        downloadFileOnMobile(blob, filename, 'text/csv');
+        toast.success('Payroll report exported successfully');
+      }).catch(error => {
+        console.error('Export error:', error);
+        // Fallback to standard download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.success('Payroll report exported successfully');
+      });
       return;
     }
 
@@ -213,13 +224,23 @@ const Reports = () => {
 
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report_${reportType}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-    toast.success('Report exported successfully');
+    const filename = reportType === 'payroll' 
+      ? `payroll_report_${format(new Date(), 'yyyy-MM-dd')}.csv`
+      : `report_${reportType}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    
+    // Use mobile file handler for downloads
+    import('../utils/mobileFileHandler').then(({ downloadFileOnMobile }) => {
+      downloadFileOnMobile(blob, filename, 'text/csv');
+    }).catch(error => {
+      console.error('Export error:', error);
+      // Fallback to standard download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
   };
 
   const exportToPDF = async () => {
@@ -229,7 +250,7 @@ const Reports = () => {
     }
 
     try {
-      toast.loading('Generating PDF report...');
+      const loadingToast = toast.loading('Generating PDF report...');
       
       // Handle payroll PDF export
       if (reportType === 'payroll') {
@@ -239,29 +260,13 @@ const Reports = () => {
           ...(filters.facility && { facility: filters.facility })
         });
 
-        const response = await fetch(`${API_URL}/api/reports/payroll-pdf?${params.toString()}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        const filename = `payroll-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+        await downloadPDFReport(
+          `${API_URL}/api/reports/payroll-pdf?${params.toString()}`,
+          filename
+        );
 
-        if (!response.ok) {
-          throw new Error('Failed to generate PDF');
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `payroll-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        
-        toast.dismiss();
-        toast.success('Payroll PDF report downloaded successfully!');
+        toast.dismiss(loadingToast);
         return;
       }
       
@@ -274,35 +279,14 @@ const Reports = () => {
         ...(filters.facility && { facility: filters.facility })
       });
 
-      // Make request to server-side PDF generation
-      const response = await fetch(`${API_URL}/api/reports/pdf?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // Add auth if needed
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
-
-      // Get the PDF blob
-      const blob = await response.blob();
+      const filename = `report_${reportType}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      await downloadPDFReport(
+        `${API_URL}/api/reports/pdf?${params.toString()}`,
+        filename
+      );
       
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `report_${reportType}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      
-      toast.dismiss();
-      toast.success('PDF report downloaded successfully!');
+      toast.dismiss(loadingToast);
     } catch (error) {
-      toast.dismiss();
       toast.error('Failed to generate PDF report');
       console.error('PDF export error:', error);
     }

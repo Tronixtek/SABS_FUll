@@ -14,7 +14,7 @@ exports.getAttendance = async (req, res) => {
       endDate,
       status,
       page = 1,
-      limit = 50
+      limit = 1000
     } = req.query;
     
     const query = {};

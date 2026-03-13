@@ -65,6 +65,9 @@ const Login = () => {
               onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="Enter your username or email"
+              autoComplete="username"
+              autoCapitalize="none"
+              inputMode="text"
             />
           </div>
 
@@ -78,6 +81,8 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="Enter your password"
+                autoComplete="current-password"
+                inputMode="text"
               />
               <button
                 type="button"
