@@ -2663,6 +2663,16 @@ exports.generateMonthlyReportPDF = async (options) => {
       const expectedWorkingDays = Math.floor(workingDaysPerWeek * weeksInPeriod);
       return total + (shiftHours * expectedWorkingDays);
     }, 0);
+
+    const avgWorkingDaysPerWeek = employeesWithShifts.length > 0
+      ? Math.round(
+          employeesWithShifts.reduce((sum, emp) => {
+            const days = emp.shift?.workingDays?.length;
+            return sum + (days && days > 0 ? days : 7);
+          }, 0) / employeesWithShifts.length
+        )
+      : 7;
+    const workingDaysInPeriod = Math.floor(daysInPeriod * (avgWorkingDaysPerWeek / 7));
     
     // Get facility name
     let facilityName = 'All Facilities';
@@ -2677,7 +2687,7 @@ exports.generateMonthlyReportPDF = async (options) => {
       records: finalRecords,
       totalWorkedHours: Math.round(totalWorkedHours * 100) / 100,
       expectedTotalHours: Math.round(expectedTotalHours * 100) / 100,
-      workingDays: Math.floor(daysInPeriod * (workingDaysPerWeek / 7))
+      workingDays: workingDaysInPeriod
     };
     
     // Generate PDF

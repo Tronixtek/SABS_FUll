@@ -48,6 +48,36 @@ const Reports = () => {
     facility: ''
   });
 
+  const resolveFacilityId = () => {
+    if (filters.facility) return filters.facility;
+    if (!reportData) return null;
+
+    const ids = new Set();
+    const addId = (facility) => {
+      if (facility && facility._id) ids.add(String(facility._id));
+    };
+
+    if (reportType === 'payroll') {
+      (reportData.payrolls || []).forEach((payroll) => {
+        addId(payroll.facility);
+        // Fallback: facility may be on employee in some responses
+        addId(payroll.employee?.facility);
+      });
+    } else {
+      (reportData.records || []).forEach((record) => {
+        addId(record.facility);
+      });
+    }
+
+    return ids.size === 1 ? Array.from(ids)[0] : null;
+  };
+
+  const resolveFacilityName = () => {
+    const facilityId = resolveFacilityId();
+    if (!facilityId) return 'Not selected';
+    return facilities.find(f => f._id === facilityId)?.name || 'Not selected';
+  };
+
   useEffect(() => {
     fetchFacilities();
     fetchUsers();
@@ -315,7 +345,8 @@ const Reports = () => {
         return;
       }
 
-      if (!filters.facility) {
+      const facilityId = resolveFacilityId();
+      if (!facilityId) {
         toast.error('Please select a facility before sending email');
         return;
       }
@@ -323,7 +354,7 @@ const Reports = () => {
       setSendingEmail(true);
       
       const payload = {
-        facilityId: filters.facility,
+        facilityId,
         startDate: reportType === 'daily' ? filters.date : filters.startDate,
         endDate: reportType === 'daily' ? filters.date : filters.endDate,
         recipients: emailRecipients.map(r => r._id),
@@ -1160,7 +1191,7 @@ const Reports = () => {
                 <h4 className="text-sm font-medium text-gray-800 mb-2">Report Details</h4>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p><strong>Type:</strong> {reportType.charAt(0).toUpperCase() + reportType.slice(1)}</p>
-                  <p><strong>Facility:</strong> {facilities.find(f => f._id === filters.facility)?.name || 'Not selected'}</p>
+                  <p><strong>Facility:</strong> {resolveFacilityName()}</p>
                   {reportType === 'daily' && (
                     <p><strong>Date:</strong> {format(new Date(filters.date), 'MMM dd, yyyy')}</p>
                   )}
