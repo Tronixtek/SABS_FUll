@@ -1,22 +1,99 @@
 const nodemailer = require('nodemailer');
+const Settings = require('../models/Settings');
 
-// Normalize SMTP settings (support SMTP_PASSWORD or SMTP_PASS, strip whitespace)
-const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-const smtpUser = process.env.SMTP_USER;
-const smtpPasswordRaw = process.env.SMTP_PASSWORD || process.env.SMTP_PASS;
-const smtpPassword = smtpPasswordRaw ? String(smtpPasswordRaw).replace(/\s+/g, '') : undefined;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedTransporter = null;
+let cachedSignature = null;
+let cachedFrom = null;
+let cachedAt = 0;
 
-// Create email transporter
-const transporter = nodemailer.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpPort === 465, // true for 465, false for other ports
-  auth: {
-    user: smtpUser,
-    pass: smtpPassword
+const normalizeValue = (value) => {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizePassword = (value) => {
+  if (value === undefined || value === null) return null;
+  // App passwords are often formatted with spaces; strip all whitespace.
+  return String(value).replace(/\s+/g, '');
+};
+
+const loadSettingsConfig = async () => {
+  try {
+    const keys = ['smtpHost', 'smtpPort', 'smtpUser', 'smtpPassword', 'fromEmail'];
+    const settings = await Settings.find({ key: { $in: keys } }).lean();
+    const map = new Map(settings.map(s => [s.key, s.value]));
+    return {
+      host: normalizeValue(map.get('smtpHost')),
+      port: normalizeValue(map.get('smtpPort')),
+      user: normalizeValue(map.get('smtpUser')),
+      pass: normalizePassword(map.get('smtpPassword')),
+      from: normalizeValue(map.get('fromEmail'))
+    };
+  } catch (error) {
+    // DB may be unavailable; fallback to env
+    return null;
   }
-});
+};
+
+const getEffectiveConfig = async () => {
+  const envHost = normalizeValue(process.env.SMTP_HOST) || 'smtp.gmail.com';
+  const envPort = normalizeValue(process.env.SMTP_PORT) || '587';
+  const envUser = normalizeValue(process.env.SMTP_USER);
+  const envPass = normalizePassword(process.env.SMTP_PASSWORD)
+    || normalizePassword(process.env.SMTP_PASS);
+  const envFrom = normalizeValue(process.env.FROM_EMAIL);
+
+  const settings = await loadSettingsConfig();
+
+  const host = settings?.host || envHost;
+  const port = settings?.port || envPort;
+  const user = settings?.user || envUser;
+  const pass = settings?.pass || envPass;
+  const from = settings?.from || envFrom || user;
+
+  if (!host || !user || !pass) {
+    return null;
+  }
+
+  return {
+    host,
+    port: parseInt(port, 10),
+    user,
+    pass,
+    from
+  };
+};
+
+const getTransporter = async () => {
+  const config = await getEffectiveConfig();
+  if (!config) {
+    throw new Error('Email configuration is incomplete');
+  }
+
+  const signature = `${config.host}|${config.port}|${config.user}|${config.pass}|${config.from}`;
+  const now = Date.now();
+
+  if (cachedTransporter && cachedSignature === signature && (now - cachedAt) < CACHE_TTL_MS) {
+    return { transporter: cachedTransporter, from: cachedFrom };
+  }
+
+  cachedTransporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.port === 465, // true for 465, false for other ports
+    auth: {
+      user: config.user,
+      pass: config.pass
+    }
+  });
+  cachedSignature = signature;
+  cachedFrom = config.from;
+  cachedAt = now;
+
+  return { transporter: cachedTransporter, from: cachedFrom };
+};
 
 /**
  * Send report email with PDF attachment
@@ -145,9 +222,11 @@ const sendReportEmail = async (options) => {
     // Generate filename
     const filename = `${reportType}-report-${facilityName.replace(/\s+/g, '-')}-${startDate}-to-${endDate}.pdf`;
 
+    const { transporter, from } = await getTransporter();
+
     // Send email
     const info = await transporter.sendMail({
-      from: `"Kano State PHCMB" <${process.env.FROM_EMAIL || smtpUser}>`,
+      from: `"Kano State PHCMB" <${from}>`,
       to: recipients.join(', '),
       subject: subject,
       html: htmlBody,
@@ -177,12 +256,13 @@ const sendReportEmail = async (options) => {
  */
 const verifyEmailConfig = async () => {
   try {
+    const { transporter } = await getTransporter();
     await transporter.verify();
     console.log('✓ Email service is ready');
     return true;
   } catch (error) {
     console.error('✗ Email service configuration error:', error.message);
-    console.log('Please check your SMTP settings in .env file');
+    console.log('Please check your SMTP settings in .env or Settings');
     return false;
   }
 };
