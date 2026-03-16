@@ -39,6 +39,7 @@ const Reports = () => {
   const [additionalEmails, setAdditionalEmails] = useState([]);
   const [emailInput, setEmailInput] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [reportFacilityId, setReportFacilityId] = useState('');
   const [filters, setFilters] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     startDate: format(new Date(), 'yyyy-MM-01'),
@@ -48,28 +49,62 @@ const Reports = () => {
     facility: ''
   });
 
+  const extractFacilityIdFromReportData = (data, type) => {
+    if (!data) return null;
+
+    const ids = new Set();
+    const addId = (value) => {
+      if (!value) return;
+      if (typeof value === 'string') {
+        ids.add(value);
+        return;
+      }
+      if (typeof value === 'object') {
+        if (value._id) {
+          ids.add(String(value._id));
+          return;
+        }
+        if (value.id) {
+          ids.add(String(value.id));
+          return;
+        }
+        if (value.facilityId) {
+          addId(value.facilityId);
+        }
+      }
+    };
+
+    const addRecordFacility = (record) => {
+      if (!record) return;
+      addId(record.facility);
+      addId(record.facilityId);
+      addId(record.employee?.facility);
+      addId(record.employee?.facilityId);
+    };
+
+    addId(data.facility);
+    addId(data.facilityId);
+
+    if (type === 'payroll') {
+      (data.payrolls || []).forEach(addRecordFacility);
+    } else {
+      (data.records || []).forEach(addRecordFacility);
+    }
+
+    (data.absentEmployees || []).forEach((employee) => {
+      addId(employee.facility);
+      addId(employee.facilityId);
+    });
+
+    return ids.size === 1 ? Array.from(ids)[0] : null;
+  };
+
   const resolveFacilityId = () => {
+    if (reportFacilityId) return reportFacilityId;
     if (filters.facility) return filters.facility;
     if (!reportData) return null;
 
-    const ids = new Set();
-    const addId = (facility) => {
-      if (facility && facility._id) ids.add(String(facility._id));
-    };
-
-    if (reportType === 'payroll') {
-      (reportData.payrolls || []).forEach((payroll) => {
-        addId(payroll.facility);
-        // Fallback: facility may be on employee in some responses
-        addId(payroll.employee?.facility);
-      });
-    } else {
-      (reportData.records || []).forEach((record) => {
-        addId(record.facility);
-      });
-    }
-
-    return ids.size === 1 ? Array.from(ids)[0] : null;
+    return extractFacilityIdFromReportData(reportData, reportType);
   };
 
   const resolveFacilityName = () => {
@@ -104,6 +139,7 @@ const Reports = () => {
   const handleReportTypeChange = (newType) => {
     setReportType(newType);
     setReportData(null); // Clear existing report data
+    setReportFacilityId('');
   };
 
   const generateReport = async () => {
@@ -145,6 +181,8 @@ const Reports = () => {
 
       const response = await axios.get(endpoint, { params });
       setReportData(response.data.data);
+      const extractedFacilityId = extractFacilityIdFromReportData(response.data.data, reportType);
+      setReportFacilityId(params.facility || extractedFacilityId || '');
       toast.success('Report generated successfully');
     } catch (error) {
       toast.error('Failed to generate report');
@@ -152,6 +190,12 @@ const Reports = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!reportData || reportFacilityId) return;
+    const extractedFacilityId = extractFacilityIdFromReportData(reportData, reportType);
+    if (extractedFacilityId) setReportFacilityId(extractedFacilityId);
+  }, [reportData, reportType, reportFacilityId]);
 
   const exportToCSV = () => {
     // Handle payroll report CSV export
