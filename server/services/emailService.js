@@ -8,6 +8,18 @@ class EmailService {
     this.fromEmail = null;
   }
 
+  normalizeValue(value) {
+    if (value === undefined || value === null) return null;
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  normalizePassword(value) {
+    if (value === undefined || value === null) return null;
+    // App passwords are often formatted with spaces; strip all whitespace.
+    return String(value).replace(/\s+/g, '');
+  }
+
   async initializeTransporter() {
     try {
       // Get email settings from database
@@ -17,22 +29,30 @@ class EmailService {
       const smtpPassword = await Settings.findOne({ key: 'smtpPassword' });
       const fromEmail = await Settings.findOne({ key: 'fromEmail' });
 
-      if (!smtpHost || !smtpUser || !smtpPassword) {
+      const host = this.normalizeValue(smtpHost?.value) || this.normalizeValue(process.env.SMTP_HOST);
+      const portValue = this.normalizeValue(smtpPort?.value) || this.normalizeValue(process.env.SMTP_PORT);
+      const user = this.normalizeValue(smtpUser?.value) || this.normalizeValue(process.env.SMTP_USER);
+      const pass = this.normalizePassword(smtpPassword?.value)
+        || this.normalizePassword(process.env.SMTP_PASSWORD)
+        || this.normalizePassword(process.env.SMTP_PASS);
+      const from = this.normalizeValue(fromEmail?.value) || this.normalizeValue(process.env.FROM_EMAIL);
+
+      if (!host || !user || !pass) {
         syncLogger.warn('⚠️ Email settings not configured');
         return false;
       }
 
       this.transporter = nodemailer.createTransport({
-        host: smtpHost.value,
-        port: parseInt(smtpPort?.value || '587'),
-        secure: smtpPort?.value === '465', // true for 465, false for other ports
+        host,
+        port: parseInt(portValue || '587', 10),
+        secure: String(portValue) === '465', // true for 465, false for other ports
         auth: {
-          user: smtpUser.value,
-          pass: smtpPassword.value,
+          user,
+          pass,
         },
       });
 
-      this.fromEmail = fromEmail?.value || smtpUser.value;
+      this.fromEmail = from || user;
       
       // Verify connection
       await this.transporter.verify();

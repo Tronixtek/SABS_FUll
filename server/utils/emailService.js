@@ -1,13 +1,20 @@
 const nodemailer = require('nodemailer');
 
+// Normalize SMTP settings (support SMTP_PASSWORD or SMTP_PASS, strip whitespace)
+const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+const smtpUser = process.env.SMTP_USER;
+const smtpPasswordRaw = process.env.SMTP_PASSWORD || process.env.SMTP_PASS;
+const smtpPassword = smtpPasswordRaw ? String(smtpPasswordRaw).replace(/\s+/g, '') : undefined;
+
 // Create email transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: false, // true for 465, false for other ports
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpPort === 465, // true for 465, false for other ports
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD
+    user: smtpUser,
+    pass: smtpPassword
   }
 });
 
@@ -140,7 +147,7 @@ const sendReportEmail = async (options) => {
 
     // Send email
     const info = await transporter.sendMail({
-      from: `"Kano State PHCMB" <${process.env.SMTP_USER}>`,
+      from: `"Kano State PHCMB" <${process.env.FROM_EMAIL || smtpUser}>`,
       to: recipients.join(', '),
       subject: subject,
       html: htmlBody,
