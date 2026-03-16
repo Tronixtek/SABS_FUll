@@ -2857,12 +2857,63 @@ exports.generateMonthlyReportPDF = async (options) => {
   }
 };
 
+const generatePdfBufferFromExport = async (query) => {
+  return new Promise((resolve, reject) => {
+    const fakeReq = { query };
+    const fakeRes = {
+      headersSent: false,
+      setHeader: () => {},
+      status(code) {
+        this.statusCode = code;
+        return {
+          json: (obj) => {
+            const err = new Error(obj?.message || 'Failed to generate PDF');
+            err.status = code;
+            err.details = obj;
+            reject(err);
+          }
+        };
+      },
+      json(obj) {
+        const err = new Error(obj?.message || 'Failed to generate PDF');
+        err.status = 400;
+        err.details = obj;
+        reject(err);
+      },
+      send(data) {
+        this.headersSent = true;
+        resolve(Buffer.isBuffer(data) ? data : Buffer.from(data));
+      },
+      end() {
+        if (!this.headersSent) {
+          resolve(Buffer.alloc(0));
+        }
+      }
+    };
+
+    Promise.resolve(exports.generatePDFReport(fakeReq, fakeRes))
+      .catch(reject);
+  });
+};
+
 /**
  * Send report via email (on-demand)
  */
 exports.sendReportEmail = async (req, res) => {
   try {
-    const { facilityId, startDate, endDate, recipients, additionalEmails } = req.body;
+    const {
+      facilityId,
+      startDate,
+      endDate,
+      recipients,
+      additionalEmails,
+      type,
+      reportType,
+      summaryType,
+      date,
+      month,
+      year
+    } = req.body;
     
     if (!facilityId || !startDate || !endDate) {
       return res.status(400).json({
@@ -2907,12 +2958,42 @@ exports.sendReportEmail = async (req, res) => {
       });
     }
     
-    // Generate PDF
-    const pdfBuffer = await exports.generateMonthlyReportPDF({
-      facilityId,
-      startDate,
-      endDate
-    });
+    const resolvedType = type || reportType;
+
+    let pdfBuffer;
+    if (resolvedType) {
+      if (resolvedType === 'payroll') {
+        return res.status(400).json({
+          success: false,
+          message: 'Payroll report emails are not supported yet'
+        });
+      }
+
+      const query = {
+        type: resolvedType,
+        summaryType,
+        facility: facilityId
+      };
+
+      if (resolvedType === 'daily') {
+        query.date = date || startDate;
+      } else if (resolvedType === 'monthly') {
+        if (month) query.month = month;
+        if (year) query.year = year;
+      } else if (resolvedType === 'custom') {
+        query.startDate = startDate;
+        query.endDate = endDate;
+      }
+
+      pdfBuffer = await generatePdfBufferFromExport(query);
+    } else {
+      // Fallback to legacy behavior
+      pdfBuffer = await exports.generateMonthlyReportPDF({
+        facilityId,
+        startDate,
+        endDate
+      });
+    }
     
     // Send email
     const { sendReportEmail: sendEmail } = require('../utils/emailService');
@@ -2920,7 +3001,7 @@ exports.sendReportEmail = async (req, res) => {
     await sendEmail({
       recipients: emailAddresses,
       subject: `Attendance Report - ${facility.name}`,
-      reportType: 'custom',
+      reportType: resolvedType || 'custom',
       pdfBuffer,
       facilityName: facility.name,
       startDate: moment(startDate).format('MMM D, YYYY'),

@@ -340,6 +340,11 @@ const Reports = () => {
 
   const sendReportEmail = async () => {
     try {
+      if (reportType === 'payroll') {
+        toast.error('Email sending is not supported for payroll reports yet');
+        return;
+      }
+
       if (emailRecipients.length === 0 && additionalEmails.length === 0) {
         toast.error('Please select at least one recipient');
         return;
@@ -355,6 +360,12 @@ const Reports = () => {
       
       const payload = {
         facilityId,
+        type: reportType,
+        summaryType,
+        ...(reportType === 'daily' && { date: filters.date }),
+        ...(reportType === 'monthly' && { month: filters.month, year: filters.year }),
+        ...(reportType === 'custom' && { startDate: filters.startDate, endDate: filters.endDate }),
+        // Keep legacy fields for backward compatibility
         startDate: reportType === 'daily' ? filters.date : filters.startDate,
         endDate: reportType === 'daily' ? filters.date : filters.endDate,
         recipients: emailRecipients.map(r => r._id),
