@@ -2914,11 +2914,22 @@ exports.sendReportEmail = async (req, res) => {
       month,
       year
     } = req.body;
+
+    const resolvedType = type || reportType;
+
+    if (!resolvedType) {
+      if (!facilityId || !startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Facility, start date, and end date are required'
+        });
+      }
+    }
     
-    if (!facilityId || !startDate || !endDate) {
+    if (resolvedType === 'custom' && (!startDate || !endDate)) {
       return res.status(400).json({
         success: false,
-        message: 'Facility, start date, and end date are required'
+        message: 'Start date and end date are required for custom reports'
       });
     }
     
@@ -2930,13 +2941,18 @@ exports.sendReportEmail = async (req, res) => {
       });
     }
     
-    // Get facility details
-    const facility = await Facility.findById(facilityId);
-    if (!facility) {
-      return res.status(404).json({
-        success: false,
-        message: 'Facility not found'
-      });
+    // Get facility details (optional for all-facilities reports)
+    let facility = null;
+    let facilityName = 'All Facilities';
+    if (facilityId) {
+      facility = await Facility.findById(facilityId);
+      if (!facility) {
+        return res.status(404).json({
+          success: false,
+          message: 'Facility not found'
+        });
+      }
+      facilityName = facility.name;
     }
     
     // Get recipient emails
@@ -2958,8 +2974,6 @@ exports.sendReportEmail = async (req, res) => {
       });
     }
     
-    const resolvedType = type || reportType;
-
     let pdfBuffer;
     if (resolvedType) {
       if (resolvedType === 'payroll') {
@@ -2971,9 +2985,10 @@ exports.sendReportEmail = async (req, res) => {
 
       const query = {
         type: resolvedType,
-        summaryType,
-        facility: facilityId
+        summaryType
       };
+
+      if (facilityId) query.facility = facilityId;
 
       if (resolvedType === 'daily') {
         query.date = date || startDate;
@@ -2994,18 +3009,31 @@ exports.sendReportEmail = async (req, res) => {
         endDate
       });
     }
+
+    let resolvedStartDate = startDate;
+    let resolvedEndDate = endDate;
+    if (resolvedType === 'daily') {
+      const day = date || startDate || new Date();
+      resolvedStartDate = moment(day).startOf('day').toDate();
+      resolvedEndDate = moment(day).endOf('day').toDate();
+    } else if (resolvedType === 'monthly') {
+      const reportMonth = month || moment().month() + 1;
+      const reportYear = year || moment().year();
+      resolvedStartDate = moment(`${reportYear}-${reportMonth}-01`).startOf('month').toDate();
+      resolvedEndDate = moment(`${reportYear}-${reportMonth}-01`).endOf('month').toDate();
+    }
     
     // Send email
     const { sendReportEmail: sendEmail } = require('../utils/emailService');
     
     await sendEmail({
       recipients: emailAddresses,
-      subject: `Attendance Report - ${facility.name}`,
+      subject: `Attendance Report - ${facilityName}`,
       reportType: resolvedType || 'custom',
       pdfBuffer,
-      facilityName: facility.name,
-      startDate: moment(startDate).format('MMM D, YYYY'),
-      endDate: moment(endDate).format('MMM D, YYYY')
+      facilityName,
+      startDate: resolvedStartDate ? moment(resolvedStartDate).format('MMM D, YYYY') : 'N/A',
+      endDate: resolvedEndDate ? moment(resolvedEndDate).format('MMM D, YYYY') : 'N/A'
     });
     
     res.json({

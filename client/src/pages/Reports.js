@@ -109,7 +109,10 @@ const Reports = () => {
 
   const resolveFacilityName = () => {
     const facilityId = resolveFacilityId();
-    if (!facilityId) return 'Not selected';
+    if (!facilityId) {
+      if (reportData && !filters.facility) return 'All Facilities';
+      return 'Not selected';
+    }
     return facilities.find(f => f._id === facilityId)?.name || 'Not selected';
   };
 
@@ -395,15 +398,11 @@ const Reports = () => {
       }
 
       const facilityId = resolveFacilityId();
-      if (!facilityId) {
-        toast.error('Please select a facility before sending email');
-        return;
-      }
 
       setSendingEmail(true);
       
       const payload = {
-        facilityId,
+        ...(facilityId && { facilityId }),
         type: reportType,
         summaryType,
         ...(reportType === 'daily' && { date: filters.date }),
