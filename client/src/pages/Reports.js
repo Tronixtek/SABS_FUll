@@ -65,7 +65,7 @@ const Reports = () => {
   const fetchUsers = async () => {
     try {
       const response = await axios.get('/api/auth/users');
-      setUsers(response.data);
+      setUsers(response.data?.data || []);
     } catch (error) {
       console.error('Failed to fetch users');
     }
@@ -1104,7 +1104,10 @@ const Reports = () => {
                             className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                           />
                           <span className="text-sm text-gray-700">
-                            {user.name} ({user.email})
+                            {user.firstName || user.lastName
+                              ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                              : (user.username || 'User')
+                            } ({user.email})
                           </span>
                         </label>
                       ))}
